@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: adalt_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: adalt
+      POSTGRES_PASSWORD: adalt_dev
+      POSTGRES_DB: adalt_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adalt -d adalt_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: adalt_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  maildev:
+    image: maildev/maildev:latest
+    container_name: adalt_maildev
+    restart: unless-stopped
+    ports:
+      - "1080:1080"  # Web UI
+      - "1025:1025"  # SMTP
+    environment:
+      MAILDEV_SMTP_PORT: "1025"
+      MAILDEV_WEB_PORT: "1080"
+
+volumes:
+  postgres_data:
+  redis_data:

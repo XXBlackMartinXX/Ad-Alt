@@ -1,0 +1,83 @@
+{
+  "name": "ad-alt",
+  "displayName": "Ad-Alt",
+  "description": "Earn from your AI coding wait-states. Privacy-first, opt-in sponsored moments.",
+  "version": "0.1.0",
+  "publisher": "ad-alt",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ad-alt.enable",
+        "title": "Ad-Alt: Enable sponsored moments"
+      },
+      {
+        "command": "ad-alt.disable",
+        "title": "Ad-Alt: Disable sponsored moments"
+      },
+      {
+        "command": "ad-alt.signIn",
+        "title": "Ad-Alt: Sign in"
+      },
+      {
+        "command": "ad-alt.signOut",
+        "title": "Ad-Alt: Sign out"
+      },
+      {
+        "command": "ad-alt.showEarnings",
+        "title": "Ad-Alt: View earnings"
+      }
+    ],
+    "configuration": {
+      "title": "Ad-Alt",
+      "properties": {
+        "ad-alt.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Ad-Alt sponsored moments during AI wait-states (requires explicit opt-in)"
+        },
+        "ad-alt.displaySurface": {
+          "type": "string",
+          "enum": ["status_bar"],
+          "default": "status_bar",
+          "description": "Where to display sponsored moments"
+        },
+        "ad-alt.adapter": {
+          "type": "string",
+          "enum": ["ai_status_bar", "mock"],
+          "default": "ai_status_bar",
+          "description": "Wait-state detection method"
+        },
+        "ad-alt.apiUrl": {
+          "type": "string",
+          "default": "https://api.adalt.dev",
+          "description": "Ad-Alt API URL (for development use)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "watch": "npm run compile -- --watch",
+    "build": "npm run compile -- --minify",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "package": "vsce package --no-dependencies",
+    "clean": "rm -rf dist *.vsix"
+  },
+  "dependencies": {
+    "@ad-alt/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^2.31.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

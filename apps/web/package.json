@@ -1,0 +1,29 @@
+{
+  "name": "@ad-alt/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "test:unit": "vitest run",
+    "clean": "rm -rf .next out"
+  },
+  "dependencies": {
+    "@ad-alt/shared": "workspace:*",
+    "next": "^14.2.0",
+    "next-auth": "^5.0.0-beta.19",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
