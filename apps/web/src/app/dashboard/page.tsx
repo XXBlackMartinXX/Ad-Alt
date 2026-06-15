@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard — Ad-Alt",
+  title: "Dashboard — PromptProfit",
 };
 
 // In production this would fetch real data from the API via a server component
@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     <main className="max-w-5xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <Link href="/" className="text-sm text-gray-500 hover:text-white mb-2 block">← Ad-Alt</Link>
+          <Link href="/" className="text-sm text-gray-500 hover:text-white mb-2 block">← PromptProfit</Link>
           <h1 className="text-3xl font-bold">Developer Dashboard</h1>
         </div>
         <div className="flex gap-3">
@@ -53,10 +53,10 @@ export default async function DashboardPage() {
             <div>
               <p className="font-semibold mb-1">You haven&apos;t opted in yet</p>
               <p className="text-gray-400 text-sm mb-3">
-                Install the VS Code extension and run &quot;Ad-Alt: Enable&quot; to start earning.
+                Install the VS Code extension and run &quot;PromptProfit: Enable&quot; to start earning.
               </p>
               <a
-                href="vscode:extension/ad-alt.ad-alt"
+                href="vscode:extension/promptprofit.promptprofit"
                 className="btn-primary text-sm inline-block"
               >
                 Install VS Code Extension

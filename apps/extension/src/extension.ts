@@ -8,11 +8,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await controller.initialize();
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("ad-alt.enable", () => controller?.enable()),
-    vscode.commands.registerCommand("ad-alt.disable", () => controller?.disable()),
-    vscode.commands.registerCommand("ad-alt.signIn", () => controller?.signIn()),
-    vscode.commands.registerCommand("ad-alt.signOut", () => controller?.signOut()),
-    vscode.commands.registerCommand("ad-alt.showEarnings", () => controller?.showEarnings()),
+    vscode.commands.registerCommand("promptprofit.enable", () => controller?.enable()),
+    vscode.commands.registerCommand("promptprofit.disable", () => controller?.disable()),
+    vscode.commands.registerCommand("promptprofit.signIn", () => controller?.signIn()),
+    vscode.commands.registerCommand("promptprofit.signOut", () => controller?.signOut()),
+    vscode.commands.registerCommand("promptprofit.showEarnings", () => controller?.showEarnings()),
   );
 }
 

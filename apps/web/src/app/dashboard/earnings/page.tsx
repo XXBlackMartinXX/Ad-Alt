@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Earnings Ledger — Ad-Alt",
+  title: "Earnings Ledger — PromptProfit",
 };
 
 // Stub data — production version fetches from API

@@ -16,7 +16,7 @@ import type {
 } from "@ad-alt/shared";
 import { FraudScorer } from "@ad-alt/fraud";
 import { LedgerService } from "./ledger.service.js";
-import { dedupCheck } from "../redis.js";
+import { dedupCheck, getRedis } from "../redis.js";
 import { logger } from "../middleware/logging.js";
 
 type ProcessResult = { isDuplicate: boolean; fraudDecision?: string };
@@ -135,11 +135,16 @@ export class EventProcessor {
     event: ViewabilityEvent,
     userId: string,
   ): Promise<ProcessResult> {
+    // Read hourly impression counter from Redis for fraud rate-limit signal
+    const redis = getRedis();
+    const hourKey = `impressions:${event.deviceId}:${Math.floor(Date.now() / 3_600_000)}`;
+    const impressionsInLastHour = parseInt((await redis.get(hourKey)) ?? "0", 10);
+
     const fraudCtx = {
       deviceId: event.deviceId,
       userId,
       sessionId: event.sessionId,
-      impressionsInLastHour: 0, // TODO: populate from a Redis counter in a future iteration
+      impressionsInLastHour,
       deviceIsBlocked: false,
       deviceFraudScore: 0,
       displayedDurationMs: event.displayedDurationMs,
@@ -148,6 +153,8 @@ export class EventProcessor {
 
     const fraudResult = fraudScorer.scoreViewability(fraudCtx);
 
+    // Only update impressions in "rendered" state — enforces the lifecycle invariant:
+    // requested → rendered → viewability_threshold_met → billable/viewable/fraud_blocked
     if (fraudResult.decision === "block") {
       await db
         .update(impressionEvents)
@@ -157,7 +164,13 @@ export class EventProcessor {
           fraudSignals: fraudResult.signals as unknown as Record<string, unknown>[],
           updatedAt: new Date(),
         })
-        .where(eq(impressionEvents.adDecisionId, event.adDecisionId));
+        .where(
+          and(
+            eq(impressionEvents.adDecisionId, event.adDecisionId),
+            eq(impressionEvents.userId, userId),
+            eq(impressionEvents.status, "rendered"),
+          ),
+        );
 
       logger.warn({
         adDecisionId: event.adDecisionId,
@@ -185,12 +198,28 @@ export class EventProcessor {
         and(
           eq(impressionEvents.adDecisionId, event.adDecisionId),
           eq(impressionEvents.userId, userId),
+          eq(impressionEvents.status, "rendered"),
         ),
       )
       .returning();
 
+    if (!impression) {
+      // Impression not in "rendered" state — lifecycle invariant violated; silently drop
+      logger.warn({
+        adDecisionId: event.adDecisionId,
+        msg: "viewability_without_rendered_impression",
+      });
+      return { isDuplicate: false, fraudDecision: "invalid_state" };
+    }
+
+    // Increment hourly counter only for impressions that passed fraud scoring
+    const pipeline = redis.pipeline();
+    pipeline.incr(hourKey);
+    pipeline.expire(hourKey, 3600, "NX");
+    await pipeline.exec();
+
     // If billable, create ledger entries
-    if (fraudResult.decision === "pass" && impression) {
+    if (fraudResult.decision === "pass") {
       await ledgerService.recordImpression(
         impression.id,
         impression.campaignId,
@@ -220,11 +249,15 @@ export class EventProcessor {
     const hasValidPriorImpression =
       impression?.status === "billable" || impression?.status === "reconciled";
 
+    const redis = getRedis();
+    const hourKey = `impressions:${event.deviceId}:${Math.floor(Date.now() / 3_600_000)}`;
+    const impressionsInLastHour = parseInt((await redis.get(hourKey)) ?? "0", 10);
+
     const fraudResult = fraudScorer.scoreClick({
       deviceId: event.deviceId,
       userId,
       sessionId: event.sessionId,
-      impressionsInLastHour: 0,
+      impressionsInLastHour,
       deviceIsBlocked: false,
       deviceFraudScore: 0,
       hasValidPriorImpression,

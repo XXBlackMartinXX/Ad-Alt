@@ -2,7 +2,7 @@
   "name": "ad-alt",
   "version": "0.0.1",
   "private": true,
-  "description": "Ad-Alt — Developer wait-state monetization platform",
+  "description": "PromptProfit — Developer wait-state monetization platform",
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"

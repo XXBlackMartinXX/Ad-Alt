@@ -1,9 +1,9 @@
 {
-  "name": "ad-alt",
-  "displayName": "Ad-Alt",
+  "name": "promptprofit",
+  "displayName": "PromptProfit",
   "description": "Earn from your AI coding wait-states. Privacy-first, opt-in sponsored moments.",
   "version": "0.1.0",
-  "publisher": "ad-alt",
+  "publisher": "promptprofit",
   "private": true,
   "engines": { "vscode": "^1.90.0" },
   "categories": ["Other"],
@@ -12,50 +12,50 @@
   "contributes": {
     "commands": [
       {
-        "command": "ad-alt.enable",
-        "title": "Ad-Alt: Enable sponsored moments"
+        "command": "promptprofit.enable",
+        "title": "PromptProfit: Enable sponsored moments"
       },
       {
-        "command": "ad-alt.disable",
-        "title": "Ad-Alt: Disable sponsored moments"
+        "command": "promptprofit.disable",
+        "title": "PromptProfit: Disable sponsored moments"
       },
       {
-        "command": "ad-alt.signIn",
-        "title": "Ad-Alt: Sign in"
+        "command": "promptprofit.signIn",
+        "title": "PromptProfit: Sign in"
       },
       {
-        "command": "ad-alt.signOut",
-        "title": "Ad-Alt: Sign out"
+        "command": "promptprofit.signOut",
+        "title": "PromptProfit: Sign out"
       },
       {
-        "command": "ad-alt.showEarnings",
-        "title": "Ad-Alt: View earnings"
+        "command": "promptprofit.showEarnings",
+        "title": "PromptProfit: View earnings"
       }
     ],
     "configuration": {
-      "title": "Ad-Alt",
+      "title": "PromptProfit",
       "properties": {
-        "ad-alt.enabled": {
+        "promptprofit.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable Ad-Alt sponsored moments during AI wait-states (requires explicit opt-in)"
+          "description": "Enable PromptProfit sponsored moments during AI wait-states (requires explicit opt-in)"
         },
-        "ad-alt.displaySurface": {
+        "promptprofit.displaySurface": {
           "type": "string",
           "enum": ["status_bar"],
           "default": "status_bar",
           "description": "Where to display sponsored moments"
         },
-        "ad-alt.adapter": {
+        "promptprofit.adapter": {
           "type": "string",
           "enum": ["ai_status_bar", "mock"],
           "default": "ai_status_bar",
           "description": "Wait-state detection method"
         },
-        "ad-alt.apiUrl": {
+        "promptprofit.apiUrl": {
           "type": "string",
-          "default": "https://api.adalt.dev",
-          "description": "Ad-Alt API URL (for development use)"
+          "default": "https://api.promptprofit.dev",
+          "description": "PromptProfit API URL (for development use)"
         }
       }
     }

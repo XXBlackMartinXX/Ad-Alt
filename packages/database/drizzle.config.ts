@@ -7,6 +7,6 @@ export default {
   dbCredentials: {
     url:
       process.env["DATABASE_URL"] ??
-      "postgresql://adalt:adalt_dev@localhost:5432/adalt_dev",
+      "postgresql://promptprofit:promptprofit_dev@localhost:5432/promptprofit_dev",
   },
 } satisfies Config;

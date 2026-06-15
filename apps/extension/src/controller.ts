@@ -9,15 +9,15 @@ import { getOrCreateDeviceId } from "./device-id";
 import type { IWaitStateAdapter, WaitStateEvent } from "./adapters/types";
 
 const EXTENSION_VERSION = "0.1.0";
-const API_KEY_SECRET = "ad-alt.apiKey";
-const FLAGS_CACHE_KEY = "ad-alt.flagsCache";
+const API_KEY_SECRET = "promptprofit.apiKey";
+const FLAGS_CACHE_KEY = "promptprofit.flagsCache";
 const FLAGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const CONSENT_TEXT =
-  `Ad-Alt will show one sponsored text line in your status bar while your AI coding assistant is thinking.\n\n` +
+  `PromptProfit will show one sponsored text line in your status bar while your AI coding assistant is thinking.\n\n` +
   `What we collect: An anonymous device ID, timing of AI wait-states, and whether you view or click an ad.\n\n` +
   `What we NEVER collect: Your source code, file names, project structure, AI prompts, AI responses, or any workspace data.\n\n` +
-  `You can disable this at any time via the Command Palette → "Ad-Alt: Disable".`;
+  `You can disable this at any time via the Command Palette → "PromptProfit: Disable".`;
 
 type FlagsCache = {
   flags: {
@@ -38,6 +38,7 @@ export class AdAltController {
   private sequenceNumber = 0;
   private disposables: vscode.Disposable[] = [];
   private currentAdDecisionId: string | undefined;
+  private currentCreativeId: string | undefined;
   private viewabilityTimer: NodeJS.Timeout | undefined;
   private isKillSwitched = false;
 
@@ -48,8 +49,8 @@ export class AdAltController {
   // ---------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
-    const config = vscode.workspace.getConfiguration("ad-alt");
-    const apiUrl = config.get<string>("apiUrl") ?? "https://api.adalt.dev";
+    const config = vscode.workspace.getConfiguration("promptprofit");
+    const apiUrl = config.get<string>("apiUrl") ?? "https://api.promptprofit.dev";
 
     this.deviceId = await getOrCreateDeviceId(this.context);
     const apiKey = await this.context.secrets.get(API_KEY_SECRET);
@@ -63,9 +64,12 @@ export class AdAltController {
 
     // Register the internal click-handler command
     this.context.subscriptions.push(
-      vscode.commands.registerCommand("ad-alt._handleAdClick", (decisionId: string) => {
-        void this.handleAdClick(decisionId);
-      }),
+      vscode.commands.registerCommand(
+        "promptprofit._handleAdClick",
+        (decisionId: string, creativeId: string) => {
+          void this.handleAdClick(decisionId, creativeId);
+        },
+      ),
     );
 
     // Fetch feature flags (fails safely)
@@ -73,7 +77,7 @@ export class AdAltController {
 
     if (this.isKillSwitched) {
       void vscode.window.showInformationMessage(
-        "Ad-Alt is temporarily unavailable. Please check for updates.",
+        "PromptProfit is temporarily unavailable. Please check for updates.",
       );
       return;
     }
@@ -90,16 +94,16 @@ export class AdAltController {
     const choice = await vscode.window.showInformationMessage(
       CONSENT_TEXT,
       { modal: true },
-      "Enable Ad-Alt",
+      "Enable PromptProfit",
       "Cancel",
     );
 
-    if (choice !== "Enable Ad-Alt") return;
+    if (choice !== "Enable PromptProfit") return;
 
     const apiKey = await this.context.secrets.get(API_KEY_SECRET);
     if (!apiKey) {
       const signIn = await vscode.window.showInformationMessage(
-        "You need to sign in first to enable Ad-Alt.",
+        "You need to sign in first to enable PromptProfit.",
         "Sign In",
       );
       if (signIn === "Sign In") await this.signIn();
@@ -107,38 +111,38 @@ export class AdAltController {
     }
 
     await vscode.workspace
-      .getConfiguration("ad-alt")
+      .getConfiguration("promptprofit")
       .update("enabled", true, vscode.ConfigurationTarget.Global);
     this.startAdapter();
     void vscode.window.showInformationMessage(
-      "Ad-Alt enabled. You'll see sponsored moments during AI wait-states.",
+      "PromptProfit enabled. You'll see sponsored moments during AI wait-states.",
     );
   }
 
   async disable(): Promise<void> {
     await vscode.workspace
-      .getConfiguration("ad-alt")
+      .getConfiguration("promptprofit")
       .update("enabled", false, vscode.ConfigurationTarget.Global);
     this.stopAdapter();
     this.statusBar.hide();
     void vscode.window.showInformationMessage(
-      "Ad-Alt disabled. No sponsored moments will be shown.",
+      "PromptProfit disabled. No sponsored moments will be shown.",
     );
   }
 
   async signIn(): Promise<void> {
-    const config = vscode.workspace.getConfiguration("ad-alt");
-    const rawApiUrl = config.get<string>("apiUrl") ?? "https://api.adalt.dev";
-    // Convert e.g. https://api.adalt.dev → https://adalt.dev
+    const config = vscode.workspace.getConfiguration("promptprofit");
+    const rawApiUrl = config.get<string>("apiUrl") ?? "https://api.promptprofit.dev";
+    // Convert e.g. https://api.promptprofit.dev → https://promptprofit.dev
     const dashboardBase = rawApiUrl.replace(/^https?:\/\/api\./, "https://");
     const dashboardUrl = `${dashboardBase}/dashboard/api-key`;
 
     await vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
 
     const key = await vscode.window.showInputBox({
-      prompt: "Paste your Ad-Alt API key from the dashboard",
+      prompt: "Paste your PromptProfit API key from the dashboard",
       password: true,
-      placeHolder: "aak_...",
+      placeHolder: "ppk_...",
       validateInput: (v) => (v.length < 10 ? "Key looks too short" : undefined),
     });
 
@@ -147,7 +151,7 @@ export class AdAltController {
     await this.context.secrets.store(API_KEY_SECRET, key);
     this.apiClient.setApiKey(key);
     void vscode.window.showInformationMessage(
-      "Signed in to Ad-Alt! Run 'Ad-Alt: Enable' to start earning.",
+      "Signed in to PromptProfit! Run 'PromptProfit: Enable' to start earning.",
     );
   }
 
@@ -155,12 +159,12 @@ export class AdAltController {
     await this.context.secrets.delete(API_KEY_SECRET);
     this.stopAdapter();
     this.statusBar.showSignedOut();
-    void vscode.window.showInformationMessage("Signed out of Ad-Alt.");
+    void vscode.window.showInformationMessage("Signed out of PromptProfit.");
   }
 
   showEarnings(): void {
-    const config = vscode.workspace.getConfiguration("ad-alt");
-    const rawApiUrl = config.get<string>("apiUrl") ?? "https://api.adalt.dev";
+    const config = vscode.workspace.getConfiguration("promptprofit");
+    const rawApiUrl = config.get<string>("apiUrl") ?? "https://api.promptprofit.dev";
     const dashboardBase = rawApiUrl.replace(/^https?:\/\/api\./, "https://");
     const dashboardUrl = `${dashboardBase}/dashboard/earnings`;
     void vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
@@ -180,7 +184,7 @@ export class AdAltController {
     if (this.adapter) return;
     if (this.isKillSwitched) return;
 
-    const config = vscode.workspace.getConfiguration("ad-alt");
+    const config = vscode.workspace.getConfiguration("promptprofit");
     const adapterName = config.get<string>("adapter") ?? "ai_status_bar";
 
     this.adapter = adapterName === "mock" ? new MockAdapter() : new AiStatusBarAdapter();
@@ -219,6 +223,7 @@ export class AdAltController {
     if (!decision) return;
 
     this.currentAdDecisionId = decision.adDecisionId;
+    this.currentCreativeId = decision.creativeId;
 
     // Impression requested (privacy-safe: no code / file / prompt data)
     this.eventQueue.enqueue({
@@ -240,6 +245,7 @@ export class AdAltController {
       headline: decision.headline,
       displayUrl: decision.displayUrl,
       adDecisionId: decision.adDecisionId,
+      creativeId: decision.creativeId,
     });
 
     // Impression rendered
@@ -282,14 +288,15 @@ export class AdAltController {
     this.clearViewabilityTimer();
     this.statusBar.hide();
     this.currentAdDecisionId = undefined;
+    this.currentCreativeId = undefined;
   }
 
   // ---------------------------------------------------------------------------
   // Click handling
   // ---------------------------------------------------------------------------
 
-  private async handleAdClick(adDecisionId: string): Promise<void> {
-    const config = vscode.workspace.getConfiguration("ad-alt");
+  private async handleAdClick(adDecisionId: string, creativeId: string): Promise<void> {
+    const config = vscode.workspace.getConfiguration("promptprofit");
     const adapterName = config.get<string>("adapter") ?? "ai_status_bar";
 
     // Send click event BEFORE navigating
@@ -303,11 +310,11 @@ export class AdAltController {
       clientTimestamp: new Date().toISOString(),
       sequenceNumber: this.sequenceNumber++,
       adDecisionId,
-      // creativeId resolved server-side via adDecisionId
+      creativeId,
     });
 
     // Open via server-side redirect so raw destination URL is never exposed to client
-    const apiUrl = config.get<string>("apiUrl") ?? "https://api.adalt.dev";
+    const apiUrl = config.get<string>("apiUrl") ?? "https://api.promptprofit.dev";
     const clickUrl = `${apiUrl}/v1/ads/click/${adDecisionId}`;
     await vscode.env.openExternal(vscode.Uri.parse(clickUrl));
   }

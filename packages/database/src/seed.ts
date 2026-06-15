@@ -17,7 +17,7 @@ import * as schema from "./schema/index.js";
 
 const connectionString =
   process.env["DATABASE_URL"] ??
-  "postgresql://adalt:adalt_dev@localhost:5432/adalt_dev";
+  "postgresql://promptprofit:promptprofit_dev@localhost:5432/promptprofit_dev";
 
 const sql = postgres(connectionString, { max: 1 });
 const db = drizzle(sql, { schema });
@@ -32,8 +32,8 @@ async function seed(): Promise<void> {
   const [adminUser] = await db
     .insert(schema.users)
     .values({
-      email: "admin@ad-alt.dev",
-      name: "Ad-Alt Admin",
+      email: "admin@promptprofit.dev",
+      name: "PromptProfit Admin",
       role: "admin",
       emailVerified: new Date(),
     })
@@ -145,7 +145,7 @@ async function seed(): Promise<void> {
       headline: "Ship faster with Acme Dev Tools",
       body: "Autocomplete, linting, and AI assist — all in one extension.",
       displayUrl: "acme.example.com/devtools",
-      clickUrl: "https://acme.example.com/devtools?utm_source=ad-alt&utm_medium=vscode",
+      clickUrl: "https://acme.example.com/devtools?utm_source=promptprofit&utm_medium=vscode",
       impressionCount: 0,
       clickCount: 0,
     })

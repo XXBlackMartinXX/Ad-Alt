@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Ad-Alt",
-  description: "Ad-Alt privacy policy and telemetry specification. Exactly what we collect and what we never collect.",
+  title: "Privacy Policy — PromptProfit",
+  description: "PromptProfit privacy policy and telemetry specification. Exactly what we collect and what we never collect.",
 };
 
 export default function PrivacyPage() {
@@ -149,13 +149,13 @@ export default function PrivacyPage() {
               ledger entries may be retained for financial compliance.
             </p>
             <p>
-              <strong className="text-white">Opt out:</strong> Disable Ad-Alt at any time via
+              <strong className="text-white">Opt out:</strong> Disable PromptProfit at any time via
               the VS Code command palette. Disabling stops all event transmission immediately.
             </p>
             <p>
               To exercise any right, email{" "}
-              <a href="mailto:privacy@adalt.dev" className="text-indigo-400 hover:underline">
-                privacy@adalt.dev
+              <a href="mailto:privacy@promptprofit.dev" className="text-indigo-400 hover:underline">
+                privacy@promptprofit.dev
               </a>
             </p>
           </div>
@@ -165,8 +165,8 @@ export default function PrivacyPage() {
           <h2 className="text-2xl font-semibold mb-4">Contact</h2>
           <p className="text-gray-400 text-sm">
             Questions about this policy:{" "}
-            <a href="mailto:privacy@adalt.dev" className="text-indigo-400 hover:underline">
-              privacy@adalt.dev
+            <a href="mailto:privacy@promptprofit.dev" className="text-indigo-400 hover:underline">
+              privacy@promptprofit.dev
             </a>
           </p>
         </section>

@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
@@ -20,7 +19,7 @@ const nextConfig: NextConfig = {
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https:",
-            "connect-src 'self' https://api.adalt.dev",
+            "connect-src 'self' https://api.promptprofit.dev",
             "frame-ancestors 'none'",
           ].join("; "),
         },

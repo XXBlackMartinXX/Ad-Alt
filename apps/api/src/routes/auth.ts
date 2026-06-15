@@ -63,7 +63,7 @@ authRoutes.post(
       .where(eq(devices.deviceId, deviceId));
 
     // Generate a new API key
-    const rawKey = `adalt_${randomBytes(32).toString("hex")}`;
+    const rawKey = `ppft_${randomBytes(32).toString("hex")}`;
     const keyHash = createHash("sha256").update(rawKey).digest("hex");
 
     const [apiKey] = await db

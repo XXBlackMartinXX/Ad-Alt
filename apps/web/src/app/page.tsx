@@ -7,7 +7,7 @@ export default function HomePage() {
       <nav className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-indigo-400 font-bold text-xl">Ad-Alt</span>
+            <span className="text-indigo-400 font-bold text-xl">PromptProfit</span>
             <span className="badge badge-gray text-xs">Beta</span>
           </div>
           <div className="flex items-center gap-4">
@@ -31,7 +31,7 @@ export default function HomePage() {
           <span className="text-indigo-400">your earnings</span>
         </h1>
         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-          Ad-Alt shows a single tasteful sponsored text line in your VS Code status bar
+          PromptProfit shows a single tasteful sponsored text line in your VS Code status bar
           while your AI assistant is thinking. You earn a share of the advertising
           revenue. No code or prompts ever leave your machine.
         </p>
@@ -53,7 +53,7 @@ export default function HomePage() {
             <span className="text-gray-500">⚙ AI thinking...</span>
             <span className="text-gray-600">|</span>
             <span className="text-indigo-300">📢 Ship faster with Acme CI — acme.example.com</span>
-            <span className="badge badge-gray ml-auto text-xs">Sponsored · Ad-Alt</span>
+            <span className="badge badge-gray ml-auto text-xs">Sponsored · PromptProfit</span>
           </div>
         </div>
       </section>
@@ -179,11 +179,11 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-gray-800 px-6 py-10 mt-10">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <span>© 2026 Ad-Alt Inc. All rights reserved.</span>
+          <span>© 2026 PromptProfit Inc. All rights reserved.</span>
           <div className="flex gap-6">
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-            <a href="mailto:support@adalt.dev" className="hover:text-white transition-colors">Support</a>
+            <a href="mailto:support@promptprofit.dev" className="hover:text-white transition-colors">Support</a>
           </div>
         </div>
       </footer>

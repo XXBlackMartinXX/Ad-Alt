@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { createHash, randomBytes } from "crypto";
 
-const DEVICE_ID_KEY = "ad-alt.deviceId";
+const DEVICE_ID_KEY = "promptprofit.deviceId";
 
 export async function getOrCreateDeviceId(context: vscode.ExtensionContext): Promise<string> {
   const existing = await context.secrets.get(DEVICE_ID_KEY);
