@@ -131,7 +131,7 @@ After step 3c, `data.entries` should contain a new ledger entry and `data.totalE
 - Confirm `displayedDurationMs` was >= 3000 in step 3c.
 - Confirm steps 3a/3b/3c were sent in order with the same `adDecisionId`.
 
-**Known limitation:** each ledger entry's `balanceAfterMicrocents` field is currently always `0`, and the `balances` table is not updated by the impression/click ledger write path — only `developerProfiles.totalEarnedMicrocents` (used above) is. The three entries per billable event (`advertiser_charge`, `developer_credit`, `platform_fee`) still reconcile exactly against each other; this is a running-balance bookkeeping gap, not a reconciliation error. Verify directly in Postgres: `SELECT entry_type, sum(amount_microcents) FROM ledger_entries GROUP BY entry_type;` — `developer_credit + platform_fee` should equal `advertiser_charge`.
+Each ledger entry's `balanceAfterMicrocents` reflects the real running balance for its account (advertiser, developer, or platform) at the time of the write — the `balances` table is updated atomically in the same transaction as the ledger-entry insert. Verify directly in Postgres: `SELECT account_id, account_type, balance_microcents FROM balances;` should match the latest `balanceAfterMicrocents` per account in `ledger_entries`, and `SELECT entry_type, sum(amount_microcents) FROM ledger_entries GROUP BY entry_type;` — `developer_credit + platform_fee` should equal `advertiser_charge`.
 
 ## 5. Test the click flow (optional)
 
