@@ -39,9 +39,9 @@ curl -s "http://localhost:3001/v1/ads/decision?deviceId=local-test-device-1&adap
   -H "Authorization: Bearer $PP_API_KEY"
 ```
 
-A `200` response returns `data` containing an ad decision (`id`, `campaignId`, `creativeId`, headline/body/displayUrl text). A `204 No Content` means no eligible campaign matched — check that the seed ran and that `feature_flags.kill_switch_all_ads` is `false`.
+A `200` response returns `data` containing an ad decision (`adDecisionId`, `campaignId`, `creativeId`, headline/body/displayUrl text). A `204 No Content` means no eligible campaign matched — check that the seed ran and that `feature_flags.kill_switch_all_ads` is `false`.
 
-Save the returned `data.id` as `DECISION_ID`, `data.campaignId` as `CAMPAIGN_ID`, `data.creativeId` as `CREATIVE_ID`.
+Save the returned `data.adDecisionId` as `DECISION_ID`, `data.campaignId` as `CAMPAIGN_ID`, `data.creativeId` as `CREATIVE_ID`.
 
 ## 3. Walk the impression lifecycle via `/v1/events`
 
@@ -130,6 +130,8 @@ After step 3c, `data.entries` should contain a new ledger entry and `data.totalE
 - Check the API logs for `impression_fraud_blocked` or `viewability_without_rendered_impression` — the fraud scorer or lifecycle guard rejected the event.
 - Confirm `displayedDurationMs` was >= 3000 in step 3c.
 - Confirm steps 3a/3b/3c were sent in order with the same `adDecisionId`.
+
+**Known limitation:** each ledger entry's `balanceAfterMicrocents` field is currently always `0`, and the `balances` table is not updated by the impression/click ledger write path — only `developerProfiles.totalEarnedMicrocents` (used above) is. The three entries per billable event (`advertiser_charge`, `developer_credit`, `platform_fee`) still reconcile exactly against each other; this is a running-balance bookkeeping gap, not a reconciliation error. Verify directly in Postgres: `SELECT entry_type, sum(amount_microcents) FROM ledger_entries GROUP BY entry_type;` — `developer_credit + platform_fee` should equal `advertiser_charge`.
 
 ## 5. Test the click flow (optional)
 
