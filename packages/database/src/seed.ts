@@ -180,7 +180,9 @@ async function seed(): Promise<void> {
       balanceMicrocents: 50_000_000,
     },
     {
-      accountId: developerProfile.id,
+      // Keyed by userId (not developerProfile.id) to match the accountId
+      // convention LedgerCalculator/LedgerService use for developer_credit entries.
+      accountId: developerUser.id,
       accountType: "developer",
       balanceMicrocents: 0,
     },
