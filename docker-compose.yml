@@ -3,25 +3,25 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: adalt_postgres
+    container_name: promptprofit_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: adalt
-      POSTGRES_PASSWORD: adalt_dev
-      POSTGRES_DB: adalt_dev
+      POSTGRES_USER: promptprofit
+      POSTGRES_PASSWORD: promptprofit_dev
+      POSTGRES_DB: promptprofit_dev
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U adalt -d adalt_dev"]
+      test: ["CMD-SHELL", "pg_isready -U promptprofit -d promptprofit_dev"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: adalt_redis
+    container_name: promptprofit_redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
@@ -36,7 +36,7 @@ services:
 
   maildev:
     image: maildev/maildev:latest
-    container_name: adalt_maildev
+    container_name: promptprofit_maildev
     restart: unless-stopped
     ports:
       - "1080:1080"  # Web UI
