@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { randomUUID } from "crypto";
 
 // ---------------------------------------------------------------------------
-// Privacy invariant tests for Ad-Alt event payloads
+// Privacy invariant tests for PromptProfit event payloads
 //
 // These tests assert that event payloads emitted by the controller NEVER
 // contain sensitive workspace data: source code, file paths, AI prompts,

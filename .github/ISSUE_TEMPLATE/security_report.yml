@@ -1,0 +1,17 @@
+name: 🚫 Security Vulnerability — Do Not Use This Form
+description: Security vulnerabilities must be reported privately, not as a public issue.
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Do not open a public issue to report a security vulnerability.
+
+        Public issues are visible to everyone, including potential attackers, before a fix is available.
+
+        Instead, please follow the private reporting process described in [`SECURITY.md`](https://github.com/XXBlackMartinXX/Ad-Alt/blob/main/SECURITY.md):
+
+        - Email **security@promptprofit.dev** with a description, reproduction steps, affected component, and suggested severity.
+        - Do not include proof-of-concept exploit code, credentials, or personally identifiable information in any public channel.
+
+        If you have already opened this form by mistake, please close it and email the address above instead.

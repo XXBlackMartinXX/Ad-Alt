@@ -1,5 +1,7 @@
 # Ad-Alt: Technical Architecture
 
+> **Historical naming note:** Authored under the original working name **"Ad-Alt,"** since rebranded **PromptProfit**. Read "Ad-Alt" below as "PromptProfit" wherever it names the product/brand (URLs like `ad-alt.com` are illustrative placeholders, not real or current). Retained verbatim for historical record; the GitHub repository name `Ad-Alt` is unrelated and unchanged.
+
 **Document version:** 1.0  
 **Date:** 2026-06-15  
 **Status:** Approved for engineering use  

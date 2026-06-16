@@ -1,5 +1,7 @@
 # Ad-Alt Privacy and Telemetry Specification
 
+> **Historical naming note:** Authored under the original working name **"Ad-Alt,"** since rebranded **PromptProfit**. Read "Ad-Alt" below as "PromptProfit" (including the illustrative `AdAltEventEnvelope` type name). Retained verbatim for historical record; the GitHub repository name `Ad-Alt` is unrelated and unchanged.
+
 **Version:** 1.0  
 **Last Updated:** 2026-06-15  
 **Classification:** Internal – Engineering + Legal  

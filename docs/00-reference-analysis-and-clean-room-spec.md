@@ -1,5 +1,7 @@
 # Ad-Alt: Reference Analysis and Clean-Room Specification
 
+> **Historical naming note:** This document was authored under the project's original working name, **"Ad-Alt."** The product has since been rebranded **PromptProfit**; wherever "Ad-Alt" appears below as a product/brand name, read it as "PromptProfit." It is retained verbatim for historical and architectural record rather than rewritten. The GitHub repository is still named `Ad-Alt` — that repository name is unrelated to this historical product naming and is not being changed.
+
 **Document version:** 1.0  
 **Date:** 2026-06-15  
 **Status:** Approved for engineering use  

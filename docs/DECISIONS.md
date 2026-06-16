@@ -136,3 +136,12 @@ This file records key architectural decisions made during the design and impleme
 **Date**: 2026-06-15  
 **Status**: Accepted  
 **Rationale**: When an AI extension updates incompatibly, the kill switch prevents broken adapters from polluting data or crashing the host IDE. Flags are fetched on extension activation and cached with a 5-minute TTL.
+
+---
+
+## ADR-016: Product Rebrand — Ad-Alt → PromptProfit
+
+**Decision**: The product is renamed from "Ad-Alt" to "PromptProfit." User-facing strings, `.env.example`, `docker-compose.yml`, the VS Code extension's package name and command IDs, and all new documentation use "PromptProfit." The GitHub repository keeps the name `Ad-Alt` (changing a repository name has its own URL/redirect implications and is out of scope for this decision); internal npm workspace package scopes (`@ad-alt/*`) are also kept as-is to avoid a repo-wide import rewrite that carries no user-facing benefit.  
+**Date**: 2026-06-16  
+**Status**: Accepted  
+**Rationale**: "PromptProfit" better communicates the product's value proposition (developers profit from AI prompt wait-time) than "Ad-Alt." Documents 00–04 above predate this rename and are retained verbatim with a historical-naming note rather than rewritten, to preserve the historical record of decisions as they were actually made.

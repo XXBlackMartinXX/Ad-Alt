@@ -371,4 +371,136 @@ describe("LedgerCalculator", () => {
       expect(calc.formatMicrocents(100_000n)).toContain("$");
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Reconciliation invariants
+  // -------------------------------------------------------------------------
+
+  describe("reconciliation invariants", () => {
+    it("developer_credit + platform_fee === total for impression", () => {
+      const result = calc.calculateImpressionEntries({
+        impressionId: "rec-imp-001",
+        advertiserId: "adv-rec",
+        developerId: "dev-rec",
+        cpmBidMicrocents: CPM_10_DOLLARS,
+      });
+      expect(result.developerCredit.amountMicrocents + result.platformFee.amountMicrocents)
+        .toBe(result.advertiserCharge.amountMicrocents);
+    });
+
+    it("developer_credit + platform_fee === total for click", () => {
+      const result = calc.calculateClickEntries({
+        clickId: "rec-click-001",
+        advertiserId: "adv-rec",
+        developerId: "dev-rec",
+        cpmBidMicrocents: CPM_10_DOLLARS,
+      });
+      expect(result.developerCredit.amountMicrocents + result.platformFee.amountMicrocents)
+        .toBe(result.advertiserCharge.amountMicrocents);
+    });
+
+    it("sum of N impression charges equals N * per-impression value", () => {
+      const N = 100;
+      let totalCharged = 0n;
+      let totalDeveloper = 0n;
+      let totalPlatform = 0n;
+      for (let i = 0; i < N; i++) {
+        const r = calc.calculateImpressionEntries({
+          impressionId: `imp-${i}`,
+          advertiserId: "adv-agg",
+          developerId: "dev-agg",
+          cpmBidMicrocents: CPM_10_DOLLARS,
+        });
+        totalCharged += r.advertiserCharge.amountMicrocents;
+        totalDeveloper += r.developerCredit.amountMicrocents;
+        totalPlatform += r.platformFee.amountMicrocents;
+      }
+      // All N impressions reconcile
+      expect(totalDeveloper + totalPlatform).toBe(totalCharged);
+      // $10.00 CPM / 1000 impressions * 100 impressions = $1.00 total = 1,000,000 µ¢
+      expect(totalCharged).toBe(1_000_000n);
+    });
+
+    it("reconciles with custom 50/50 platform/developer split", () => {
+      const calc5050 = new LedgerCalculator(50, 50);
+      const result = calc5050.calculateImpressionEntries({
+        impressionId: "rec-5050",
+        advertiserId: "adv-5050",
+        developerId: "dev-5050",
+        cpmBidMicrocents: CPM_10_DOLLARS,
+      });
+      expect(result.developerCredit.amountMicrocents).toBe(result.platformFee.amountMicrocents);
+      expect(result.developerCredit.amountMicrocents + result.platformFee.amountMicrocents)
+        .toBe(result.totalMicrocents);
+    });
+
+    it("reconciles over a mixed impression+click session", () => {
+      let totalCharged = 0n;
+      let totalDev = 0n;
+      let totalPlatform = 0n;
+
+      for (let i = 0; i < 10; i++) {
+        const r = calc.calculateImpressionEntries({
+          impressionId: `session-imp-${i}`,
+          advertiserId: "adv-session",
+          developerId: "dev-session",
+          cpmBidMicrocents: CPM_1_DOLLAR,
+        });
+        totalCharged += r.advertiserCharge.amountMicrocents;
+        totalDev += r.developerCredit.amountMicrocents;
+        totalPlatform += r.platformFee.amountMicrocents;
+      }
+
+      // 2 clicks in the session
+      for (let i = 0; i < 2; i++) {
+        const r = calc.calculateClickEntries({
+          clickId: `session-click-${i}`,
+          advertiserId: "adv-session",
+          developerId: "dev-session",
+          cpmBidMicrocents: CPM_1_DOLLAR,
+        });
+        totalCharged += r.advertiserCharge.amountMicrocents;
+        totalDev += r.developerCredit.amountMicrocents;
+        totalPlatform += r.platformFee.amountMicrocents;
+      }
+
+      expect(totalDev + totalPlatform).toBe(totalCharged);
+    });
+
+    it("verifyBalance returns true for all valid results", () => {
+      const cpmValues = [CPM_TINY, CPM_1_DOLLAR, CPM_10_DOLLARS, 999_000_000n];
+      for (const cpm of cpmValues) {
+        const imp = calc.calculateImpressionEntries({
+          impressionId: "verify-imp",
+          advertiserId: "adv",
+          developerId: "dev",
+          cpmBidMicrocents: cpm,
+        });
+        expect(calc.verifyBalance(imp)).toBe(true);
+
+        const click = calc.calculateClickEntries({
+          clickId: "verify-click",
+          advertiserId: "adv",
+          developerId: "dev",
+          cpmBidMicrocents: cpm,
+        });
+        expect(calc.verifyBalance(click)).toBe(true);
+      }
+    });
+
+    it("rounding never creates money — developer + platform === total exactly", () => {
+      // Use odd CPM to force truncation in integer division
+      const oddCpm = 3_000_001n; // 3,000,001 µ¢/1000 = 3,000.001 µ¢ per impression (truncates)
+      const result = calc.calculateImpressionEntries({
+        impressionId: "rounding-test",
+        advertiserId: "adv-rounding",
+        developerId: "dev-rounding",
+        cpmBidMicrocents: oddCpm,
+      });
+      // Must reconcile exactly — no rounding error creates or destroys value
+      expect(result.developerCredit.amountMicrocents + result.platformFee.amountMicrocents)
+        .toBe(result.totalMicrocents);
+      expect(calc.verifyBalance(result)).toBe(true);
+    });
+  });
 });

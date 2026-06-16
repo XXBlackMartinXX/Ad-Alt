@@ -1,0 +1,6 @@
+src/**
+.vscode-test/**
+.gitignore
+tsconfig.json
+vitest.config.ts
+.eslintrc*

@@ -1,9 +1,11 @@
 # Ad-Alt: Product Requirements Document
 
+> **Historical naming note:** Authored under the original working name **"Ad-Alt,"** since rebranded **PromptProfit**. Read "Ad-Alt" below as "PromptProfit" wherever it names the product/brand. Retained verbatim for historical record; the GitHub repository name `Ad-Alt` is unrelated and unchanged.
+
 **Document version:** 1.0  
 **Date:** 2026-06-15  
 **Status:** Approved for engineering use  
-**Product name:** Ad-Alt  
+**Product name:** Ad-Alt (see naming note above — now PromptProfit)  
 **Author:** Ad-Alt Inc. — Product
 
 ---

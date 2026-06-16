@@ -1,0 +1,56 @@
+name: Feature Request
+description: Suggest an idea or enhancement for PromptProfit
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Note that PromptProfit is privacy-by-construction: feature requests that would require collecting source code, file paths, prompts, AI responses, or other workspace content will not be accepted. See `docs/04-privacy-and-telemetry.md` and `SECURITY.md` for the privacy model.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the problem or limitation you're running into.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - API (apps/api)
+        - VS Code extension (apps/extension)
+        - Web dashboard (apps/web)
+        - Database / migrations (packages/database)
+        - Ledger (packages/ledger)
+        - Fraud scoring (packages/fraud)
+        - Telemetry (packages/telemetry)
+        - Documentation
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy-confirm
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: This request does not require collecting source code, file paths, prompts, AI responses, or other project/workspace content.
+          required: true

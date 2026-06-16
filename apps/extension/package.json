@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "promptprofit",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XXBlackMartinXX/Ad-Alt.git",
+    "directory": "apps/extension"
+  },
   "engines": { "vscode": "^1.90.0" },
   "categories": ["Other"],
   "activationEvents": ["onStartupFinished"],

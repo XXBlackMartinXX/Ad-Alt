@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import { AdAltController } from "./controller";
+import { PromptProfitController } from "./controller";
 
-let controller: AdAltController | undefined;
+let controller: PromptProfitController | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  controller = new AdAltController(context);
+  controller = new PromptProfitController(context);
   await controller.initialize();
 
   context.subscriptions.push(

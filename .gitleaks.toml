@@ -1,0 +1,29 @@
+title = "PromptProfit Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "promptprofit-api-key"
+description = "PromptProfit API key (ppft_ prefix)"
+regex = '''ppft_[a-f0-9]{64}'''
+tags = ["api-key", "promptprofit"]
+
+[allowlist]
+description = "Allowlist for known false positives"
+regexes = [
+  # Placeholder patterns in .env.example
+  '''sk_test_\.\.\.$''',
+  '''whsec_\.\.\.$''',
+  '''pk_test_\.\.\.$''',
+  # Test/seed values that are clearly not real secrets
+  '''promptprofit_dev''',
+  # openssl generation examples
+  '''generate-with:.*openssl''',
+]
+paths = [
+  ".env.example",
+  "packages/database/src/seed.ts",
+  "packages/database/drizzle.config.ts",
+  "docs/",
+]

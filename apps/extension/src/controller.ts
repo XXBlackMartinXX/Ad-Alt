@@ -28,7 +28,7 @@ type FlagsCache = {
   fetchedAt: number;
 };
 
-export class AdAltController {
+export class PromptProfitController {
   private apiClient!: ApiClient;
   private statusBar!: AdStatusBar;
   private eventQueue!: EventQueue;
