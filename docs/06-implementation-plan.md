@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> **Historical naming note:** Authored under the original working name **"Ad-Alt,"** since rebranded **PromptProfit**. Read "ad-alt"/"Ad-Alt" below as "PromptProfit." Retained verbatim for historical record; the GitHub repository name `Ad-Alt` and the npm workspace scope `@ad-alt/*` are unrelated/unchanged — see [`DECISIONS.md`](./DECISIONS.md#adr-016-product-rebrand--ad-alt--promptprofit).
+
 ## Phase Overview
 
 | Phase | Description | Status |
