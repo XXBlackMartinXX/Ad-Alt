@@ -21,18 +21,29 @@ const FLAGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 let cachedFlags: FeatureFlags = FALLBACK_FLAGS_DISABLED;
 let flagsFetchedAt = 0;
 
+function isValidFeatureFlags(value: unknown): value is FeatureFlags {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v["killSwitchEnabled"] === "boolean" &&
+    Array.isArray(v["disabledAdapters"]) &&
+    typeof v["flags"] === "object" &&
+    v["flags"] !== null
+  );
+}
+
 async function refreshFlags(): Promise<FeatureFlags> {
   const now = Date.now();
   if (now - flagsFetchedAt < FLAGS_CACHE_TTL_MS) return cachedFlags;
 
   try {
     const stored = await chrome.storage.local.get("featureFlags") as Record<string, unknown>;
-    if (stored["featureFlags"]) {
-      cachedFlags = stored["featureFlags"] as FeatureFlags;
-    } else {
-      cachedFlags = { killSwitchEnabled: false, disabledAdapters: [], flags: {} };
+    if (isValidFeatureFlags(stored["featureFlags"])) {
+      cachedFlags = stored["featureFlags"];
+      flagsFetchedAt = now;
     }
-    flagsFetchedAt = now;
+    // If storage is empty or invalid, keep FALLBACK_FLAGS_DISABLED and do NOT
+    // stamp flagsFetchedAt — the next call will retry storage immediately.
   } catch {
     // On any storage error, keep existing cached flags (fail closed)
   }
@@ -52,7 +63,12 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message?.["type"] === "UPDATE_FLAGS") {
-      cachedFlags = message["flags"] as FeatureFlags;
+      const candidate = message["flags"];
+      if (!isValidFeatureFlags(candidate)) {
+        sendResponse({ ok: false });
+        return false;
+      }
+      cachedFlags = candidate;
       flagsFetchedAt = Date.now();
       chrome.storage.local.set({ featureFlags: cachedFlags }).catch(() => {});
       sendResponse({ ok: true });

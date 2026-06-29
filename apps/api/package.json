@@ -16,6 +16,7 @@
     "@ad-alt/database": "workspace:*",
     "@ad-alt/fraud": "workspace:*",
     "@ad-alt/ledger": "workspace:*",
+    "@ad-alt/platform-core": "workspace:*",
     "@ad-alt/shared": "workspace:*",
     "@ad-alt/telemetry": "workspace:*",
     "@hono/node-server": "^1.12.0",

@@ -18,6 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ad-alt/platform-core": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

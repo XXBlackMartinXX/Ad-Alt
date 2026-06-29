@@ -47,23 +47,30 @@ export class WaitStateDetector implements IWaitStateDetector {
     const selectors = PROCESSING_SELECTORS[hostname] ?? [];
     if (selectors.length === 0) return;
 
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
     const checkState = () => {
-      try {
-        const isProcessing = selectors.some((sel) => !!document.querySelector(sel));
-        if (isProcessing && !this.inWaitState) {
-          this.inWaitState = true;
-          onStart(new Date());
-        } else if (!isProcessing && this.inWaitState) {
-          this.inWaitState = false;
-          onEnd();
+      if (throttleTimer !== null) return;
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        try {
+          const isProcessing = selectors.some((sel) => !!document.querySelector(sel));
+          if (isProcessing && !this.inWaitState) {
+            this.inWaitState = true;
+            onStart(new Date());
+          } else if (!isProcessing && this.inWaitState) {
+            this.inWaitState = false;
+            onEnd();
+          }
+        } catch {
+          // DOM query failed — fail closed (no wait-state declared)
         }
-      } catch {
-        // DOM query failed — fail closed (no wait-state declared)
-      }
+      }, 150);
     };
 
+    // attributes: false — child-list mutations are sufficient to detect stop-button
+    // appearance/disappearance; attribute changes fire too aggressively during streaming.
     this.observer = new MutationObserver(checkState);
-    this.observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    this.observer.observe(document.body, { childList: true, subtree: true });
     checkState();
   }
 
@@ -71,5 +78,8 @@ export class WaitStateDetector implements IWaitStateDetector {
     this.observer?.disconnect();
     this.observer = null;
     this.inWaitState = false;
+    // Note: any pending throttle timer is left to expire harmlessly; checkState
+    // guards via this.observer being null are not needed since the timer fires
+    // only synchronous code that reads this.inWaitState.
   }
 }

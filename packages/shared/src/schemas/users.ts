@@ -21,12 +21,14 @@ export const DevOptiInSchema = z.object({
 export const UpdateDeveloperProfileSchema = z.object({
   /** Email address to which Stripe payouts should be sent */
   payoutEmail: z.string().email().optional(),
-  /** Preferred wait-state adapter (excludes "manual" which is test-only) */
+  /**
+   * Preferred wait-state adapter.
+   * Excludes "manual" (test-only) and all desktop adapters (not yet implemented).
+   */
   preferredAdapterName: z
     .enum([
       "ai_status_bar", "copilot_status",
       "browser_chatgpt", "browser_claude", "browser_gemini", "browser_mock",
-      "desktop_chatgpt", "desktop_claude", "antigravity",
       "mock",
     ])
     .optional(),

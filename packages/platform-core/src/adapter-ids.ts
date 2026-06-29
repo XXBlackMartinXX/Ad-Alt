@@ -64,3 +64,12 @@ export function getPlatformCategory(adapterId: string): PlatformCategory {
 export function isAllowedAdapter(adapterId: string): adapterId is AllowedAdapterId {
   return (ALLOWED_ADAPTER_IDS as readonly string[]).includes(adapterId);
 }
+
+/**
+ * Mutable tuple of all allowed adapter IDs, typed for direct use with z.enum().
+ * Derived at module load time from ALLOWED_ADAPTER_IDS — update that array, not this.
+ */
+export const ADAPTER_ENUM_VALUES = [...ALLOWED_ADAPTER_IDS] as [
+  AllowedAdapterId,
+  ...AllowedAdapterId[]
+];

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
 import { optionalApiKey } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { AdDecisionService } from "../services/ad-decision.service.js";
@@ -11,12 +12,7 @@ const adDecisionService = new AdDecisionService();
 
 const QuerySchema = z.object({
   deviceId: z.string().min(1).max(64),
-  adapterName: z.enum([
-    "ai_status_bar", "copilot_status",
-    "browser_chatgpt", "browser_claude", "browser_gemini", "browser_mock",
-    "desktop_chatgpt", "desktop_claude", "antigravity",
-    "mock", "manual",
-  ]),
+  adapterName: z.enum(ADAPTER_ENUM_VALUES),
   extensionVersion: z.string(),
 });
 

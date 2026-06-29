@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
 
 // ---------------------------------------------------------------------------
 // Privacy guardrails
@@ -7,8 +8,11 @@ import { z } from "zod";
 /**
  * Forbidden fields that must NEVER appear in telemetry schemas.
  * The telemetry-privacy test asserts these keys are absent from every schema.
+ *
+ * Must stay in sync with TELEMETRY_FORBIDDEN_FIELDS in packages/platform-core/src/privacy-guard.ts.
  */
 export const TELEMETRY_FORBIDDEN_FIELDS = [
+  // VS Code / general
   "sourceCode",
   "fileContent",
   "filePath",
@@ -26,6 +30,16 @@ export const TELEMETRY_FORBIDDEN_FIELDS = [
   "secret",
   "password",
   "token",
+  // Browser / desktop adapters
+  "pageTitle",
+  "pageUrl",
+  "pageContent",
+  "domText",
+  "clipboardContent",
+  "screenshotData",
+  "cookieData",
+  "authToken",
+  "sessionCookie",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -46,23 +60,7 @@ const BaseEventSchema = z.object({
   /** Semver string of the VS Code extension */
   extensionVersion: z.string(),
   /** Which wait-state adapter generated this event */
-  adapterName: z.enum([
-    // VS Code extension adapters
-    "ai_status_bar",
-    "copilot_status",
-    // Browser extension adapters
-    "browser_chatgpt",
-    "browser_claude",
-    "browser_gemini",
-    "browser_mock",
-    // Desktop adapters (planned — not yet implemented)
-    "desktop_chatgpt",
-    "desktop_claude",
-    "antigravity",
-    // Dev/test adapters
-    "mock",
-    "manual",
-  ]),
+  adapterName: z.enum(ADAPTER_ENUM_VALUES),
   /** Wall-clock time on the client when the event occurred */
   clientTimestamp: z.string().datetime(),
   /** Monotonically increasing counter within the current session */

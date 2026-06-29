@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
 import {
   CREATIVE_HEADLINE_MAX_LENGTH,
   CREATIVE_BODY_MAX_LENGTH,
@@ -23,14 +24,7 @@ export const CreateCampaignSchema = z.object({
   /** ISO 8601 datetime when the campaign should stop serving ads */
   endAt: z.string().datetime().optional(),
   /** Restrict delivery to specific extension adapters; absent = all adapters */
-  targetAdapterNames: z
-    .array(z.enum([
-      "ai_status_bar", "copilot_status",
-      "browser_chatgpt", "browser_claude", "browser_gemini", "browser_mock",
-      "desktop_chatgpt", "desktop_claude", "antigravity",
-      "mock", "manual",
-    ]))
-    .optional(),
+  targetAdapterNames: z.array(z.enum(ADAPTER_ENUM_VALUES)).optional(),
 });
 
 export const UpdateCampaignSchema = CreateCampaignSchema.partial();

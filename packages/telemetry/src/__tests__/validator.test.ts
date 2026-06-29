@@ -156,6 +156,7 @@ describe("EventValidator", () => {
 
   describe("forbidden fields", () => {
     const forbiddenCases: Array<[string, string]> = [
+      // VS Code / general
       ["sourceCode", "function hello() {}"],
       ["filePath", "/home/user/project/src/app.ts"],
       ["fileName", "app.ts"],
@@ -173,6 +174,16 @@ describe("EventValidator", () => {
       ["secret", "mysecret"],
       ["password", "hunter2"],
       ["token", "Bearer abc"],
+      // Browser / desktop adapters
+      ["pageTitle", "ChatGPT - OpenAI"],
+      ["pageUrl", "https://chatgpt.com/c/abc123"],
+      ["pageContent", "<html>..."],
+      ["domText", "Hello, how can I assist you?"],
+      ["clipboardContent", "some copied text"],
+      ["screenshotData", "data:image/png;base64,..."],
+      ["cookieData", "__Secure-next-auth.session-token=abc"],
+      ["authToken", "Bearer eyJhbGciOiJIUzI1NiJ9"],
+      ["sessionCookie", "session=abc123"],
     ];
 
     it.each(forbiddenCases)(

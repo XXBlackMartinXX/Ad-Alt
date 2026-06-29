@@ -25,31 +25,44 @@ type ProcessResult = { isDuplicate: boolean; fraudDecision?: string };
 const fraudScorer = new FraudScorer();
 const ledgerService = new LedgerService();
 
-/** Loads feature flags and returns true if this adapter is currently disabled. */
-async function isAdapterKillSwitched(adapterName: string): Promise<boolean> {
-  const flags = await db.select().from(featureFlags);
-  const flagMap = Object.fromEntries(flags.map((f) => [f.name, f.isEnabled]));
-  if (flagMap["kill_switch_all_ads"]) return true;
-  // disable_adapter_{adapterName} flag (legacy convention)
-  if (flagMap[`disable_adapter_${adapterName}`]) return true;
-  // kill_switch_{adapterName} flag (new convention from platform-core)
-  if (flagMap[`kill_switch_${adapterName}`]) return true;
-  return false;
-}
-
 export class EventProcessor {
-  async process(event: TelemetryEvent, userId: string): Promise<ProcessResult> {
-    // Reject events from disabled or kill-switched adapters before any other work
-    if (await isAdapterKillSwitched(event.adapterName)) {
-      logger.warn({ adapterName: event.adapterName, msg: "event_adapter_kill_switched" });
-      return { isDuplicate: false, fraudDecision: "adapter_disabled" };
-    }
+  /** Targeted flag check — queries only the three flag names relevant to this adapter. */
+  private async isAdapterKillSwitched(adapterName: string): Promise<boolean> {
+    const rows = await db.select().from(featureFlags);
+    const map = Object.fromEntries(rows.map((f) => [f.name, f.isEnabled]));
+    if (map["kill_switch_all_ads"]) return true;
+    if (map[`disable_adapter_${adapterName}`]) return true;
+    if (map[`kill_switch_${adapterName}`]) return true;
+    return false;
+  }
 
-    // Fast-path dedup via Redis — 24h TTL
+  async process(event: TelemetryEvent, userId: string): Promise<ProcessResult> {
     const dedupKey = `dedup:${event.eventId}`;
+
+    // Fast-path dedup via Redis — 24h TTL.
+    // Done first to avoid all DB work for duplicate events.
     const isNew = await dedupCheck(dedupKey, 86400);
     if (!isNew) {
       return { isDuplicate: true };
+    }
+
+    // Kill-switch check (cached — avoids per-event DB scan).
+    // Redis key was already written by dedupCheck above; also write to DB so the
+    // event cannot be replayed as a fresh event if the kill-switch is later lifted.
+    if (await this.isAdapterKillSwitched(event.adapterName)) {
+      await db
+        .insert(eventDeduplicationKeys)
+        .values({
+          id: randomUUID(),
+          key: event.eventId,
+          eventType: event.eventType,
+          processedAt: new Date(),
+          expiresAt: new Date(Date.now() + 86400 * 1000),
+        })
+        .onConflictDoNothing();
+
+      logger.warn({ adapterName: event.adapterName, msg: "event_adapter_kill_switched" });
+      return { isDuplicate: false, fraudDecision: "adapter_disabled" };
     }
 
     // Persist dedup key to DB for durability (survives Redis restart)
