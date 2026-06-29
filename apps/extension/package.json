@@ -67,8 +67,8 @@
   },
   "scripts": {
     "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
-    "watch": "npm run compile -- --watch",
-    "build": "npm run compile -- --minify",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --minify",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
     "package": "vsce package --no-dependencies",

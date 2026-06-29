@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
+import { ADAPTER_ENUM_VALUES } from "./adapters.js";
 
 // ---------------------------------------------------------------------------
 // Privacy guardrails
@@ -9,7 +9,7 @@ import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
  * Forbidden fields that must NEVER appear in telemetry schemas.
  * The telemetry-privacy test asserts these keys are absent from every schema.
  *
- * Must stay in sync with TELEMETRY_FORBIDDEN_FIELDS in packages/platform-core/src/privacy-guard.ts.
+ * Must stay in sync with TELEMETRY_FORBIDDEN_FIELDS in packages/platform-core/src/privacy-guard.ts and here.
  */
 export const TELEMETRY_FORBIDDEN_FIELDS = [
   // VS Code / general

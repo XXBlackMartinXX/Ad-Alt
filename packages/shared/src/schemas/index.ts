@@ -1,3 +1,4 @@
+export * from "./adapters.js";
 export * from "./events.js";
 export * from "./campaigns.js";
 export * from "./users.js";

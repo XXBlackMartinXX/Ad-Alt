@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
+import { ADAPTER_ENUM_VALUES } from "./adapters.js";
 import {
   CREATIVE_HEADLINE_MAX_LENGTH,
   CREATIVE_BODY_MAX_LENGTH,

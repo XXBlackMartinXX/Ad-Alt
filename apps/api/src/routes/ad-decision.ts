@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { ADAPTER_ENUM_VALUES } from "@ad-alt/platform-core";
+import { ADAPTER_ENUM_VALUES } from "@ad-alt/shared";
 import { optionalApiKey } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { AdDecisionService } from "../services/ad-decision.service.js";
