@@ -46,7 +46,23 @@ const BaseEventSchema = z.object({
   /** Semver string of the VS Code extension */
   extensionVersion: z.string(),
   /** Which wait-state adapter generated this event */
-  adapterName: z.enum(["copilot_status", "ai_status_bar", "mock", "manual"]),
+  adapterName: z.enum([
+    // VS Code extension adapters
+    "ai_status_bar",
+    "copilot_status",
+    // Browser extension adapters
+    "browser_chatgpt",
+    "browser_claude",
+    "browser_gemini",
+    "browser_mock",
+    // Desktop adapters (planned — not yet implemented)
+    "desktop_chatgpt",
+    "desktop_claude",
+    "antigravity",
+    // Dev/test adapters
+    "mock",
+    "manual",
+  ]),
   /** Wall-clock time on the client when the event occurred */
   clientTimestamp: z.string().datetime(),
   /** Monotonically increasing counter within the current session */

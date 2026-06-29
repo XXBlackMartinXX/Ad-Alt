@@ -62,5 +62,12 @@ eventsRoutes.post("/v1/events", async (c) => {
     eventType: event.eventType,
     msg: "event_ingested",
   });
-  return c.json({ data: { status: "accepted", eventId: event.eventId }, requestId });
+  return c.json({
+    data: {
+      status: "accepted",
+      eventId: event.eventId,
+      ...(result.fraudDecision !== undefined && { fraudDecision: result.fraudDecision }),
+    },
+    requestId,
+  });
 });

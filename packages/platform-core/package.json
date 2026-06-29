@@ -1,0 +1,25 @@
+{
+  "name": "@ad-alt/platform-core",
+  "version": "0.0.1",
+  "description": "Platform-agnostic adapter types, privacy constants, and event contracts for PromptProfit",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
+  }
+}

@@ -79,6 +79,22 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.43)
 
+  apps/browser-extension:
+    dependencies:
+      '@ad-alt/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+      '@ad-alt/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@20.19.43)
+
   apps/extension:
     dependencies:
       '@ad-alt/shared':
@@ -208,6 +224,15 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/platform-core:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
         version: 2.1.9(@types/node@20.19.43)
 
   packages/shared:

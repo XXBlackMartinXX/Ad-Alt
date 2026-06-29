@@ -25,6 +25,7 @@ vi.mock("@ad-alt/database", () => {
   const impressionEvents = { __t: "impressionEvents" };
   const eventDeduplicationKeys = { __t: "eventDeduplicationKeys" };
   const adDeliveryDecisions = { __t: "adDeliveryDecisions" };
+  const featureFlags = { __t: "featureFlags" };
 
   const state = {
     campaignRow: null as any,
@@ -108,6 +109,10 @@ vi.mock("@ad-alt/database", () => {
         if (table === adDeliveryDecisions) {
           return { where: () => ({ limit: async () => (state.decisionRow ? [state.decisionRow] : []) }) };
         }
+        // Return empty feature flags (no kill switches) for adapter-check path
+        if (table === featureFlags) {
+          return { then: (resolve: (v: any[]) => void) => resolve([]) };
+        }
         throw new Error(`unexpected db.select table: ${table?.__t}`);
       },
     }),
@@ -168,6 +173,7 @@ vi.mock("@ad-alt/database", () => {
     impressionEvents,
     eventDeduplicationKeys,
     adDeliveryDecisions,
+    featureFlags,
     eq: () => undefined,
     and: () => undefined,
     or: () => undefined,

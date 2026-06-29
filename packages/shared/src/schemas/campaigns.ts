@@ -24,7 +24,12 @@ export const CreateCampaignSchema = z.object({
   endAt: z.string().datetime().optional(),
   /** Restrict delivery to specific extension adapters; absent = all adapters */
   targetAdapterNames: z
-    .array(z.enum(["copilot_status", "ai_status_bar", "mock", "manual"]))
+    .array(z.enum([
+      "ai_status_bar", "copilot_status",
+      "browser_chatgpt", "browser_claude", "browser_gemini", "browser_mock",
+      "desktop_chatgpt", "desktop_claude", "antigravity",
+      "mock", "manual",
+    ]))
     .optional(),
 });
 

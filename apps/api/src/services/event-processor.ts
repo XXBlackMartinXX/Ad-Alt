@@ -4,6 +4,7 @@ import {
   clickEvents,
   eventDeduplicationKeys,
   adDeliveryDecisions,
+  featureFlags,
 } from "@ad-alt/database";
 import { eq, and, gt } from "@ad-alt/database";
 import { randomUUID } from "crypto";
@@ -24,8 +25,26 @@ type ProcessResult = { isDuplicate: boolean; fraudDecision?: string };
 const fraudScorer = new FraudScorer();
 const ledgerService = new LedgerService();
 
+/** Loads feature flags and returns true if this adapter is currently disabled. */
+async function isAdapterKillSwitched(adapterName: string): Promise<boolean> {
+  const flags = await db.select().from(featureFlags);
+  const flagMap = Object.fromEntries(flags.map((f) => [f.name, f.isEnabled]));
+  if (flagMap["kill_switch_all_ads"]) return true;
+  // disable_adapter_{adapterName} flag (legacy convention)
+  if (flagMap[`disable_adapter_${adapterName}`]) return true;
+  // kill_switch_{adapterName} flag (new convention from platform-core)
+  if (flagMap[`kill_switch_${adapterName}`]) return true;
+  return false;
+}
+
 export class EventProcessor {
   async process(event: TelemetryEvent, userId: string): Promise<ProcessResult> {
+    // Reject events from disabled or kill-switched adapters before any other work
+    if (await isAdapterKillSwitched(event.adapterName)) {
+      logger.warn({ adapterName: event.adapterName, msg: "event_adapter_kill_switched" });
+      return { isDuplicate: false, fraudDecision: "adapter_disabled" };
+    }
+
     // Fast-path dedup via Redis — 24h TTL
     const dedupKey = `dedup:${event.eventId}`;
     const isNew = await dedupCheck(dedupKey, 86400);

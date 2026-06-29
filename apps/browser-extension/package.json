@@ -1,0 +1,26 @@
+{
+  "name": "@ad-alt/browser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PromptProfit browser extension — privacy-first sponsored moments in browser-based AI tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XXBlackMartinXX/Ad-Alt.git",
+    "directory": "apps/browser-extension"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node scripts/bundle.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@ad-alt/platform-core": "workspace:*",
+    "@ad-alt/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
+  }
+}

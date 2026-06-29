@@ -23,7 +23,12 @@ export const UpdateDeveloperProfileSchema = z.object({
   payoutEmail: z.string().email().optional(),
   /** Preferred wait-state adapter (excludes "manual" which is test-only) */
   preferredAdapterName: z
-    .enum(["copilot_status", "ai_status_bar", "mock"])
+    .enum([
+      "ai_status_bar", "copilot_status",
+      "browser_chatgpt", "browser_claude", "browser_gemini", "browser_mock",
+      "desktop_chatgpt", "desktop_claude", "antigravity",
+      "mock",
+    ])
     .optional(),
   /** Where the ad creative should be rendered in VS Code */
   displaySurface: z.enum(["status_bar", "webview"]).optional(),

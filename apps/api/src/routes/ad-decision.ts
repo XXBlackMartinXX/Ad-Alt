@@ -11,7 +11,12 @@ const adDecisionService = new AdDecisionService();
 
 const QuerySchema = z.object({
   deviceId: z.string().min(1).max(64),
-  adapterName: z.enum(["copilot_status", "ai_status_bar", "mock", "manual"]),
+  adapterName: z.enum([
+    "ai_status_bar", "copilot_status",
+    "browser_chatgpt", "browser_claude", "browser_gemini", "browser_mock",
+    "desktop_chatgpt", "desktop_claude", "antigravity",
+    "mock", "manual",
+  ]),
   extensionVersion: z.string(),
 });
 

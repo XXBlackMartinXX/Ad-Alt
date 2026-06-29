@@ -79,10 +79,21 @@ export type LedgerEntryType =
   | "refund_credit"
   | "payout_debit";
 
-/** Identifiers for VS Code extension adapters that detect wait states */
+/** Identifiers for all adapters that detect wait states across platforms */
 export type AdapterName =
-  | "copilot_status"
+  // VS Code extension adapters
   | "ai_status_bar"
+  | "copilot_status"
+  // Browser extension adapters
+  | "browser_chatgpt"
+  | "browser_claude"
+  | "browser_gemini"
+  | "browser_mock"
+  // Desktop adapters (planned — not yet implemented)
+  | "desktop_chatgpt"
+  | "desktop_claude"
+  | "antigravity"
+  // Dev/test adapters
   | "mock"
   | "manual";
 
