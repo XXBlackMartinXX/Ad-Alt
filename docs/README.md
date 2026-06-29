@@ -9,6 +9,17 @@
 - [`ROADMAP.md`](./ROADMAP.md) — what's built, what's next
 - [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) — checklist to run before any release/deployment
 
+## Browser extension
+
+- [`CHATGPT_BROWSER_ADAPTER_SPEC.md`](./CHATGPT_BROWSER_ADAPTER_SPEC.md) — ChatGPT browser adapter implementation specification
+- [`CHATGPT_BROWSER_LOCAL_SMOKE_TEST.md`](./CHATGPT_BROWSER_LOCAL_SMOKE_TEST.md) — manual smoke test checklist for the ChatGPT browser adapter
+
+## Audit and hardening
+
+- [`BROWSER_FOUNDATION_HARDENING_BASELINE.md`](./BROWSER_FOUNDATION_HARDENING_BASELINE.md) — pre-hardening baseline documentation
+- [`BROWSER_FOUNDATION_AUDIT_FIXES.md`](./BROWSER_FOUNDATION_AUDIT_FIXES.md) — fix record for browser foundation hardening (9 findings)
+- [`HARDENING_REVIEW_BEFORE_CHATGPT_MVP.md`](./HARDENING_REVIEW_BEFORE_CHATGPT_MVP.md) — gate review of commit ffa5ba0 before ChatGPT MVP ship
+
 ## Original specification and design documents
 
 These predate the PromptProfit rebrand and are kept verbatim as the historical record of how the product was designed; each carries a naming note at the top. See [`DECISIONS.md`](./DECISIONS.md#adr-016-product-rebrand--ad-alt--promptprofit) for the rebrand decision itself.

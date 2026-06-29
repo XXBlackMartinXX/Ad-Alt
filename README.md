@@ -179,24 +179,31 @@ PromptProfit is an **MVP in active development**. It is **not yet production-dep
 **What is implemented:**
 
 - VS Code extension with status bar rendering, wait-state detection, and mock adapter for local testing
+- **Browser extension (Manifest V3)** with ChatGPT adapter (`chatgpt.com`, `chat.openai.com`):
+  - Structural DOM wait-state detection (no content read, no URL beyond hostname)
+  - Fixed-position sponsored moment banner (non-invasive, labeled, dismissible)
+  - Kill-switch enforced at service-worker startup — fresh install fails closed
+  - 79 unit tests; **alpha — not yet manually verified in browser** (see `docs/CHATGPT_BROWSER_LOCAL_SMOKE_TEST.md`)
 - Hono API with impression, event, and developer endpoints
 - Drizzle ORM schema and migrations for campaigns, impressions, ledger, and developer accounts
 - `@ad-alt/ledger` integer-microcent accounting package with balance verification
 - `@ad-alt/fraud` impression fraud scoring
 - `@ad-alt/telemetry` closed event schema with forbidden-field validator
 - Redis-based deduplication and rate limiting
-- Unit test coverage across packages
+- Unit test coverage across packages (261+ tests)
 
 **What is not yet implemented:**
 
 - OAuth / SSO login (API key auth only in MVP)
 - Stripe payout integration
 - VS Code Marketplace publication
+- Browser extension Chrome Web Store publication
 - Full advertiser self-serve portal
 - GDPR data-export endpoint
 - Production infrastructure and deployment pipeline
 - Reconciliation / settlement job
 - Monitoring and alerting
+- Claude.ai and Gemini browser adapters (adapter IDs reserved, implementations pending)
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the planned post-MVP work.
 
@@ -206,9 +213,9 @@ See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the planned post-MVP work.
 
 | Phase | Highlights |
 |---|---|
-| **MVP (current)** | Extension, API, ledger, fraud, telemetry — local dev complete |
-| **V1** | OAuth, Stripe payouts, bigint mode, GDPR export, Marketplace publish |
-| **Future** | Multi-AI-provider adapters, RTB auction, advertiser analytics, multi-currency |
+| **MVP (current)** | VS Code extension, ChatGPT browser adapter (alpha), API, ledger, fraud, telemetry — local dev complete |
+| **V1** | OAuth, Stripe payouts, GDPR export, Chrome Web Store + VS Code Marketplace publish |
+| **Future** | Claude.ai / Gemini browser adapters, RTB auction, advertiser analytics, multi-currency |
 
 Full detail in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

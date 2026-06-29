@@ -50,6 +50,50 @@ async function refreshFlags(): Promise<FeatureFlags> {
   return cachedFlags;
 }
 
+/**
+ * Fetch an ad decision from the PromptProfit API.
+ * Returns null when no ad is available, the API is not configured, or any error occurs.
+ *
+ * The API base URL is read from extension storage ("apiBaseUrl"). If absent,
+ * no request is made — the caller shows no ad (fail-closed on unconfigured state).
+ */
+async function getAdDecision(adapterId: string): Promise<Record<string, unknown> | null> {
+  let apiBaseUrl: string | null = null;
+  try {
+    const stored = await chrome.storage.local.get("apiBaseUrl") as Record<string, unknown>;
+    if (typeof stored["apiBaseUrl"] === "string" && stored["apiBaseUrl"].length > 0) {
+      apiBaseUrl = stored["apiBaseUrl"];
+    }
+  } catch {
+    return null;
+  }
+
+  if (!apiBaseUrl) return null;
+
+  try {
+    const url = `${apiBaseUrl}/v1/ad-decision?adapterName=${encodeURIComponent(adapterId)}`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!resp.ok) return null;
+    const body = await resp.json() as Record<string, unknown>;
+    // Validate required SponsoredMoment fields are present and have correct types
+    if (
+      typeof body["adDecisionId"] === "string" &&
+      typeof body["creativeId"] === "string" &&
+      typeof body["headline"] === "string" &&
+      typeof body["displayUrl"] === "string" &&
+      typeof body["expiresAt"] === "number"
+    ) {
+      return body;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 chrome.runtime.onMessage.addListener(
   (message: Record<string, unknown>, _sender: unknown, sendResponse: (r: unknown) => void) => {
     if (message?.["type"] === "CHECK_ADAPTER_STATUS") {
@@ -59,6 +103,16 @@ chrome.runtime.onMessage.addListener(
       }).catch(() => {
         sendResponse({ disabled: true });
       });
+      return true;
+    }
+
+    if (message?.["type"] === "GET_AD_DECISION") {
+      // Fetch an ad decision from the API on behalf of the content script.
+      // Returns { decision: SponsoredMoment | null } — null means no ad to show.
+      const adapterId = String(message["adapterId"] ?? "");
+      getAdDecision(adapterId)
+        .then((decision) => sendResponse({ decision }))
+        .catch(() => sendResponse({ decision: null }));
       return true;
     }
 
