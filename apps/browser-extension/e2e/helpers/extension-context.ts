@@ -16,6 +16,7 @@ export interface ExtensionConfig {
   apiBaseUrl: string;
   killSwitchEnabled?: boolean;
   disabledAdapters?: string[];
+  debugMode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,19 +113,22 @@ export async function configureExtensionStorage(
     config.apiBaseUrl,
     config.killSwitchEnabled ?? false,
     config.disabledAdapters ?? [],
-  ] as [string, boolean, string[]];
+    config.debugMode ?? false,
+  ] as [string, boolean, string[], boolean];
 
   const doEvaluate = async () => {
     const sw = await getOrWaitForServiceWorker(context);
     await sw.evaluate(
-      ([apiBaseUrl, killSwitchEnabled, disabledAdapters]: [
+      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode]: [
         string,
         boolean,
         string[],
+        boolean,
       ]) => {
         return new Promise<void>((resolve, reject) => {
           const items = {
             apiBaseUrl,
+            debugMode,
             featureFlags: {
               killSwitchEnabled,
               disabledAdapters,

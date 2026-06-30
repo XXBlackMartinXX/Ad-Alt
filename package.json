@@ -23,7 +23,9 @@
     "db:seed": "pnpm --filter @ad-alt/database db:seed",
     "db:reset": "pnpm --filter @ad-alt/database db:migrate && pnpm --filter @ad-alt/database db:seed",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
-    "extension:package": "pnpm --filter promptprofit package"
+    "extension:package": "pnpm --filter promptprofit package",
+    "smoke:chatgpt:live": "pnpm --filter @ad-alt/browser-extension test:e2e:live",
+    "smoke:chatgpt:fixture": "pnpm --filter @ad-alt/browser-extension test:e2e"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

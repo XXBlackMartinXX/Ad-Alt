@@ -13,6 +13,7 @@
 
 import { ChatGPTAdapter } from "../adapters/chatgpt/chatgpt.adapter.js";
 import { ViewabilityObserver } from "./viewability-observer.js";
+import { DebugPanel, isDebugModeEnabled, isApiConfigured } from "./debug-panel.js";
 import {
   sendImpressionRequested,
   sendImpressionRendered,
@@ -30,22 +31,40 @@ void (async () => {
     getHostname: () => "chatgpt.com",
   });
 
+  // Optionally mount debug panel (only if debugMode is enabled in storage).
+  const debugMode = await isDebugModeEnabled();
+  const debugPanel = new DebugPanel();
+  if (debugMode) {
+    debugPanel.mount();
+    debugPanel.update({
+      apiConfigured: await isApiConfigured(),
+    });
+  }
+
   // Kill-switch check — fail closed if service worker is unreachable.
+  let killSwitchEnabled = false;
   try {
     const resp = (await chrome.runtime.sendMessage({
       type: "CHECK_ADAPTER_STATUS",
       adapterId: adapter.adapterId,
     })) as { disabled: boolean } | undefined;
-    if (resp?.disabled) return;
+    killSwitchEnabled = resp?.disabled ?? true;
+    if (killSwitchEnabled) {
+      debugPanel.update({ killSwitchEnabled: true });
+      return;
+    }
   } catch {
     return;
   }
 
   await adapter.start();
+  debugPanel.update({ adapterActive: true, killSwitchEnabled });
 
   const viewabilityObserver = new ViewabilityObserver();
 
   adapter.onWaitStateStart(async (_event) => {
+    debugPanel.update({ waitStateDetected: true });
+
     // Request an ad decision from the service-worker (which calls the mock API).
     let decision: SponsoredMoment | null = null;
     try {
@@ -63,11 +82,14 @@ void (async () => {
 
     // Fire impression_requested before rendering (campaignId required by schema).
     void sendImpressionRequested(decision, adapter.adapterId);
+    debugPanel.update({ lastEventType: "impression_requested" });
 
     await adapter.renderSponsoredMoment(decision);
+    debugPanel.update({ sponsoredMomentRendered: true });
 
     // Fire impression_rendered immediately after the banner enters the DOM.
     void sendImpressionRendered(decision, adapter.adapterId);
+    debugPanel.update({ lastEventType: "impression_rendered" });
 
     // Start viewability tracking — fires viewability_threshold_met after threshold.
     // In E2E tests the banner is typically dismissed before the threshold is met;
@@ -82,17 +104,20 @@ void (async () => {
           durationMs,
           VIEWABILITY_THRESHOLDS.BILLABLE_DURATION_MS,
         );
+        debugPanel.update({ lastEventType: "viewability_threshold_met" });
       });
     }
   });
 
   adapter.onWaitStateEnd(async () => {
     viewabilityObserver.stop();
+    debugPanel.update({ waitStateDetected: false, sponsoredMomentRendered: false });
     await adapter.removeSponsoredMoment();
   });
 
   window.addEventListener("beforeunload", () => {
     viewabilityObserver.stop();
+    debugPanel.unmount();
     void adapter.stop();
   });
 })();
