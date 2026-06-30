@@ -18,8 +18,9 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         headless: true,
         channel: undefined,
-        // Pre-installed Chromium binary required by the CI environment.
-        executablePath: "/opt/pw-browsers/chromium",
+        // executablePath is intentionally omitted here — extension-context.ts
+        // handles the launch via chromium.launchPersistentContext() and reads
+        // PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH from the environment when set.
       },
     },
   ],

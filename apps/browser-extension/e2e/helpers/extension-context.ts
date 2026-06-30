@@ -41,18 +41,28 @@ const EXTENSION_PATH = path.resolve(
  * register itself.
  */
 export async function buildExtensionContext(): Promise<BrowserContext> {
+  const args = [
+    // Chrome's new headless mode (112+) supports extensions; old --headless does not.
+    '--headless=new',
+    `--disable-extensions-except=${EXTENSION_PATH}`,
+    `--load-extension=${EXTENSION_PATH}`,
+  ];
+
+  // --no-sandbox / --disable-setuid-sandbox are only needed in Linux containers.
+  if (process.platform !== 'win32') {
+    args.push('--no-sandbox', '--disable-setuid-sandbox');
+  }
+
+  // Allow an explicit override (e.g. CI pre-installs Chromium at a fixed path).
+  // When absent, Playwright uses its own managed Chromium installation.
+  const customPath = process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'];
+
   const context = await chromium.launchPersistentContext('', {
     // headless: false is required so Playwright does not inject --headless itself;
-    // --headless=new below is Chrome's new headless mode which supports extensions.
+    // the --headless=new arg above enables Chrome's new headless mode.
     headless: false,
-    executablePath: '/opt/pw-browsers/chromium',
-    args: [
-      '--headless=new',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      `--disable-extensions-except=${EXTENSION_PATH}`,
-      `--load-extension=${EXTENSION_PATH}`,
-    ],
+    ...(customPath ? { executablePath: customPath } : {}),
+    args,
   });
 
   // Wait until the extension service worker appears in the context.
@@ -176,8 +186,8 @@ export async function openFixturePage(
 // ---------------------------------------------------------------------------
 
 /** Gracefully close the browser context after a test suite. */
-export async function closeContext(context: BrowserContext): Promise<void> {
-  await context.close();
+export async function closeContext(context: BrowserContext | null | undefined): Promise<void> {
+  if (context) await context.close();
 }
 
 // ---------------------------------------------------------------------------
