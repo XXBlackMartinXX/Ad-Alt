@@ -7,6 +7,8 @@
 export interface SponsoredMoment {
   /** Backend-assigned decision ID; used as the reference for events. */
   adDecisionId: string;
+  /** Campaign ID — present in backend responses; required for impression_requested events. */
+  campaignId?: string;
   /** Campaign creative ID. */
   creativeId: string;
   /** Short headline text (max 80 chars). Safe to display — never user-derived. */

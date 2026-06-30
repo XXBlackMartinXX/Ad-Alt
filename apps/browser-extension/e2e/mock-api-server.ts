@@ -36,6 +36,7 @@ export interface CapturedEvent {
 
 export const DEFAULT_AD_DECISION: SponsoredMoment = {
   adDecisionId: '00000000-0000-0000-0000-000000000001',
+  campaignId: '00000000-0000-0000-0000-000000000003',
   creativeId: '00000000-0000-0000-0000-000000000002',
   headline: 'E2E Test Sponsored Headline',
   body: 'This is a test sponsored moment body text.',

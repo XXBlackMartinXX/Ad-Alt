@@ -6,11 +6,19 @@
  * pages rather than on chatgpt.com, enabling full adapter integration testing without
  * a real ChatGPT session.
  *
- * PRIVACY RULE: Inherits all privacy rules from ChatGPTAdapter — this script never
- * reads page content, user input, DOM text, or any data beyond structural DOM signals.
+ * PRIVACY RULE: Inherits all privacy rules from ChatGPTAdapter and ad-event-sender —
+ * this script never reads page content, user input, DOM text, cookies, auth tokens,
+ * page URL/title, or any data beyond structural DOM signals.
  */
 
 import { ChatGPTAdapter } from "../adapters/chatgpt/chatgpt.adapter.js";
+import { ViewabilityObserver } from "./viewability-observer.js";
+import {
+  sendImpressionRequested,
+  sendImpressionRendered,
+  sendViewabilityThresholdMet,
+} from "./ad-event-sender.js";
+import { VIEWABILITY_THRESHOLDS } from "@ad-alt/platform-core";
 import type { SponsoredMoment } from "@ad-alt/platform-core";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,6 +43,8 @@ void (async () => {
 
   await adapter.start();
 
+  const viewabilityObserver = new ViewabilityObserver();
+
   adapter.onWaitStateStart(async (_event) => {
     // Request an ad decision from the service-worker (which calls the mock API).
     let decision: SponsoredMoment | null = null;
@@ -51,14 +61,38 @@ void (async () => {
 
     if (!decision) return;
 
+    // Fire impression_requested before rendering (campaignId required by schema).
+    void sendImpressionRequested(decision, adapter.adapterId);
+
     await adapter.renderSponsoredMoment(decision);
+
+    // Fire impression_rendered immediately after the banner enters the DOM.
+    void sendImpressionRendered(decision, adapter.adapterId);
+
+    // Start viewability tracking — fires viewability_threshold_met after threshold.
+    // In E2E tests the banner is typically dismissed before the threshold is met;
+    // the observer is stopped in onWaitStateEnd regardless.
+    const bannerEl = document.getElementById("promptprofit-sponsored-banner");
+    if (bannerEl) {
+      const capturedDecision = decision;
+      viewabilityObserver.observe(bannerEl, (durationMs) => {
+        void sendViewabilityThresholdMet(
+          capturedDecision,
+          adapter.adapterId,
+          durationMs,
+          VIEWABILITY_THRESHOLDS.BILLABLE_DURATION_MS,
+        );
+      });
+    }
   });
 
   adapter.onWaitStateEnd(async () => {
+    viewabilityObserver.stop();
     await adapter.removeSponsoredMoment();
   });
 
   window.addEventListener("beforeunload", () => {
+    viewabilityObserver.stop();
     void adapter.stop();
   });
 })();

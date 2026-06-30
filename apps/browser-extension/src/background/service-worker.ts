@@ -51,6 +51,37 @@ async function refreshFlags(): Promise<FeatureFlags> {
 }
 
 /**
+ * Post a single telemetry event to the PromptProfit API.
+ * Returns true on HTTP 2xx; false on any error or missing API configuration.
+ * The payload is passed through as-is — privacy validation is the content
+ * script's responsibility (ad-event-sender.ts never includes page data).
+ */
+async function postEvent(event: unknown): Promise<boolean> {
+  let apiBaseUrl: string | null = null;
+  try {
+    const stored = await chrome.storage.local.get("apiBaseUrl") as Record<string, unknown>;
+    if (typeof stored["apiBaseUrl"] === "string" && stored["apiBaseUrl"].length > 0) {
+      apiBaseUrl = stored["apiBaseUrl"];
+    }
+  } catch {
+    return false;
+  }
+
+  if (!apiBaseUrl) return false;
+
+  try {
+    const resp = await fetch(`${apiBaseUrl}/v1/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch an ad decision from the PromptProfit API.
  * Returns null when no ad is available, the API is not configured, or any error occurs.
  *
@@ -115,6 +146,16 @@ chrome.runtime.onMessage.addListener(
       getAdDecision(adapterId)
         .then((decision) => sendResponse({ decision }))
         .catch(() => sendResponse({ decision: null }));
+      return true;
+    }
+
+    if (message?.["type"] === "POST_EVENT") {
+      // Post a telemetry event on behalf of the content script.
+      // Returns { ok: boolean } — caller treats false as a silent drop.
+      const event = message["event"];
+      postEvent(event)
+        .then((ok) => sendResponse({ ok }))
+        .catch(() => sendResponse({ ok: false }));
       return true;
     }
 
