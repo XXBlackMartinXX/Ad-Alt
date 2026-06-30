@@ -13,6 +13,7 @@
 
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { eq } from "drizzle-orm";
 import * as schema from "./schema/index.js";
 
 const connectionString =
@@ -24,6 +25,18 @@ const db = drizzle(sql, { schema });
 
 async function seed(): Promise<void> {
   console.log("Starting seed...");
+
+  // Idempotency guard: skip if already seeded.
+  const existing = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "admin@promptprofit.dev"))
+    .limit(1);
+  if (existing.length > 0) {
+    console.log("Seed already applied — nothing to do");
+    await sql.end();
+    return;
+  }
 
   // ---------------------------------------------------------------------------
   // Users

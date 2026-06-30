@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E2E Fixture — AI Response Simulator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .disclaimer {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #664d03;
+    }
+
+    .disclaimer strong { display: block; margin-bottom: 4px; }
+
+    #chat-container {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      min-height: 120px;
+    }
+
+    .chat-placeholder {
+      color: #888;
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    .chat-placeholder p { margin-bottom: 8px; }
+
+    #wait-state-indicator {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #e9ecef;
+      color: #495057;
+      margin-bottom: 20px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    #wait-state-indicator.waiting {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #btn-start-wait { background: #0d6efd; color: #fff; }
+    #btn-start-wait:hover:not(:disabled) { background: #0b5ed7; }
+
+    #btn-end-wait { background: #198754; color: #fff; }
+    #btn-end-wait:hover:not(:disabled) { background: #157347; }
+
+    /* Stop-button sentinel is kept off-screen — never visible to humans */
+    #fixture-stop-btn-sentinel {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body data-fixture-ready="true">
+
+  <div class="disclaimer">
+    <strong>Synthetic E2E Test Fixture</strong>
+    This page is a local test fixture for automated browser extension testing.
+    It is NOT affiliated with, endorsed by, or representative of any real AI platform
+    or service. No real AI content is served here.
+  </div>
+
+  <div id="chat-container">
+    <div class="chat-placeholder">
+      <p>[Synthetic placeholder — simulates a ChatGPT conversation container]</p>
+      <p>No real user data, AI responses, or external content is present on this page.</p>
+    </div>
+  </div>
+
+  <div id="wait-state-indicator">State: idle</div>
+
+  <div class="controls">
+    <button id="btn-start-wait">Start Wait State</button>
+    <button id="btn-end-wait" disabled>End Wait State</button>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var SENTINEL_ID = 'fixture-stop-btn-sentinel';
+
+      /**
+       * Adds a button element with the structural attributes that the ChatGPT
+       * wait-state detector watches for:
+       *   - data-testid="stop-button"
+       *   - aria-label="Stop generating"
+       *
+       * The element is positioned off-screen so it is invisible to human users
+       * but fully present in the DOM for MutationObserver to detect.
+       */
+      window.fixtureStartWait = function () {
+        if (document.getElementById(SENTINEL_ID)) return; // idempotent
+
+        var btn = document.createElement('button');
+        btn.id = SENTINEL_ID;
+        btn.setAttribute('data-testid', 'stop-button');
+        btn.setAttribute('aria-label', 'Stop generating');
+        btn.textContent = 'Stop generating';
+        document.body.appendChild(btn);
+
+        var indicator = document.getElementById('wait-state-indicator');
+        indicator.textContent = 'State: waiting (stop-button present)';
+        indicator.classList.add('waiting');
+
+        document.getElementById('btn-start-wait').disabled = true;
+        document.getElementById('btn-end-wait').disabled = false;
+      };
+
+      /**
+       * Removes the stop-button sentinel element, signalling that the wait
+       * state has ended. The MutationObserver in the adapter will detect the
+       * removal and fire the onWaitStateEnd callbacks.
+       */
+      window.fixtureEndWait = function () {
+        var sentinel = document.getElementById(SENTINEL_ID);
+        if (sentinel) sentinel.parentNode.removeChild(sentinel);
+
+        var indicator = document.getElementById('wait-state-indicator');
+        indicator.textContent = 'State: idle';
+        indicator.classList.remove('waiting');
+
+        document.getElementById('btn-start-wait').disabled = false;
+        document.getElementById('btn-end-wait').disabled = true;
+      };
+
+      /**
+       * Returns true if the stop-button sentinel is currently present in the DOM.
+       * Useful for Playwright assertions and test helper utilities.
+       */
+      window.fixtureIsWaiting = function () {
+        return document.getElementById(SENTINEL_ID) !== null;
+      };
+
+      // Wire up the manual-control buttons for interactive inspection
+      document.getElementById('btn-start-wait').addEventListener('click', window.fixtureStartWait);
+      document.getElementById('btn-end-wait').addEventListener('click', window.fixtureEndWait);
+    })();
+  </script>
+
+</body>
+</html>

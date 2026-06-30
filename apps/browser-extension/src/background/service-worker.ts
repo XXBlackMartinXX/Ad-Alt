@@ -71,13 +71,15 @@ async function getAdDecision(adapterId: string): Promise<Record<string, unknown>
   if (!apiBaseUrl) return null;
 
   try {
-    const url = `${apiBaseUrl}/v1/ad-decision?adapterName=${encodeURIComponent(adapterId)}`;
+    const url = `${apiBaseUrl}/v1/ads/decision?adapterName=${encodeURIComponent(adapterId)}`;
     const resp = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
     if (!resp.ok) return null;
-    const body = await resp.json() as Record<string, unknown>;
+    const outer = await resp.json() as Record<string, unknown>;
+    // Support both wrapped { data: { ... } } and flat response shapes
+    const body = (outer["data"] ?? outer) as Record<string, unknown>;
     // Validate required SponsoredMoment fields are present and have correct types
     if (
       typeof body["adDecisionId"] === "string" &&
@@ -136,6 +138,14 @@ chrome.runtime.onMessage.addListener(
 chrome.alarms.create("refresh-flags", { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm: { name: string }) => {
   if (alarm.name === "refresh-flags") {
+    flagsFetchedAt = 0;
+  }
+});
+
+// Invalidate the in-memory flag cache whenever featureFlags changes in storage
+// (covers test helpers that write directly to chrome.storage.local).
+chrome.storage.onChanged.addListener((changes: Record<string, unknown>, area: string) => {
+  if (area === "local" && "featureFlags" in changes) {
     flagsFetchedAt = 0;
   }
 });

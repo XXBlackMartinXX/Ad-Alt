@@ -11,15 +11,20 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/bundle.mjs",
+    "build:test": "node scripts/bundle-test.mjs",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
-    "clean": "rm -rf dist"
+    "test:e2e": "pnpm build:test && playwright test",
+    "test:e2e:headed": "pnpm build:test && playwright test --headed",
+    "smoke:chatgpt-fixture": "pnpm build:test && playwright test --grep chatgpt-adapter",
+    "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
     "@ad-alt/platform-core": "workspace:*",
     "@ad-alt/shared": "workspace:*"
   },
   "devDependencies": {
+    "@playwright/test": "^1.47.0",
     "esbuild": "^0.23.0",
     "typescript": "^5.4.5",
     "vitest": "^2.1.9"
