@@ -6,3 +6,6 @@ scripts/**
 tsconfig.json
 vitest.config.ts
 .eslintrc*
+dist/**/*.map
+dist/**/*.d.ts
+dist/**/*.d.ts.map

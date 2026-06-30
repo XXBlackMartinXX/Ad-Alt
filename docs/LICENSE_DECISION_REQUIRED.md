@@ -118,14 +118,34 @@ None. This is a distribution/legal blocker, not a code or test blocker.
 
 ---
 
+## Automated Check
+
+The `check:license` script enforces this decision gate without making a choice:
+
+```bash
+pnpm check:license                    # internal-beta mode (WARN, exit 0)
+pnpm check:license -- --mode public-release  # FAIL if no LICENSE, exit 1
+```
+
+The script checks:
+- Whether a LICENSE file exists (WARN in internal-beta; FAIL in public-release)
+- License type consistency across all workspace `package.json` files
+- Whether this document references the chosen license (if LICENSE exists)
+
+It does NOT create a LICENSE file. It does NOT choose a license.
+
+---
+
 ## Resolution Steps
 
 1. Get license decision from stakeholders.
 2. Add `LICENSE` file to repository root.
-3. Update `package.json` `"license"` field.
-4. Update `apps/extension/package.json` for VSIX compliance.
-5. Remove this blocker from `CHATGPT_BROWSER_BETA_READINESS_CHECKLIST.md`.
-6. Proceed with Chrome Web Store / Marketplace submission.
+3. Update all workspace `package.json` files' `"license"` field.
+4. Run `pnpm check:license` to verify consistency.
+5. Update this document to reference the decision.
+6. Update `docs/PUBLIC_RELEASE_READINESS_MATRIX.md` license row.
+7. Remove this blocker from `CHATGPT_BROWSER_BETA_READINESS_CHECKLIST.md`.
+8. Proceed with Chrome Web Store / Marketplace submission.
 
 ---
 

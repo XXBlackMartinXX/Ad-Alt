@@ -3,7 +3,7 @@
 **Date:** 2026-06-30
 **Branch:** `claude/ecstatic-maxwell-h0d8d8`
 **Overall label:** beta-readiness candidate with local-real-API smoke verified
-**Last updated:** billing/ledger verification + beta packaging hardening
+**Last updated:** public-release gating, artifact audits, billing reconciliation plan
 
 ---
 
@@ -141,12 +141,13 @@
 | src/ excluded from VSIX | PASS | .vscodeignore entry |
 | No dist-test/ in VSIX | PASS | Different app package |
 | No .env / secrets in VSIX | PASS | git-ignored |
-| VSIX source maps (VS Code ext) | PASS | Beta-acceptable; exclude before Marketplace submission |
-| Browser ext source maps (dist/) | NOT STARTED | Strip .map before CWS submission; OK for beta |
+| VSIX source maps (VS Code ext) | PASS | .vscodeignore now excludes dist/**/*.map; verify on next package |
+| Browser ext source maps (dist/) | PASS | Excluded by package:browser:beta; audit script verifies |
 | LICENSE file present | BLOCKED | No LICENSE file; see docs/LICENSE_DECISION_REQUIRED.md |
-| License decision documented | PASS | docs/LICENSE_DECISION_REQUIRED.md created |
+| License decision documented | PASS | docs/LICENSE_DECISION_REQUIRED.md |
+| License check script | PASS | check:license script enforces --mode gating |
 | Beta release notes created | PASS | docs/CHATGPT_BROWSER_BETA_RELEASE_NOTES.md |
-| Full hygiene documented | PASS | docs/RELEASE_PACKAGE_HYGIENE.md |
+| Full hygiene documented | PASS | docs/RELEASE_PACKAGE_HYGIENE.md updated |
 
 ---
 
@@ -181,10 +182,18 @@
 | CANARY 8: No events = skip privacy check | PASS | Spec skips; 0 events = vacuous truth avoided |
 | CANARY 9: Billing not claimed if ledger unverified | PASS | Billing smoke only claims PASS after DB invariant confirmed |
 | CANARY 10: Click billing not claimed if unverified | PASS | Click smoke exits 1 if DB ledger entries not found |
-| CANARY 11: Source maps not stripped = not store-ready | PASS | audit-browser-extension-package.js warns on .map files; --mode public-release promotes to FAIL |
+| CANARY 11: Source maps not stripped = not store-ready | PASS | audit-browser-extension-package.js + audit-browser-extension-zip.js; --mode public-release FAILs |
 | CANARY 12: No LICENSE file committed without decision | PASS | docs/LICENSE_DECISION_REQUIRED.md updated; no LICENSE file added |
 | CANARY 13: No mojibake in reports | PASS | All em-dash/checkmark Unicode fixed; ASCII-clean |
 | CANARY 14: Not claimed production-ready | PASS | Label is beta-readiness candidate |
+| CANARY 7 (new): No raw API key in output/reports/artifacts | PASS | check:secrets:local clean; smoke report post-write validation |
+| CANARY 8 (new): No LICENSE without explicit decision | PASS | check:license does not create LICENSE; only checks |
+| CANARY 9 (new): No license in package.json without decision | PASS | No change to license fields; UNLICENSED unchanged |
+| CANARY 10 (new): Source maps in public ZIP = audit FAIL | PASS | package:browser:zip:audit --mode public-release enforces |
+| CANARY 11 (new): Icons placeholder = CWS readiness BLOCKED | PASS | audit-browser-extension-zip.js warns on small icons; matrix reflects BLOCKED |
+| CANARY 12 (new): No production billing claimed without staging | PASS | check:billing:reconciliation always mode-gates staging; matrix shows BLOCKED |
+| CANARY 13 (new): Test artifacts in ZIP/VSIX = public audit FAIL | PASS | Both audit scripts check for test-results, dist-test, screenshots, traces |
+| CANARY 14 (new): Generated artifacts not committed | PASS | dist-package/ gitignored; icons committed; no ZIP/VSIX committed |
 
 ---
 
@@ -211,8 +220,14 @@
 | query:local-billing-events | PASS | query-local-billing-events.ps1 created; queries impression_events |
 | query-local-browser-events.ps1 | PASS | No local psql; correct table/DB defaults; filters |
 | package:browser:beta | PASS | package-browser-extension.mjs; excludes .map; auto-runs Compress-Archive on Windows |
-| package:browser:audit | PASS | audit-browser-extension-package.js; supports --mode internal-beta/public-release |
-| package:vscode:audit | PASS | audit-vsix-package.js; supports --mode internal-beta/public-release |
+| package:browser:public | PASS | --mode public-release; fails on LICENSE/icons blockers |
+| package:browser:audit | PASS | audit-browser-extension-package.js; supports --mode |
+| package:browser:zip:audit | PASS | audit-browser-extension-zip.js; reads ZIP Central Directory |
+| package:vscode:audit | PASS | audit-vsix-package.js; supports --mode |
+| package:vscode:vsix:audit | PASS | audit-vsix-artifact.js; reads VSIX binary format |
+| check:license | PASS | check-license-decision.js; mode-gated; does not choose a license |
+| check:billing:reconciliation | PASS | check-billing-reconciliation-readiness.js; mode-gated |
+| icons:create | PASS | create-placeholder-icons.mjs; generates solid #1D4ED8 PNGs |
 | Generated report mojibake | PASS | All em-dash/checkmark chars removed from report strings |
 
 ---
@@ -221,11 +236,10 @@
 
 | Blocker | Category | Severity | Path to Resolve |
 |---------|----------|----------|----------------|
-| No LICENSE file | Release | Store-submission blocker | See docs/LICENSE_DECISION_REQUIRED.md |
-| Browser ext source maps not stripped | Release | Pre-CWS-submission | `sourcemap: false` in esbuild OR exclude .map from ZIP (package:browser:beta does this) |
-| Viewability billing not end-to-end verified (production) | Testing | Pre-production | Staging environment test required |
+| No LICENSE file | Release | Store-submission blocker | See docs/LICENSE_DECISION_REQUIRED.md; requires stakeholder decision |
+| Final brand icons not designed | Release | Pre-CWS-submission | Placeholder icons present (pnpm icons:create); final brand assets required before CWS |
+| Viewability billing not end-to-end verified (production) | Testing | Pre-production | Staging environment test required; see docs/PRODUCTION_BILLING_RECONCILIATION_PLAN.md |
 | Click billing not end-to-end verified (production) | Testing | Pre-production | Staging environment test required |
-| icons/ directory missing | Release | Pre-CWS-submission | icon16.png, icon48.png, icon128.png required for CWS |
 
 **Resolved in this session:**
 - "No automated API key seed" - RESOLVED (auto-minting in script)
@@ -239,6 +253,13 @@
 - "Billing smoke report false-positive PASSED" - RESOLVED (StatusTag() helper + post-write validation in both smoke scripts)
 - "package:browser:beta fails on Windows" - RESOLVED (auto-executes Compress-Archive on win32; verifies ZIP size > 0)
 - "popup.html / options.html missing from manifest" - RESOLVED (removed unused declarations from manifest.json)
+- "No artifact-level ZIP audit" - RESOLVED (audit-browser-extension-zip.js reads ZIP Central Directory)
+- "No VSIX artifact audit" - RESOLVED (audit-vsix-artifact.js reads VSIX binary format)
+- "icons/ directory missing" - RESOLVED for internal beta (create-placeholder-icons.mjs generates solid-color PNG placeholders; final brand icons still BLOCKED)
+- "VSIX source maps not excluded" - RESOLVED (.vscodeignore now has dist/**/*.map entries)
+- "No production billing reconciliation plan" - RESOLVED (docs/PRODUCTION_BILLING_RECONCILIATION_PLAN.md created)
+- "No release readiness matrix" - RESOLVED (docs/PUBLIC_RELEASE_READINESS_MATRIX.md created)
+- "No public-release packaging gate" - RESOLVED (package:browser:public and --mode public-release in packaging script)
 
 ---
 
@@ -261,36 +282,35 @@
 | Item | Status | Notes |
 |------|--------|-------|
 | Browser extension beta ZIP | PASS (script) | package:browser:beta creates ZIP without .map files |
-| Browser extension package audit | PASS (script) | package:browser:audit checks manifest refs, source maps, permissions |
-| VS Code extension VSIX audit | PASS (script) | package:vscode:audit checks .vscodeignore, dist, license, sensitive files |
+| Browser extension ZIP audit | PASS (script) | package:browser:zip:audit reads ZIP Central Directory |
+| Browser extension package audit | PASS (script) | package:browser:audit checks dist/ directory |
+| VS Code extension VSIX artifact audit | PASS (script) | package:vscode:vsix:audit reads VSIX binary |
+| VS Code extension VSIX package audit | PASS (script) | package:vscode:audit checks .vscodeignore, dist, license |
 | popup.html / options.html | RESOLVED | Removed unused declarations from manifest.json (not implemented) |
-| icons/ directory | MISSING | icon16.png, icon48.png, icon128.png not yet created |
-| Source maps in browser ext dist/ | PRESENT | Excluded by package:browser:beta; strip before CWS submission |
-| Source maps in VSIX | PRESENT | Acceptable for beta; add `dist/*.map` to .vscodeignore before Marketplace |
+| icons/ directory | PASS (placeholder) | icon16.png, icon48.png, icon128.png created; final brand icons required before CWS |
+| Source maps in browser ext dist/ | EXCLUDED | Excluded by package:browser:beta and audit scripts |
+| Source maps in VSIX | EXCLUDED | .vscodeignore now excludes dist/**/*.map, dist/**/*.d.ts |
 
 ---
 
 ## Final Label
 
-**beta-readiness candidate with billing/ledger verification, packaging hardened, and automation bugs fixed**
+**beta-readiness candidate with public-release gating, artifact audits, and billing reconciliation plan**
 
 The ChatGPT browser adapter passes all automated fixture tests, unit tests,
-TypeScript checks, lint, and Windows live smoke validation. The local
-real-API smoke pipeline runs end-to-end and was verified on Windows at
-commit c5167e2. Billing/ledger smoke scripts are implemented: they submit the
-full event lifecycle (impression_requested, impression_rendered,
-viewability_threshold_met) and verify ledger entries via both the API and
-Postgres, including the invariant developer_credit + platform_fee ===
-advertiser_charge. Click billing smoke is also scripted. Both smoke scripts
-now use StatusTag() helper functions (fixing a PowerShell 5.1 inline `if`
-expression bug) and validate report existence, size, content, and absence of
-secrets before printing PASSED. The browser extension packager
-(package:browser:beta) now auto-executes Compress-Archive on Windows and
-verifies the ZIP is created and non-empty. The manifest.json was cleaned of
-unimplemented popup/options declarations. Audit scripts support --mode
-internal-beta and --mode public-release to distinguish warning vs blocking
-severity. Privacy and security audits are clean. Reports are ASCII-only.
-Secret leak checks pass. Four outstanding blockers (LICENSE, source maps,
-icons/ assets, and production billing reconciliation) do not affect core
-adapter correctness or internal beta testing. Public store submission requires
-resolving all FAIL items listed in the blockers table above.
+TypeScript checks, lint, and Windows live smoke validation. Billing/ledger smoke
+scripts verify the full impression and click billing invariant. Artifact-level
+audit scripts read ZIP and VSIX Central Directories to verify forbidden content
+exclusion. All audit scripts support --mode internal-beta (warn on blockers, exit 0)
+and --mode public-release (fail on blockers, exit 1). Source maps are excluded from
+browser extension ZIPs by the packaging script, and .vscodeignore now excludes
+dist/**/*.map from the VS Code VSIX. Placeholder icons (solid #1D4ED8 squares,
+programmatically generated) are present in icons/ for internal beta. The production
+billing reconciliation plan is documented with full staging checklist, fraud guard
+verification, rollback criteria, and audit log requirements. The public release
+readiness matrix records what is PASS, BLOCKED, or FAIL at each stage.
+
+Three outstanding blockers (LICENSE decision, final brand icons, and staging billing
+reconciliation) do not affect core adapter correctness or internal beta testing.
+These are hard gates for CWS submission, Marketplace submission, and production
+billing respectively. See docs/PUBLIC_RELEASE_READINESS_MATRIX.md for the full matrix.

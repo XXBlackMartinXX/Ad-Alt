@@ -41,11 +41,17 @@
     "query:local-ledger": "node scripts/run-ps1.js scripts/query-local-ledger.ps1",
     "query:local-billing-events": "node scripts/run-ps1.js scripts/query-local-billing-events.ps1",
     "package:browser:beta": "node scripts/package-browser-extension.mjs",
+    "package:browser:public": "node scripts/package-browser-extension.mjs --mode public-release",
     "package:browser:audit": "node scripts/audit-browser-extension-package.js",
+    "package:browser:zip:audit": "node scripts/audit-browser-extension-zip.js",
     "package:vscode:audit": "node scripts/audit-vsix-package.js",
+    "package:vscode:vsix:audit": "node scripts/audit-vsix-artifact.js",
     "check:ps1": "node scripts/check-ps1-ascii.js",
     "check:secrets:local": "node scripts/check-no-secret-leaks.js",
-    "check:report-ascii": "node scripts/check-report-templates-ascii.js"
+    "check:report-ascii": "node scripts/check-report-templates-ascii.js",
+    "check:license": "node scripts/check-license-decision.js",
+    "check:billing:reconciliation": "node scripts/check-billing-reconciliation-readiness.js",
+    "icons:create": "node scripts/create-placeholder-icons.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

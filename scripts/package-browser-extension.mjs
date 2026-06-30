@@ -51,6 +51,14 @@ const DIST_DIR  = join(EXT_DIR, 'dist');
 const MANIFEST  = join(EXT_DIR, 'manifest.json');
 const OUT_DIR   = join(EXT_DIR, 'dist-package');
 
+const modeIdx     = process.argv.indexOf('--mode');
+const mode        = modeIdx !== -1 ? process.argv[modeIdx + 1] : 'internal-beta';
+if (mode !== 'internal-beta' && mode !== 'public-release') {
+  process.stderr.write('[XX] Unknown --mode: ' + mode + '. Use internal-beta or public-release.\n');
+  process.exit(2);
+}
+const isPublicRelease = mode === 'public-release';
+
 /** Extensions to exclude from the ZIP. */
 const EXCLUDED_EXTENSIONS = new Set(['.map', '.ts']);
 
@@ -64,10 +72,21 @@ const EXCLUDED_PATTERNS = [
 /** Directory names to exclude entirely. */
 const EXCLUDED_DIRS = new Set(['__tests__']);
 
+let exitCode = 0;
+
 function log(msg)  { process.stdout.write('[--] ' + msg + '\n'); }
 function ok(msg)   { process.stdout.write('[OK] ' + msg + '\n'); }
 function warn(msg) { process.stderr.write('[!!] ' + msg + '\n'); }
 function err(msg)  { process.stderr.write('[XX] ' + msg + '\n'); }
+
+function modeGatedFail(msg) {
+  if (isPublicRelease) {
+    process.stderr.write('[FAIL] ' + msg + '\n');
+    exitCode = 1;
+  } else {
+    process.stderr.write('[!!] ' + msg + ' [OK for internal-beta; BLOCKED for public release]\n');
+  }
+}
 
 function isExcluded(filePath) {
   const ext  = extname(filePath);
@@ -113,7 +132,7 @@ function collectFiles(dir, baseDir) {
 // ---------------------------------------------------------------------------
 
 process.stdout.write('\n');
-process.stdout.write('[>>] Browser Extension Beta Packager\n');
+process.stdout.write('[>>] Browser Extension Packager (' + mode + ')\n');
 process.stdout.write('-'.repeat(60) + '\n');
 
 if (!existsSync(DIST_DIR)) {
@@ -182,7 +201,7 @@ if (existsSync(iconsDir)) {
   packageFiles.push(...iconFiles);
   ok('Including icons/ (' + iconFiles.length + ' files)');
 } else {
-  warn('Missing: icons/ directory (icon16.png, icon48.png, icon128.png required for CWS)');
+  modeGatedFail('icons/ directory missing (icon16.png, icon48.png, icon128.png required for CWS)');
 }
 
 process.stdout.write('\n');
@@ -312,19 +331,34 @@ process.stdout.write('='.repeat(60) + '\n');
 process.stdout.write('\n');
 
 // Known issues summary
-const issues = [];
+const knownIssues = [];
 // Check for HTML pages that are declared in manifest but still missing
 for (const ref of htmlRefs) {
-  if (!existsSync(join(EXT_DIR, ref))) issues.push(ref + ' missing (declared in manifest.json)');
+  if (!existsSync(join(EXT_DIR, ref))) knownIssues.push(ref + ' missing (declared in manifest.json)');
 }
-if (!existsSync(iconsDir)) issues.push('icons/ directory missing');
-if (!existsSync(join(REPO_ROOT, 'LICENSE'))) issues.push('No LICENSE file (required for CWS)');
+if (!existsSync(iconsDir)) knownIssues.push('icons/ directory missing — run: pnpm icons:create');
+if (!existsSync(join(REPO_ROOT, 'LICENSE'))) {
+  if (isPublicRelease) {
+    process.stderr.write('[FAIL] No LICENSE file at repository root (required for CWS / Marketplace)\n');
+    exitCode = 1;
+  } else {
+    knownIssues.push('No LICENSE file (required for CWS — see docs/LICENSE_DECISION_REQUIRED.md)');
+  }
+}
 
-if (issues.length > 0) {
+if (knownIssues.length > 0) {
   warn('Issues to resolve before Chrome Web Store submission:');
-  for (const issue of issues) warn('  - ' + issue);
+  for (const issue of knownIssues) warn('  - ' + issue);
   process.stdout.write('\n');
 }
 
-ok('Beta package ready for internal distribution (source maps excluded).');
-ok('Resolve listed issues before Chrome Web Store submission.');
+process.stdout.write('='.repeat(60) + '\n');
+process.stdout.write('Mode: ' + mode + '\n');
+if (exitCode === 0) {
+  ok('Package ready for ' + (isPublicRelease ? 'public release' : 'internal beta') + ' distribution (source maps excluded).');
+  if (!isPublicRelease) ok('Re-run with --mode public-release before Chrome Web Store submission.');
+} else {
+  process.stderr.write('[FAIL] Packaging check failed. Resolve FAIL items before public release.\n');
+}
+process.stdout.write('='.repeat(60) + '\n');
+process.exit(exitCode);
