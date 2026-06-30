@@ -241,9 +241,15 @@ if ($responseObj.data -and $responseObj.data.apiKey) {
     $rawKey = $responseObj.apiKey
 }
 
-if (-not $rawKey -or $rawKey.Length -lt 8) {
-    Write-Err "Could not extract apiKey from /v1/auth/exchange response."
+if (-not $rawKey -or $rawKey.Length -lt 20) {
+    Write-Err "Could not extract a valid apiKey from /v1/auth/exchange response."
     Write-Err "(Key is shown exactly once - if the seed ran twice, re-seed or query existing key)"
+    exit 1
+}
+
+if (-not $rawKey.StartsWith("ppft_")) {
+    Write-Err "API key does not match expected format (must start with 'ppft_')."
+    Write-Err "Check the /v1/auth/exchange response shape and the seed script."
     exit 1
 }
 
@@ -277,9 +283,9 @@ if ($Json) {
 }
 
 if ($PrintKey) {
-    # Print ONLY the raw key - no other output on stdout when -Quiet is set.
-    # This makes it safe to capture: $key = .\get-local-dev-api-key.ps1 -PrintKey -Quiet
-    Write-Host $rawKey
+    # Write-Output sends to the Success pipeline so the parent can capture it.
+    # Write-Host goes to the console Information stream and cannot be captured.
+    Write-Output $rawKey
 }
 
 if (-not $PrintKey -and -not $Json) {

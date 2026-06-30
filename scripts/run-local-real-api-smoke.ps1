@@ -384,12 +384,15 @@ if ($env:PROMPTPROFIT_DEV_API_KEY -and $env:PROMPTPROFIT_DEV_API_KEY.Length -gt 
         exit 2
     }
 
-    # Capture key via -PrintKey -Quiet (key only on stdout, no other output)
-    $mintedKey = & $getMintScript -PrintKey -Quiet -ApiUrl $ApiUrl 2>$null
+    # Capture key via -PrintKey -Quiet.
+    # The helper uses Write-Output so the value flows to the Success pipeline (capturable).
+    # Write-Host would go to the console Information stream and cannot be assigned here.
+    $rawOutput = @(& $getMintScript -PrintKey -Quiet -ApiUrl $ApiUrl 2>$null)
     $mintExit  = $LASTEXITCODE
+    $mintedKey = if ($rawOutput.Count -gt 0) { $rawOutput[0].Trim() } else { "" }
 
-    if ($mintExit -ne 0 -or -not $mintedKey -or $mintedKey.Trim().Length -lt 8) {
-        Write-Err ("Failed to mint local dev API key (exit " + $mintExit + ").")
+    if ($mintExit -ne 0) {
+        Write-Err ("Key mint helper exited " + $mintExit + ". Cannot continue.")
         Write-Err "Ensure pnpm db:seed has been run and the API is healthy."
         if ($apiJobHandle) {
             Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
@@ -398,7 +401,26 @@ if ($env:PROMPTPROFIT_DEV_API_KEY -and $env:PROMPTPROFIT_DEV_API_KEY.Length -gt 
         exit 2
     }
 
-    $env:PROMPTPROFIT_DEV_API_KEY = $mintedKey.Trim()
+    if ($mintedKey.Length -lt 8) {
+        Write-Err "Key mint helper exited 0 but produced no capturable key."
+        Write-Err "Verify get-local-dev-api-key.ps1 uses Write-Output (not Write-Host) for -PrintKey."
+        if ($apiJobHandle) {
+            Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
+            Remove-Job -Job $apiJobHandle -Force -ErrorAction SilentlyContinue
+        }
+        exit 2
+    }
+
+    if (-not $mintedKey.StartsWith("ppft_")) {
+        Write-Err "Captured key does not start with 'ppft_'. Refusing to use an unexpected key format."
+        if ($apiJobHandle) {
+            Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
+            Remove-Job -Job $apiJobHandle -Force -ErrorAction SilentlyContinue
+        }
+        exit 2
+    }
+
+    $env:PROMPTPROFIT_DEV_API_KEY = $mintedKey
     $keyMinted = $true
     Write-Ok "Local dev API key minted and set in process environment (LOCAL ONLY, not printed)"
 }
