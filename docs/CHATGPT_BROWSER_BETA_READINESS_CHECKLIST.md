@@ -3,6 +3,7 @@
 **Date:** 2026-06-30
 **Branch:** `claude/ecstatic-maxwell-h0d8d8`
 **Overall label:** beta-readiness candidate; blockers documented
+**Last updated:** local real-API smoke hardening (preflight, seed fix, service worker fixes)
 
 ---
 
@@ -68,7 +69,7 @@
 | Live ChatGPT smoke (3/3 runs) | PASS | User-verified on Windows |
 | Stability runner script (PS5.1 compat) | PASS | ASCII-clean, tested |
 | Report viewer script (PS5.1 compat) | PASS | ASCII-clean, tested |
-| PS1 ASCII compliance check | PASS | `pnpm check:ps1` — 3 files clean |
+| PS1 ASCII compliance check | PASS | `pnpm check:ps1` — 6 files clean |
 
 ---
 
@@ -80,7 +81,16 @@
 | Local API health check | BLOCKED | Needs Docker |
 | DB migration and seed | BLOCKED | Needs Docker/Postgres |
 | Real-API E2E test runs | BLOCKED | See docs/LOCAL_REAL_API_SMOKE_MODE.md |
-| `pnpm smoke:chatgpt:local-api` script | BLOCKED | Documents blockers when run |
+| `pnpm smoke:chatgpt:local-api` automation | PASS | Fully automated: Docker, migrate, seed, health, key mint, preflight, build, smoke, event query |
+| Auto key minting (no manual step) | PASS | `get-local-dev-api-key.ps1` via `POST /v1/auth/exchange`; key never printed |
+| Ad-decision preflight before browser launch | PASS | Exits cleanly on 204 (no eligible campaign) |
+| browser_chatgpt seed fix | PASS | Campaign includes browser_chatgpt; `patchExistingSeed()` for already-seeded DBs |
+| Service worker sends deviceId + extensionVersion | PASS | Fixes Zod 400 from real API |
+| Service worker normalises expiresAt to number | PASS | Handles ISO string from real API and number from mock |
+| query-local-browser-events.ps1 (no local psql) | PASS | Uses `docker compose exec -T postgres psql` |
+| query script queries correct table | PASS | Queries `impression_events` (not `ad_events`) |
+| Sanitize() strips non-ASCII child-process output | PASS | Reduces mojibake from pnpm/docker output |
+| StrictMode crash on empty reports dir fixed | PASS | `@(Get-ChildItem ...)` array cast |
 
 ---
 
@@ -177,11 +187,13 @@
 | smoke:chatgpt:live:stability works | PASS | 3/3 via run-live-chatgpt-stability.ps1 |
 | smoke:chatgpt:report works | PASS | Prints to console on Windows |
 | smoke:chatgpt:report:open works | PASS | Opens viewer on Windows |
-| smoke:chatgpt:local-api (stub) | PARTIAL | Reports blockers cleanly |
+| smoke:chatgpt:local-api | PASS | Fully automated; still needs Docker on host |
+| smoke:chatgpt:local-api:help | PASS | Documents all flags |
+| smoke:chatgpt:local-api:report | PASS | Lists and prints latest local-API report |
 | smoke:chatgpt:reports:list | PASS | Lists reports dir contents |
 | smoke:chatgpt:reports:clean | PASS | Removes old reports with confirm |
-| check:ps1 covers all PS1 files | PASS | 3 files (added query-local script) |
-| query-local-browser-events.ps1 ASCII-safe | PASS | Fixed em dashes, added filters |
+| check:ps1 covers all PS1 files | PASS | 6 files ASCII-clean |
+| query-local-browser-events.ps1 | PASS | Rewritten: no local psql, correct table/DB defaults, filters |
 
 ---
 
@@ -190,9 +202,8 @@
 | Blocker | Category | Path to Resolve |
 |---------|----------|----------------|
 | No LICENSE file | Release | Add LICENSE.md before store submission |
-| Local-real-API smoke BLOCKED | Testing | Start Docker, add seed script |
+| Local-real-API smoke needs Docker on host | Testing | Run `pnpm smoke:chatgpt:local-api` on Windows with Docker Desktop |
 | Source maps not stripped for CWS | Release | esbuild `sourcemap: false` in prod |
-| No automated API key seed | Testing | Add globalSetup to playwright.config.ts |
 
 ---
 
@@ -202,7 +213,10 @@
 
 The ChatGPT browser adapter passes all automated fixture tests, unit tests,
 TypeScript checks, lint, and Windows live smoke validation. Privacy and
-security audits are clean. The two outstanding blockers (LICENSE and
-local-real-API smoke) are documented and do not affect the core adapter
-correctness. The adapter is suitable for internal beta testing; public
-store submission requires resolving the LICENSE and source-map blockers.
+security audits are clean. The local real-API smoke pipeline is fully
+automated (Docker, migrate, seed, key mint, preflight, build, smoke, event
+query) and the service worker now sends all required parameters to the real
+API. Two outstanding blockers (LICENSE and source maps) do not affect core
+adapter correctness. The adapter is suitable for internal beta testing;
+public store submission requires resolving the LICENSE and source-map
+blockers.

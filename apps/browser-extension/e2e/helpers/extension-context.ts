@@ -29,6 +29,13 @@ export interface ExtensionConfig {
    * Only used for local real-API smoke tests — never set in production.
    */
   apiKey?: string;
+  /**
+   * Device ID written to chrome.storage.local so the service worker can
+   * include it in /v1/ads/decision requests. When omitted, the service worker
+   * generates and persists its own UUID. For local-API smoke tests, set this to
+   * the same deviceId used when minting the dev API key.
+   */
+  deviceId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,17 +138,19 @@ export async function configureExtensionStorage(
     config.debugMode ?? false,
     config.testViewabilityThresholdMs ?? null,
     config.apiKey ?? null,
-  ] as [string, boolean, string[], boolean, number | null, string | null];
+    config.deviceId ?? null,
+  ] as [string, boolean, string[], boolean, number | null, string | null, string | null];
 
   const doEvaluate = async () => {
     const sw = await getOrWaitForServiceWorker(context);
     await sw.evaluate(
-      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey]: [
+      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey, deviceId]: [
         string,
         boolean,
         string[],
         boolean,
         number | null,
+        string | null,
         string | null,
       ]) => {
         return new Promise<void>((resolve, reject) => {
@@ -165,6 +174,9 @@ export async function configureExtensionStorage(
           // SECURITY: apiKey is stored in extension storage only — never written
           // to event payloads, debug panel, or any generated report.
           items["apiKey"] = apiKey ?? null;
+          // deviceId: when set, the service worker uses this ID in /v1/ads/decision
+          // requests. null clears any previously set value so the SW auto-generates.
+          items["deviceId"] = deviceId ?? null;
           // @ts-ignore — running inside Chrome extension service worker context
           chrome.storage.local.set(items, () => {
             // @ts-ignore

@@ -23,6 +23,32 @@ const connectionString =
 const sql = postgres(connectionString, { max: 1 });
 const db = drizzle(sql, { schema });
 
+type Db = ReturnType<typeof drizzle>;
+
+/**
+ * Idempotent patches applied whenever seed runs on an already-seeded database.
+ * Add incremental fixes here rather than changing the guard check above.
+ */
+async function patchExistingSeed(db: Db): Promise<void> {
+  // Patch 1: ensure browser_chatgpt is in targetAdapterNames for the dev campaign.
+  const [devCampaign] = await db
+    .select({ id: schema.campaigns.id, targetAdapterNames: schema.campaigns.targetAdapterNames })
+    .from(schema.campaigns)
+    .where(eq(schema.campaigns.name, "Acme Dev Tools Launch"))
+    .limit(1);
+
+  if (devCampaign) {
+    const existing = (devCampaign.targetAdapterNames as string[] | null) ?? [];
+    if (!existing.includes("browser_chatgpt")) {
+      await db
+        .update(schema.campaigns)
+        .set({ targetAdapterNames: [...existing, "browser_chatgpt"] })
+        .where(eq(schema.campaigns.id, devCampaign.id));
+      console.log("  Patch: added browser_chatgpt to campaign targetAdapterNames");
+    }
+  }
+}
+
 async function seed(): Promise<void> {
   console.log("Starting seed...");
 
@@ -33,7 +59,10 @@ async function seed(): Promise<void> {
     .where(eq(schema.users.email, "admin@promptprofit.dev"))
     .limit(1);
   if (existing.length > 0) {
-    console.log("Seed already applied — nothing to do");
+    // Seed was already applied. Run incremental patches for previously-seeded
+    // databases so they stay in sync with new local-dev requirements.
+    await patchExistingSeed(db);
+    console.log("Seed already applied — incremental patch complete");
     await sql.end();
     return;
   }
@@ -137,7 +166,7 @@ async function seed(): Promise<void> {
       spentMicrocents: 0,
       startAt: new Date(),
       endAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-      targetAdapterNames: ["copilot_status", "ai_status_bar"],
+      targetAdapterNames: ["copilot_status", "ai_status_bar", "browser_chatgpt"],
     })
     .returning();
 

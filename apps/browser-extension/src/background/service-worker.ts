@@ -51,6 +51,32 @@ async function refreshFlags(): Promise<FeatureFlags> {
 }
 
 /**
+ * Read or generate a stable device ID from extension storage.
+ * The ID is generated once on first use and persisted across service-worker restarts.
+ */
+async function getDeviceId(): Promise<string> {
+  try {
+    const stored = await chrome.storage.local.get("deviceId") as Record<string, unknown>;
+    const existing = stored["deviceId"];
+    if (typeof existing === "string" && existing.length > 0) return existing;
+    const newId = crypto.randomUUID();
+    chrome.storage.local.set({ deviceId: newId }).catch(() => {});
+    return newId;
+  } catch {
+    return "unknown-device";
+  }
+}
+
+/** Read the extension version from the manifest (falls back to "0.1.0"). */
+function getExtensionVersion(): string {
+  try {
+    return String((chrome.runtime.getManifest() as { version: string }).version ?? "0.1.0");
+  } catch {
+    return "0.1.0";
+  }
+}
+
+/**
  * Read apiBaseUrl from storage. Returns null if absent or invalid.
  */
 async function getApiBaseUrl(): Promise<string | null> {
@@ -117,22 +143,32 @@ async function getAdDecision(adapterId: string): Promise<Record<string, unknown>
   if (!apiBaseUrl) return null;
 
   try {
-    const url = `${apiBaseUrl}/v1/ads/decision?adapterName=${encodeURIComponent(adapterId)}`;
+    const deviceId = await getDeviceId();
+    const extensionVersion = getExtensionVersion();
+    const url =
+      `${apiBaseUrl}/v1/ads/decision` +
+      `?adapterName=${encodeURIComponent(adapterId)}` +
+      `&deviceId=${encodeURIComponent(deviceId)}` +
+      `&extensionVersion=${encodeURIComponent(extensionVersion)}`;
     const headers = await buildHeaders();
     const resp = await fetch(url, { method: "GET", headers });
     if (!resp.ok) return null;
     const outer = await resp.json() as Record<string, unknown>;
     // Support both wrapped { data: { ... } } and flat response shapes
     const body = (outer["data"] ?? outer) as Record<string, unknown>;
-    // Validate required SponsoredMoment fields are present and have correct types
+    // Validate required SponsoredMoment fields
     if (
       typeof body["adDecisionId"] === "string" &&
       typeof body["creativeId"] === "string" &&
       typeof body["headline"] === "string" &&
-      typeof body["displayUrl"] === "string" &&
-      typeof body["expiresAt"] === "number"
+      typeof body["displayUrl"] === "string"
     ) {
-      return body;
+      // Normalise expiresAt: real API returns ISO string, mock returns ms number.
+      const rawExpiry = body["expiresAt"];
+      const expiresAt =
+        typeof rawExpiry === "number" ? rawExpiry :
+        typeof rawExpiry === "string" ? new Date(rawExpiry).getTime() : 0;
+      return { ...body, expiresAt };
     }
     return null;
   } catch {

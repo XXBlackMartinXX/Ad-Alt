@@ -103,6 +103,13 @@ function Write-Warn([string]$msg)  { Write-Host ("[!!] " + $msg) -ForegroundColo
 function Write-Err([string]$msg)   { Write-Host ("[XX] " + $msg) -ForegroundColor Red }
 function Write-Separator           { Write-Host ("-" * 60) -ForegroundColor DarkGray }
 
+# Sanitize child-process output: replace non-printable/non-ASCII bytes (e.g.
+# Unicode box-drawing chars from pnpm spinners) with '?' to prevent mojibake
+# in Windows PowerShell 5.1 consoles that default to CP1252.
+function Sanitize([string]$text) {
+    return ($text -replace '[^\x20-\x7E]', '?').TrimEnd()
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $RepoRoot  = Split-Path -Parent $ScriptDir
 $ExtDir    = Join-Path $RepoRoot "apps/browser-extension"
@@ -247,7 +254,7 @@ if (-not $SkipDocker) {
     Write-Step "Starting Docker services"
     Push-Location $RepoRoot
     try {
-        & docker compose up -d 2>&1 | ForEach-Object { Write-Info $_ }
+        & docker compose up -d 2>&1 | ForEach-Object { Write-Info (Sanitize "$_") }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "docker compose up -d failed."
             Pop-Location
@@ -271,7 +278,7 @@ if (-not $SkipMigrate) {
     Write-Step "Running database migrations"
     Push-Location $RepoRoot
     try {
-        & pnpm db:migrate 2>&1 | ForEach-Object { Write-Info $_ }
+        & pnpm db:migrate 2>&1 | ForEach-Object { Write-Info (Sanitize "$_") }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "pnpm db:migrate failed."
             Pop-Location
@@ -280,7 +287,7 @@ if (-not $SkipMigrate) {
         Write-Ok "Migrations applied"
 
         Write-Step "Running database seed (idempotent)"
-        & pnpm db:seed 2>&1 | ForEach-Object { Write-Info $_ }
+        & pnpm db:seed 2>&1 | ForEach-Object { Write-Info (Sanitize "$_") }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "pnpm db:seed failed."
             Pop-Location
@@ -426,6 +433,74 @@ if ($env:PROMPTPROFIT_DEV_API_KEY -and $env:PROMPTPROFIT_DEV_API_KEY.Length -gt 
 }
 
 # ---------------------------------------------------------------------------
+# Step 5b: Ad-decision preflight
+# Verify the local API can serve a browser_chatgpt decision before opening the
+# browser. This catches seed/campaign eligibility issues early and prevents a
+# misleading "banner not found after 30s" failure.
+# SECURITY: Authorization header is never written to output.
+# ---------------------------------------------------------------------------
+
+Write-Step "Ad-decision preflight: checking browser_chatgpt eligibility"
+
+$preflightUri = $ApiUrl + "/v1/ads/decision?deviceId=local-real-api-smoke-device&adapterName=browser_chatgpt&extensionVersion=0.1.0"
+$preflightStatus = 0
+
+try {
+    $preflightResp = Invoke-WebRequest `
+        -Uri $preflightUri `
+        -Method GET `
+        -Headers @{ "Authorization" = ("Bearer " + $env:PROMPTPROFIT_DEV_API_KEY) } `
+        -UseBasicParsing `
+        -TimeoutSec 10 `
+        -ErrorAction Stop
+    $preflightStatus = [int]$preflightResp.StatusCode
+} catch {
+    if ($_.Exception.Response -ne $null) {
+        try { $preflightStatus = [int]$_.Exception.Response.StatusCode } catch { $preflightStatus = 0 }
+    }
+}
+
+if ($preflightStatus -eq 200) {
+    Write-Ok "Ad-decision preflight: 200 OK - campaign eligible for browser_chatgpt"
+} elseif ($preflightStatus -eq 204) {
+    Write-Err "Ad-decision preflight: 204 No Content"
+    Write-Err "The local API has no eligible ad decision for browser_chatgpt."
+    Write-Err "Likely cause: no active campaign targets browser_chatgpt in local DB."
+    Write-Err "Fix: run 'pnpm db:seed' (patch adds browser_chatgpt to targetAdapterNames)"
+    Write-Err "     or check campaign status/budget/dates in local Postgres."
+    if ($apiJobHandle) {
+        Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
+        Remove-Job -Job $apiJobHandle -Force -ErrorAction SilentlyContinue
+    }
+    exit 2
+} elseif ($preflightStatus -eq 401 -or $preflightStatus -eq 403) {
+    Write-Err ("Ad-decision preflight: HTTP " + $preflightStatus + " - local dev API key rejected.")
+    Write-Err "The key may be expired or invalid. Re-run seed and retry:"
+    Write-Err "  pnpm db:seed"
+    Write-Err "  pnpm -w run smoke:chatgpt:local-api"
+    if ($apiJobHandle) {
+        Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
+        Remove-Job -Job $apiJobHandle -Force -ErrorAction SilentlyContinue
+    }
+    exit 2
+} elseif ($preflightStatus -eq 0) {
+    Write-Err "Ad-decision preflight: no response (network error or API not reachable)."
+    if ($apiJobHandle) {
+        Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
+        Remove-Job -Job $apiJobHandle -Force -ErrorAction SilentlyContinue
+    }
+    exit 2
+} else {
+    Write-Err ("Ad-decision preflight: unexpected HTTP " + $preflightStatus + ".")
+    Write-Err "Check the local API logs: pnpm dev:api"
+    if ($apiJobHandle) {
+        Stop-Job -Job $apiJobHandle -ErrorAction SilentlyContinue
+        Remove-Job -Job $apiJobHandle -Force -ErrorAction SilentlyContinue
+    }
+    exit 2
+}
+
+# ---------------------------------------------------------------------------
 # Step 6: Build extension (dist-test/)
 # ---------------------------------------------------------------------------
 
@@ -433,7 +508,7 @@ if (-not $SkipBuild) {
     Write-Step "Building extension (dist-test/)"
     Push-Location $ExtDir
     try {
-        & pnpm build:test 2>&1 | ForEach-Object { Write-Info $_ }
+        & pnpm build:test 2>&1 | ForEach-Object { Write-Info (Sanitize "$_") }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "pnpm build:test failed."
             Pop-Location
@@ -511,10 +586,12 @@ if (-not $NoDbVerify) {
 Write-Separator
 $reportDir = Join-Path $ExtDir "test-results/local-api"
 if (Test-Path $reportDir) {
-    $reports = Get-ChildItem -Path $reportDir -Filter "*.md" -ErrorAction SilentlyContinue |
-               Sort-Object LastWriteTime -Descending
-    if ($reports.Count -gt 0) {
-        $latest = $reports[0]
+    # @() forces result to array so .Count is always valid in StrictMode
+    # (Get-ChildItem returns null/scalar when 0/1 items without the cast).
+    $reportFiles = @(Get-ChildItem -Path $reportDir -Filter "*.md" -ErrorAction SilentlyContinue |
+                     Sort-Object LastWriteTime -Descending)
+    if ($reportFiles.Count -gt 0) {
+        $latest = $reportFiles[0]
         Write-Ok ("Latest report: " + $latest.FullName)
         Write-Host ""
         Write-Host (Get-Content $latest.FullName -Raw)

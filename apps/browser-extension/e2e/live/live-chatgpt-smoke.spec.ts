@@ -270,6 +270,9 @@ test.beforeAll(async () => {
       disabledAdapters: [],
       debugMode: true,
       apiKey,
+      // Must match the deviceId used when minting the local dev API key so the
+      // ad-decision request passes the API's deviceId validation (min 1, max 64).
+      deviceId: "local-real-api-smoke-device",
     });
     console.log(`[local-api] Extension configured -> ${LOCAL_API_BASE_URL} (key: [redacted])`);
   } else {
