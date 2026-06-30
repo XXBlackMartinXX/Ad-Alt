@@ -38,6 +38,10 @@
     # Run 5 times, stop on first failure, skip the build step
     .\scripts\run-live-chatgpt-stability.ps1 -Runs 5 -StopOnFail -SkipBuild
 
+.EXAMPLE
+    # Show usage via pnpm (pass -Help after --)
+    pnpm -w run smoke:chatgpt:live:stability -- -Help
+
 .NOTES
     Results are written as individual .md reports to
     apps/browser-extension/test-results/live/.
@@ -47,6 +51,7 @@
 
 [CmdletBinding()]
 param(
+    [switch]$Help,
     [int]$Runs = 3,
     [int]$DelayBetweenRunsSeconds = 5,
     [switch]$StopOnFail,
@@ -62,9 +67,49 @@ $ErrorActionPreference = "Continue"
 
 function Write-Step([string]$msg)    { Write-Host "[>>] $msg" -ForegroundColor Cyan }
 function Write-Ok([string]$msg)      { Write-Host "[OK] $msg" -ForegroundColor Green }
+function Write-Info([string]$msg)    { Write-Host "[--] $msg" -ForegroundColor Cyan }
 function Write-Warn([string]$msg)    { Write-Host "[!!] $msg" -ForegroundColor Yellow }
 function Write-Err([string]$msg)     { Write-Host "[XX] $msg" -ForegroundColor Red }
-function Write-Separator            { Write-Host ("-" * 60) -ForegroundColor DarkGray }
+function Write-Separator             { Write-Host ("-" * 60) -ForegroundColor DarkGray }
+
+# ---------------------------------------------------------------------------
+# Help mode
+# ---------------------------------------------------------------------------
+
+if ($Help) {
+    Write-Host ""
+    Write-Host "SYNOPSIS" -ForegroundColor Cyan
+    Write-Host "  Runs the live ChatGPT smoke test N times and reports aggregate stability."
+    Write-Host ""
+    Write-Host "USAGE"
+    Write-Host "  .\scripts\run-live-chatgpt-stability.ps1 [-Runs <int>] [-DelayBetweenRunsSeconds <int>]"
+    Write-Host "                                            [-StopOnFail] [-SkipBuild]"
+    Write-Host "  pnpm -w run smoke:chatgpt:live:stability"
+    Write-Host "  pnpm -w run smoke:chatgpt:live:stability -- -Runs 5 -StopOnFail -SkipBuild"
+    Write-Host "  pnpm -w run smoke:chatgpt:live:stability -- -Help"
+    Write-Host ""
+    Write-Host "OPTIONS"
+    Write-Host "  -Help                      Show this help and exit."
+    Write-Host "  -Runs <int>                Number of smoke-test runs (default: 3)."
+    Write-Host "  -DelayBetweenRunsSeconds   Seconds to wait between runs (default: 5)."
+    Write-Host "  -StopOnFail                Stop immediately on any FAILED result."
+    Write-Host "                             INCONCLUSIVE results do not trigger a stop."
+    Write-Host "  -SkipBuild                 Skip 'pnpm build:test' before the first run."
+    Write-Host ""
+    Write-Host "RESULTS"
+    Write-Host "  PASSED        — banner appeared and events fired."
+    Write-Host "  FAILED        — adapter ran but events or banner were wrong."
+    Write-Host "  INCONCLUSIVE  — ChatGPT wait-state was not detected within timeout."
+    Write-Host "                  Not a failure: re-run after manually prompting ChatGPT."
+    Write-Host "  ERROR         — Playwright did not write a report (build or launch failure)."
+    Write-Host ""
+    Write-Host "NOTES"
+    Write-Host "  Reports are written to: apps/browser-extension/test-results/live/"
+    Write-Host "  (git-ignored — they stay local, never committed)"
+    Write-Host "  View the latest report: pnpm -w run smoke:chatgpt:report"
+    Write-Host ""
+    exit 0
+}
 
 # ---------------------------------------------------------------------------
 # Setup
