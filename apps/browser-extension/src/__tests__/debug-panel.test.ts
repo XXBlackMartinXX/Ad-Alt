@@ -18,6 +18,15 @@ const FORBIDDEN_FIELD_NAMES = [
   "chatHistory",
 ];
 
+// Approved error codes — must be internal-only, no page content.
+const ALLOWED_ERROR_CODES = [
+  "service_worker_unreachable",
+  "kill_switch_active",
+  "no_decision",
+  "banner_render_failed",
+  null,
+];
+
 describe("DebugPanelState — defaults", () => {
   it("adapter is inactive by default", () => {
     const panel = new DebugPanelState();
@@ -47,6 +56,21 @@ describe("DebugPanelState — defaults", () => {
   it("api is not configured by default", () => {
     const panel = new DebugPanelState();
     expect(panel.getState().apiConfigured).toBe(false);
+  });
+
+  it("adDecisionRequested is false by default", () => {
+    const panel = new DebugPanelState();
+    expect(panel.getState().adDecisionRequested).toBe(false);
+  });
+
+  it("adDecisionReceived is false by default", () => {
+    const panel = new DebugPanelState();
+    expect(panel.getState().adDecisionReceived).toBe(false);
+  });
+
+  it("lastErrorCode is null by default", () => {
+    const panel = new DebugPanelState();
+    expect(panel.getState().lastErrorCode).toBeNull();
   });
 });
 
@@ -85,6 +109,31 @@ describe("DebugPanelState — state updates", () => {
     const panel = new DebugPanelState();
     panel.update({ apiConfigured: true });
     expect(panel.getState().apiConfigured).toBe(true);
+  });
+
+  it("update() marks ad decision requested", () => {
+    const panel = new DebugPanelState();
+    panel.update({ adDecisionRequested: true });
+    expect(panel.getState().adDecisionRequested).toBe(true);
+  });
+
+  it("update() marks ad decision received", () => {
+    const panel = new DebugPanelState();
+    panel.update({ adDecisionReceived: true });
+    expect(panel.getState().adDecisionReceived).toBe(true);
+  });
+
+  it("update() sets a safe error code", () => {
+    const panel = new DebugPanelState();
+    panel.update({ lastErrorCode: "service_worker_unreachable" });
+    expect(panel.getState().lastErrorCode).toBe("service_worker_unreachable");
+  });
+
+  it("update() clears error code to null", () => {
+    const panel = new DebugPanelState();
+    panel.update({ lastErrorCode: "no_decision" });
+    panel.update({ lastErrorCode: null });
+    expect(panel.getState().lastErrorCode).toBeNull();
   });
 
   it("partial update leaves other fields unchanged", () => {
@@ -127,10 +176,23 @@ describe("DebugPanelState — privacy safety", () => {
     expect(ALLOWED_TYPES).toContain(panel.getState().lastEventType);
   });
 
+  it("lastErrorCode is restricted to approved safe codes", () => {
+    const panel = new DebugPanelState();
+    panel.update({ lastErrorCode: "kill_switch_active" });
+    expect(ALLOWED_ERROR_CODES).toContain(panel.getState().lastErrorCode);
+  });
+
   it("DebugPanelState constructor exposes no forbidden fields", () => {
     const panel = new DebugPanelState();
     for (const field of FORBIDDEN_FIELD_NAMES) {
       expect((panel as unknown as Record<string, unknown>)[field]).toBeUndefined();
     }
+  });
+
+  it("adDecisionRequested and adDecisionReceived are not in forbidden list", () => {
+    // Belt-and-suspenders: these diagnostic fields must not be confused with private data.
+    expect(FORBIDDEN_FIELD_NAMES).not.toContain("adDecisionRequested");
+    expect(FORBIDDEN_FIELD_NAMES).not.toContain("adDecisionReceived");
+    expect(FORBIDDEN_FIELD_NAMES).not.toContain("lastErrorCode");
   });
 });

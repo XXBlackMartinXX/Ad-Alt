@@ -19,11 +19,32 @@ export class ViewabilityObserver {
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
   private element: Element | null = null;
 
-  observe(element: Element, onBillable: ViewabilityCallback): void {
+  /**
+   * Begin observing `element` for billable viewability.
+   *
+   * @param element         The DOM element to observe.
+   * @param onBillable      Callback fired with elapsed visible ms when
+   *                        the billable threshold is met.
+   * @param billableThresholdMs  Override the production billable threshold.
+   *   MUST only be supplied from fixture-test.ts (test-only content script).
+   *   chatgpt.ts (production) never passes this argument.
+   */
+  observe(
+    element: Element,
+    onBillable: ViewabilityCallback,
+    billableThresholdMs?: number,
+  ): void {
     this.stop();
     this.element = element;
 
     if (typeof IntersectionObserver === "undefined") return;
+
+    // Production uses the platform-core constants.
+    // Test-only: fixture-test.ts may pass a shorter duration so E2E tests
+    // complete in milliseconds rather than minutes.
+    const threshold = billableThresholdMs ?? VIEWABILITY_THRESHOLDS.BILLABLE_DURATION_MS;
+    // Guard uses the same threshold so test and production logic stay consistent.
+    const minDuration = billableThresholdMs ?? VIEWABILITY_THRESHOLDS.MIN_DURATION_MS;
 
     this.observer = new IntersectionObserver(
       (entries) => {
@@ -35,10 +56,10 @@ export class ViewabilityObserver {
           this.visibleSince = Date.now();
           this.timerHandle = setTimeout(() => {
             const duration = Date.now() - (this.visibleSince ?? 0);
-            if (duration >= VIEWABILITY_THRESHOLDS.MIN_DURATION_MS) {
+            if (duration >= minDuration) {
               onBillable(duration);
             }
-          }, VIEWABILITY_THRESHOLDS.BILLABLE_DURATION_MS);
+          }, threshold);
         } else if (!isVisible) {
           this.clearTimer();
         }

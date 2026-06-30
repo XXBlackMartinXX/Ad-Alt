@@ -114,6 +114,7 @@ async function openConfiguredPage(opts?: {
   killSwitchEnabled?: boolean;
   apiBaseUrl?: string;
   disabledAdapters?: string[];
+  testViewabilityThresholdMs?: number;
 }): Promise<Page> {
   const apiBaseUrl =
     opts?.apiBaseUrl !== undefined
@@ -124,6 +125,7 @@ async function openConfiguredPage(opts?: {
     apiBaseUrl,
     killSwitchEnabled: opts?.killSwitchEnabled ?? false,
     disabledAdapters: opts?.disabledAdapters ?? [],
+    testViewabilityThresholdMs: opts?.testViewabilityThresholdMs,
   });
 
   return openFixturePage(extensionContext, fileServerPort);
@@ -291,6 +293,69 @@ test('missing api url shows no banner', async () => {
 
   const banner = await page.$('#promptprofit-sponsored-banner');
   expect(banner).toBeNull();
+
+  await page.close();
+});
+
+// ---------------------------------------------------------------------------
+// Viewability threshold E2E
+//
+// The production threshold is 5 000 ms — too long for fast E2E.
+// We configure testViewabilityThresholdMs: 200 in chrome.storage.local, which
+// fixture-test.ts reads and passes to ViewabilityObserver. chatgpt.ts (the
+// production content script) never reads this key, so the production threshold
+// is never weakened in the field.
+// ---------------------------------------------------------------------------
+
+test('viewability_threshold_met fires after test threshold', async () => {
+  // Use a 200 ms threshold so the event fires in well under 1 s.
+  const TEST_THRESHOLD_MS = 200;
+
+  const page = await openConfiguredPage({ testViewabilityThresholdMs: TEST_THRESHOLD_MS });
+
+  await page.waitForTimeout(CONTENT_SCRIPT_SETTLE_MS);
+  await page.evaluate('window.fixtureStartWait()');
+
+  // Wait for the banner — viewability observation starts when it enters the DOM.
+  await page.waitForSelector('#promptprofit-sponsored-banner', {
+    state: 'visible',
+    timeout: 8_000,
+  });
+
+  // Wait for threshold + buffer for service-worker round-trip.
+  await page.waitForTimeout(TEST_THRESHOLD_MS + 400);
+
+  const events = mockApi.getCapturedEvents();
+  const viewabilityEvents = events.filter((e) => {
+    const body = e.body as Record<string, unknown>;
+    return body?.['eventType'] === 'viewability_threshold_met';
+  });
+
+  expect(viewabilityEvents).toHaveLength(1);
+
+  const body = viewabilityEvents[0].body as Record<string, unknown>;
+
+  // displayedDurationMs should be at least the configured threshold.
+  expect(typeof body['displayedDurationMs']).toBe('number');
+  expect(body['displayedDurationMs'] as number).toBeGreaterThanOrEqual(TEST_THRESHOLD_MS);
+
+  // thresholdMs in the event must reflect the configured test threshold.
+  expect(body['thresholdMs']).toBe(TEST_THRESHOLD_MS);
+
+  // Standard event identifiers must be present.
+  expect(typeof body['eventId']).toBe('string');
+  expect(typeof body['adDecisionId']).toBe('string');
+  expect(typeof body['sessionId']).toBe('string');
+  expect(body['eventType']).toBe('viewability_threshold_met');
+
+  // Privacy: no forbidden fields in the event payload.
+  const FORBIDDEN_FIELDS = [
+    'pageUrl', 'pageTitle', 'domText', 'promptText',
+    'aiResponse', 'chatHistory', 'cookies', 'authToken', 'sessionCookie',
+  ];
+  for (const field of FORBIDDEN_FIELDS) {
+    expect(body, `forbidden field "${field}" found in viewability event`).not.toHaveProperty(field);
+  }
 
   await page.close();
 });

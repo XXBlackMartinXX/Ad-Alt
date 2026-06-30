@@ -17,6 +17,12 @@ export interface ExtensionConfig {
   killSwitchEnabled?: boolean;
   disabledAdapters?: string[];
   debugMode?: boolean;
+  /**
+   * Test-only: override the viewability billable threshold (ms) in the fixture
+   * content script. Only fixture-test.ts reads this key. chatgpt.ts (production)
+   * never reads it, ensuring production thresholds are never weakened in the field.
+   */
+  testViewabilityThresholdMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,19 +120,21 @@ export async function configureExtensionStorage(
     config.killSwitchEnabled ?? false,
     config.disabledAdapters ?? [],
     config.debugMode ?? false,
-  ] as [string, boolean, string[], boolean];
+    config.testViewabilityThresholdMs ?? null,
+  ] as [string, boolean, string[], boolean, number | null];
 
   const doEvaluate = async () => {
     const sw = await getOrWaitForServiceWorker(context);
     await sw.evaluate(
-      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode]: [
+      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs]: [
         string,
         boolean,
         string[],
         boolean,
+        number | null,
       ]) => {
         return new Promise<void>((resolve, reject) => {
-          const items = {
+          const items: Record<string, unknown> = {
             apiBaseUrl,
             debugMode,
             featureFlags: {
@@ -135,6 +143,14 @@ export async function configureExtensionStorage(
               flags: {},
             },
           };
+          // Only write testViewabilityThresholdMs when provided — avoids
+          // accidentally carrying a previous value across tests.
+          if (testViewabilityThresholdMs !== null) {
+            items["testViewabilityThresholdMs"] = testViewabilityThresholdMs;
+          } else {
+            // Explicitly clear so previous test runs don't bleed into new ones.
+            items["testViewabilityThresholdMs"] = null;
+          }
           // @ts-ignore — running inside Chrome extension service worker context
           chrome.storage.local.set(items, () => {
             // @ts-ignore

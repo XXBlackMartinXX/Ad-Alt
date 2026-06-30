@@ -42,10 +42,11 @@ void (async () => {
       adapterId: adapter.adapterId,
     })) as { disabled: boolean } | undefined;
     if (resp?.disabled) {
-      debugPanel.update({ killSwitchEnabled: true });
+      debugPanel.update({ killSwitchEnabled: true, lastErrorCode: "kill_switch_active" });
       return;
     }
   } catch {
+    debugPanel.update({ lastErrorCode: "service_worker_unreachable" });
     return;
   }
 
@@ -58,6 +59,7 @@ void (async () => {
     debugPanel.update({ waitStateDetected: true });
 
     // Request an ad decision from the service-worker (which calls the API)
+    debugPanel.update({ adDecisionRequested: true });
     let decision: SponsoredMoment | null = null;
     try {
       const resp = (await chrome.runtime.sendMessage({
@@ -67,10 +69,16 @@ void (async () => {
       decision = resp?.decision ?? null;
     } catch {
       // Service worker unreachable — show no ad, fail closed
+      debugPanel.update({ lastErrorCode: "service_worker_unreachable" });
       return;
     }
 
-    if (!decision) return;
+    if (!decision) {
+      debugPanel.update({ lastErrorCode: "no_decision" });
+      return;
+    }
+
+    debugPanel.update({ adDecisionReceived: true, lastErrorCode: null });
 
     // Fire impression_requested before rendering (campaignId required by schema).
     void sendImpressionRequested(decision, adapter.adapterId);
@@ -83,7 +91,8 @@ void (async () => {
     void sendImpressionRendered(decision, adapter.adapterId);
     debugPanel.update({ lastEventType: "impression_rendered" });
 
-    // Start viewability tracking — fires viewability_threshold_met after threshold.
+    // Start viewability tracking — always uses production threshold.
+    // chatgpt.ts never reads testViewabilityThresholdMs from storage.
     const bannerEl = document.getElementById("promptprofit-sponsored-banner");
     if (bannerEl) {
       const capturedDecision = decision;
@@ -96,6 +105,7 @@ void (async () => {
         );
         debugPanel.update({ lastEventType: "viewability_threshold_met" });
       });
+      // Note: no billableThresholdMs arg — always uses production default.
     }
   });
 
