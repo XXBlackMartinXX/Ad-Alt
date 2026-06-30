@@ -93,6 +93,11 @@ function Write-Warn([string]$msg)  { Write-Host ("[!!] " + $msg) -ForegroundColo
 function Write-Err([string]$msg)   { Write-Host ("[XX] " + $msg) -ForegroundColor Red }
 function Write-Separator           { Write-Host ("-" * 60) -ForegroundColor DarkGray }
 
+# Returns "[PASS]" or "[FAIL]" - must be a function; PS 5.1 does not support
+# (if ...) as an expression in string concatenation within array literals.
+function StatusTag([bool]$Condition) { if ($Condition) { "[PASS]" } else { "[FAIL]" } }
+function StatusTagWarn([bool]$Condition) { if ($Condition) { "[PASS]" } else { "[WARN]" } }
+
 function Sanitize([string]$text) {
     return ($text -replace '[^\x20-\x7E]', '?').TrimEnd()
 }
@@ -820,6 +825,12 @@ $reportFile  = Join-Path $reportDir ("billing-ledger-smoke-" + $timestamp + ".md
 $allChecksPassed = ($viewStatus -eq "accepted") -and $dbVerified -and $invariantOk
 $overallResult   = if ($allChecksPassed) { "PASS" } else { "FAIL" }
 
+# Pre-compute status labels - PS 5.1 does not support (if ...) as an expression
+# inside string concatenation within an array literal; use StatusTag() instead.
+$reqLabel  = StatusTagWarn(($reqStatus  -eq "accepted") -or ($reqStatus  -eq "duplicate"))
+$rendLabel = StatusTagWarn(($rendStatus -eq "accepted") -or ($rendStatus -eq "duplicate"))
+$viewLabel = StatusTag($viewStatus -eq "accepted")
+
 $reportLines = @(
     "# Billing/Ledger Smoke - " + $overallResult,
     "",
@@ -830,9 +841,9 @@ $reportLines = @(
     "",
     "## Event Submission",
     "",
-    "[" + (if ($reqStatus -eq "accepted" -or $reqStatus -eq "duplicate") { "PASS" } else { "FAIL" }) + "] impression_requested: " + $reqStatus,
-    "[" + (if ($rendStatus -eq "accepted" -or $rendStatus -eq "duplicate") { "PASS" } else { "FAIL" }) + "] impression_rendered: " + $rendStatus,
-    "[" + (if ($viewStatus -eq "accepted") { "PASS" } else { "FAIL" }) + "] viewability_threshold_met: " + $viewStatus + " (fraud: " + $fraudDecision + ")",
+    $reqLabel  + " impression_requested: " + $reqStatus,
+    $rendLabel + " impression_rendered: " + $rendStatus,
+    $viewLabel + " viewability_threshold_met: " + $viewStatus + " (fraud: " + $fraudDecision + ")",
     ""
 )
 
@@ -868,7 +879,52 @@ if ($overallResult -eq "PASS") {
 
 $reportContent = $reportLines -join "`n"
 Set-Content -Path $reportFile -Value $reportContent -Encoding UTF8
-Write-Ok ("Report written to: " + $reportFile)
+
+# ---------------------------------------------------------------------------
+# Validate report before claiming success (CANARY 7: never print PASSED after
+# report-write failure)
+# ---------------------------------------------------------------------------
+
+$reportValid = $false
+try {
+    if (-not (Test-Path $reportFile)) {
+        Write-Err "FATAL: Report file was not created: $reportFile"
+        exit 1
+    }
+    $reportSize = (Get-Item $reportFile).Length
+    if ($reportSize -eq 0) {
+        Write-Err "FATAL: Report file is empty: $reportFile"
+        exit 1
+    }
+    $reportText = Get-Content $reportFile -Raw -Encoding UTF8
+    if ($reportText -notmatch "# Billing/Ledger Smoke") {
+        Write-Err "FATAL: Report missing expected heading."
+        exit 1
+    }
+    if ($reportText -match "ppft_[0-9a-fA-F]{8}") {
+        Write-Err "FATAL: Report contains API key pattern. Aborting."
+        exit 1
+    }
+    if ($reportText -match "Authorization: Bearer") {
+        Write-Err "FATAL: Report contains Authorization header value. Aborting."
+        exit 1
+    }
+    $nonAscii = [System.Text.RegularExpressions.Regex]::Match($reportText, '[^\x00-\x7F]')
+    if ($nonAscii.Success) {
+        Write-Err ("FATAL: Report contains non-ASCII character at index " + $nonAscii.Index + ". Aborting.")
+        exit 1
+    }
+    $reportValid = $true
+    Write-Ok ("Report written and validated: " + $reportFile + " (" + $reportSize + " bytes)")
+} catch {
+    Write-Err ("FATAL: Report validation threw an exception: " + $_.Exception.Message)
+    exit 1
+}
+
+if (-not $reportValid) {
+    Write-Err "FATAL: Report validation failed unexpectedly."
+    exit 1
+}
 
 # ---------------------------------------------------------------------------
 # Cleanup: stop background API job if we started it

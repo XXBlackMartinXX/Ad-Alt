@@ -32,15 +32,13 @@
  *
  * Prerequisites:
  *   - Run `pnpm build` (production build) before packaging.
- *   - `zip` command must be available (Linux/macOS) OR PowerShell 5.1+ (Windows).
- *
- * On Windows without zip:
- *   Run the printed Compress-Archive command manually in PowerShell.
+ *   - Linux/macOS: `zip` command must be available (apt install zip / brew install zip).
+ *   - Windows: PowerShell 5.1+ (Compress-Archive is auto-executed; no manual step).
  */
 
 import { execSync } from 'child_process';
-import { existsSync, readdirSync, statSync, mkdirSync, rmSync } from 'fs';
-import { join, relative, extname, basename } from 'path';
+import { existsSync, readdirSync, statSync, mkdirSync, rmSync, copyFileSync } from 'fs';
+import { join, relative, extname, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
@@ -129,6 +127,10 @@ if (!existsSync(MANIFEST)) {
   process.exit(2);
 }
 
+// Load manifest early so htmlRefs and reference checks can both use it
+const require  = createRequire(import.meta.url);
+const manifest = require(MANIFEST);
+
 // Check for source maps in dist/ and report them
 const mapFiles = [];
 function findMaps(dir) {
@@ -159,14 +161,17 @@ const distFiles = collectFiles(DIST_DIR, EXT_DIR);
 // Include manifest.json
 const packageFiles = [MANIFEST, ...distFiles];
 
-// Include popup.html / options.html if present
-for (const extra of ['popup.html', 'options.html']) {
-  const fp = join(EXT_DIR, extra);
+// Include HTML pages declared in manifest (popup, options_ui) if present
+const htmlRefs = [];
+if (manifest.action && manifest.action.default_popup) htmlRefs.push(manifest.action.default_popup);
+if (manifest.options_ui && manifest.options_ui.page)  htmlRefs.push(manifest.options_ui.page);
+for (const ref of htmlRefs) {
+  const fp = join(EXT_DIR, ref);
   if (existsSync(fp)) {
     packageFiles.push(fp);
-    ok('Including: ' + extra);
+    ok('Including: ' + ref);
   } else {
-    warn('Missing: ' + extra + ' (referenced in manifest.json - required for CWS submission)');
+    warn('Missing: ' + ref + ' (declared in manifest.json but file not found)');
   }
 }
 
@@ -189,8 +194,6 @@ ok('Files to package: ' + packageFiles.length);
 
 process.stdout.write('\n');
 log('Checking manifest.json references:');
-const require = createRequire(import.meta.url);
-const manifest = require(MANIFEST);
 
 const referencedFiles = [];
 if (manifest.background && manifest.background.service_worker) {
@@ -215,7 +218,7 @@ for (const ref of referencedFiles) {
 }
 
 // ---------------------------------------------------------------------------
-// Create package output directory and relative file list
+// Create package output directory and staging directory
 // ---------------------------------------------------------------------------
 
 if (existsSync(OUT_DIR)) {
@@ -223,8 +226,18 @@ if (existsSync(OUT_DIR)) {
 }
 mkdirSync(OUT_DIR, { recursive: true });
 
-// Build a relative file list for the zip command
-const relativeFiles = packageFiles.map(f => relative(EXT_DIR, f));
+// Stage files into a temporary subdirectory preserving relative paths.
+// Both `zip` and Compress-Archive will zip from this staging dir so the
+// layout inside the ZIP matches dist/ exactly regardless of platform.
+const stageDir = join(OUT_DIR, 'stage');
+mkdirSync(stageDir, { recursive: true });
+
+for (const f of packageFiles) {
+  const rel  = relative(EXT_DIR, f);
+  const dest = join(stageDir, rel);
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(f, dest);
+}
 
 // ---------------------------------------------------------------------------
 // Create ZIP
@@ -236,36 +249,55 @@ const timestamp  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const zipName    = 'promptprofit-browser-beta-' + timestamp + '.zip';
 const zipPath    = join(OUT_DIR, zipName);
 
-// Try using the `zip` command (Linux/macOS/WSL)
 let zipSuccess = false;
-try {
-  execSync('which zip', { stdio: 'ignore' });
-  const fileArgs = relativeFiles.map(f => '"' + f + '"').join(' ');
-  const zipCmd   = 'cd "' + EXT_DIR + '" && zip -r "' + zipPath + '" ' + fileArgs;
-  log('Creating ZIP with: zip command');
-  execSync(zipCmd, { stdio: 'inherit', cwd: EXT_DIR });
-  zipSuccess = true;
-} catch {
-  warn('`zip` command not found. Showing manual ZIP command instead.');
+
+if (process.platform === 'win32') {
+  // Auto-execute PowerShell Compress-Archive on Windows (no `zip` needed)
+  log('Creating ZIP with PowerShell Compress-Archive (Windows)');
+  const stageGlob = stageDir.replace(/'/g, "''") + '\\*';
+  const outPath   = zipPath.replace(/'/g, "''");
+  const psCmd     = `powershell.exe -NoProfile -NonInteractive -Command "Compress-Archive -Path '${stageGlob}' -DestinationPath '${outPath}' -Force"`;
+  try {
+    execSync(psCmd, { stdio: 'inherit' });
+    zipSuccess = true;
+  } catch (e) {
+    err('Compress-Archive failed: ' + e.message);
+  }
+} else {
+  // Use `zip` command on Linux/macOS
+  try {
+    execSync('which zip', { stdio: 'ignore' });
+    const zipCmd = 'cd "' + stageDir + '" && zip -r "' + zipPath + '" .';
+    log('Creating ZIP with: zip command');
+    execSync(zipCmd, { stdio: 'inherit' });
+    zipSuccess = true;
+  } catch {
+    err('`zip` command not found. Install zip (e.g. apt install zip) and retry.');
+    rmSync(stageDir, { recursive: true, force: true });
+    process.exit(1);
+  }
 }
 
-if (zipSuccess) {
-  ok('Package created: ' + zipPath);
-} else {
-  // Print PowerShell command for Windows users
-  process.stdout.write('\n');
-  warn('To create the ZIP on Windows PowerShell, run these commands:');
-  process.stdout.write('\n');
-  process.stdout.write('  $files = @(\n');
-  for (const f of relativeFiles) {
-    process.stdout.write('    "' + f + '",\n');
-  }
-  process.stdout.write('  )\n');
-  process.stdout.write('  Compress-Archive -Path $files -DestinationPath "' + zipPath + '" -Force\n');
-  process.stdout.write('\n');
-  warn('ZIP was NOT created (no `zip` command). Run the PowerShell command above.');
+// Always clean up staging dir regardless of ZIP success
+rmSync(stageDir, { recursive: true, force: true });
+
+if (!zipSuccess) {
+  err('ZIP creation failed.');
   process.exit(1);
 }
+
+// Verify ZIP was actually created and is non-empty (CANARY 11)
+if (!existsSync(zipPath)) {
+  err('FATAL: ZIP file was not created at: ' + zipPath);
+  process.exit(1);
+}
+const zipSize = statSync(zipPath).size;
+if (zipSize === 0) {
+  err('FATAL: ZIP file is empty: ' + zipPath);
+  process.exit(1);
+}
+
+ok('Package created: ' + zipPath + ' (' + zipSize + ' bytes)');
 
 // ---------------------------------------------------------------------------
 // Report summary
@@ -281,8 +313,10 @@ process.stdout.write('\n');
 
 // Known issues summary
 const issues = [];
-if (!existsSync(join(EXT_DIR, 'popup.html'))) issues.push('popup.html missing');
-if (!existsSync(join(EXT_DIR, 'options.html'))) issues.push('options.html missing');
+// Check for HTML pages that are declared in manifest but still missing
+for (const ref of htmlRefs) {
+  if (!existsSync(join(EXT_DIR, ref))) issues.push(ref + ' missing (declared in manifest.json)');
+}
 if (!existsSync(iconsDir)) issues.push('icons/ directory missing');
 if (!existsSync(join(REPO_ROOT, 'LICENSE'))) issues.push('No LICENSE file (required for CWS)');
 

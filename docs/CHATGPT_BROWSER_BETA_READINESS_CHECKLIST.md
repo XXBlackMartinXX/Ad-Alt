@@ -181,7 +181,7 @@
 | CANARY 8: No events = skip privacy check | PASS | Spec skips; 0 events = vacuous truth avoided |
 | CANARY 9: Billing not claimed if ledger unverified | PASS | Billing smoke only claims PASS after DB invariant confirmed |
 | CANARY 10: Click billing not claimed if unverified | PASS | Click smoke exits 1 if DB ledger entries not found |
-| CANARY 11: Source maps not stripped = not store-ready | PASS | audit-browser-extension-package.js warns on .map files |
+| CANARY 11: Source maps not stripped = not store-ready | PASS | audit-browser-extension-package.js warns on .map files; --mode public-release promotes to FAIL |
 | CANARY 12: No LICENSE file committed without decision | PASS | docs/LICENSE_DECISION_REQUIRED.md updated; no LICENSE file added |
 | CANARY 13: No mojibake in reports | PASS | All em-dash/checkmark Unicode fixed; ASCII-clean |
 | CANARY 14: Not claimed production-ready | PASS | Label is beta-readiness candidate |
@@ -210,9 +210,9 @@
 | query:local-ledger | PASS | query-local-ledger.ps1 created; queries ledger_entries + balances |
 | query:local-billing-events | PASS | query-local-billing-events.ps1 created; queries impression_events |
 | query-local-browser-events.ps1 | PASS | No local psql; correct table/DB defaults; filters |
-| package:browser:beta | PASS | package-browser-extension.mjs created; excludes .map files |
-| package:browser:audit | PASS | audit-browser-extension-package.js created |
-| package:vscode:audit | PASS | audit-vsix-package.js created |
+| package:browser:beta | PASS | package-browser-extension.mjs; excludes .map; auto-runs Compress-Archive on Windows |
+| package:browser:audit | PASS | audit-browser-extension-package.js; supports --mode internal-beta/public-release |
+| package:vscode:audit | PASS | audit-vsix-package.js; supports --mode internal-beta/public-release |
 | Generated report mojibake | PASS | All em-dash/checkmark chars removed from report strings |
 
 ---
@@ -225,7 +225,6 @@
 | Browser ext source maps not stripped | Release | Pre-CWS-submission | `sourcemap: false` in esbuild OR exclude .map from ZIP (package:browser:beta does this) |
 | Viewability billing not end-to-end verified (production) | Testing | Pre-production | Staging environment test required |
 | Click billing not end-to-end verified (production) | Testing | Pre-production | Staging environment test required |
-| popup.html / options.html missing | Release | Pre-CWS-submission | UI pages referenced in manifest.json; must be created |
 | icons/ directory missing | Release | Pre-CWS-submission | icon16.png, icon48.png, icon128.png required for CWS |
 
 **Resolved in this session:**
@@ -234,9 +233,12 @@
 - "Local-real-API smoke BLOCKED" - RESOLVED (passed on Windows at c5167e2)
 - "Billing smoke not implemented" - RESOLVED (run-local-billing-ledger-smoke.ps1 created)
 - "Click billing smoke not implemented" - RESOLVED (run-local-click-billing-smoke.ps1 created)
-- "No browser extension package script" - RESOLVED (package-browser-extension.mjs excludes .map)
-- "No VSIX audit script" - RESOLVED (audit-vsix-package.js + audit-browser-extension-package.js)
+- "No browser extension package script" - RESOLVED (package-browser-extension.mjs excludes .map; auto-executes on Windows)
+- "No VSIX audit script" - RESOLVED (audit-vsix-package.js + audit-browser-extension-package.js with --mode flag)
 - "LICENSE decision not documented" - RESOLVED (decision matrix added to LICENSE_DECISION_REQUIRED.md)
+- "Billing smoke report false-positive PASSED" - RESOLVED (StatusTag() helper + post-write validation in both smoke scripts)
+- "package:browser:beta fails on Windows" - RESOLVED (auto-executes Compress-Archive on win32; verifies ZIP size > 0)
+- "popup.html / options.html missing from manifest" - RESOLVED (removed unused declarations from manifest.json)
 
 ---
 
@@ -261,7 +263,7 @@
 | Browser extension beta ZIP | PASS (script) | package:browser:beta creates ZIP without .map files |
 | Browser extension package audit | PASS (script) | package:browser:audit checks manifest refs, source maps, permissions |
 | VS Code extension VSIX audit | PASS (script) | package:vscode:audit checks .vscodeignore, dist, license, sensitive files |
-| popup.html / options.html | MISSING | Referenced in manifest.json; not yet created |
+| popup.html / options.html | RESOLVED | Removed unused declarations from manifest.json (not implemented) |
 | icons/ directory | MISSING | icon16.png, icon48.png, icon128.png not yet created |
 | Source maps in browser ext dist/ | PRESENT | Excluded by package:browser:beta; strip before CWS submission |
 | Source maps in VSIX | PRESENT | Acceptable for beta; add `dist/*.map` to .vscodeignore before Marketplace |
@@ -270,7 +272,7 @@
 
 ## Final Label
 
-**beta-readiness candidate with billing/ledger verification and packaging hardened**
+**beta-readiness candidate with billing/ledger verification, packaging hardened, and automation bugs fixed**
 
 The ChatGPT browser adapter passes all automated fixture tests, unit tests,
 TypeScript checks, lint, and Windows live smoke validation. The local
@@ -279,10 +281,16 @@ commit c5167e2. Billing/ledger smoke scripts are implemented: they submit the
 full event lifecycle (impression_requested, impression_rendered,
 viewability_threshold_met) and verify ledger entries via both the API and
 Postgres, including the invariant developer_credit + platform_fee ===
-advertiser_charge. Click billing smoke is also scripted. Privacy and security
-audits are clean. Reports are ASCII-only. Secret leak checks pass on all 326
-source files. Browser extension beta packaging excludes source maps. Six
-outstanding blockers (LICENSE, source maps, popup/options/icons assets, and
-production billing reconciliation) do not affect core adapter correctness or
-internal beta testing. Public store submission requires resolving all FAIL
-items listed in the blockers table above.
+advertiser_charge. Click billing smoke is also scripted. Both smoke scripts
+now use StatusTag() helper functions (fixing a PowerShell 5.1 inline `if`
+expression bug) and validate report existence, size, content, and absence of
+secrets before printing PASSED. The browser extension packager
+(package:browser:beta) now auto-executes Compress-Archive on Windows and
+verifies the ZIP is created and non-empty. The manifest.json was cleaned of
+unimplemented popup/options declarations. Audit scripts support --mode
+internal-beta and --mode public-release to distinguish warning vs blocking
+severity. Privacy and security audits are clean. Reports are ASCII-only.
+Secret leak checks pass. Four outstanding blockers (LICENSE, source maps,
+icons/ assets, and production billing reconciliation) do not affect core
+adapter correctness or internal beta testing. Public store submission requires
+resolving all FAIL items listed in the blockers table above.

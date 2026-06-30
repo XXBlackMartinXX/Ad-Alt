@@ -13,7 +13,13 @@
  *
  * Usage:
  *   node scripts/audit-vsix-package.js
+ *   node scripts/audit-vsix-package.js --mode internal-beta
+ *   node scripts/audit-vsix-package.js --mode public-release
  *   pnpm -w run package:vscode:audit
+ *
+ * Modes:
+ *   internal-beta  (default) - LICENSE/source-maps are WARN (not blockers)
+ *   public-release           - LICENSE/source-maps are FAIL (hard blockers)
  *
  * To inspect VSIX contents after packaging:
  *   vsce package  (creates .vsix)
@@ -30,6 +36,15 @@ const VSIGNORE   = path.join(EXT_DIR, '.vscodeignore');
 const PKG_JSON   = path.join(EXT_DIR, 'package.json');
 const EXT_DIST   = path.join(EXT_DIR, 'dist');
 
+// Parse --mode flag
+const modeIdx = process.argv.indexOf('--mode');
+const mode    = modeIdx !== -1 ? process.argv[modeIdx + 1] : 'internal-beta';
+if (mode !== 'internal-beta' && mode !== 'public-release') {
+  process.stderr.write('[XX] Unknown --mode: ' + mode + '. Use internal-beta or public-release.\n');
+  process.exit(2);
+}
+const isPublicRelease = mode === 'public-release';
+
 let exitCode = 0;
 
 function pass(msg)  { process.stdout.write('[PASS] ' + msg + '\n'); }
@@ -37,6 +52,11 @@ function fail(msg)  { process.stderr.write('[FAIL] ' + msg + '\n'); exitCode = 1
 function warn(msg)  { process.stdout.write('[WARN] ' + msg + '\n'); }
 function info(msg)  { process.stdout.write('[--]   ' + msg + '\n'); }
 function section(t) { process.stdout.write('\n== ' + t + ' ==\n'); }
+
+// In public-release mode, treat these categories as hard FAIL; otherwise WARN.
+function modeGatedFail(msg) {
+  if (isPublicRelease) { fail(msg); } else { warn(msg + ' [OK for internal-beta]'); }
+}
 
 // ---------------------------------------------------------------------------
 // Check 1: Extension directory exists
@@ -147,8 +167,7 @@ if (!fs.existsSync(EXT_DIST)) {
   // Source maps
   const mapFiles = distFiles.filter(f => f.endsWith('.js.map'));
   if (mapFiles.length > 0) {
-    warn('Source map(s) in dist/: ' + mapFiles.join(', '));
-    info('  OK for beta. Exclude via .vscodeignore: dist/*.map before Marketplace.');
+    modeGatedFail('Source map(s) in dist/: ' + mapFiles.join(', ') + ' - exclude before Marketplace');
     info('  Add to .vscodeignore: dist/*.map');
   } else {
     pass('No source maps in dist/ (or already excluded)');
@@ -217,7 +236,7 @@ const rootLicense = path.join(REPO_ROOT, 'LICENSE');
 if (fs.existsSync(rootLicense)) {
   pass('LICENSE file present at repo root');
 } else {
-  fail('No LICENSE file at repo root - required for Marketplace submission');
+  modeGatedFail('No LICENSE file at repo root - required for Marketplace submission');
   info('  See docs/LICENSE_DECISION_REQUIRED.md');
 }
 
@@ -263,12 +282,18 @@ if (vsixFiles.length === 0) {
 
 process.stdout.write('\n');
 process.stdout.write('='.repeat(60) + '\n');
+process.stdout.write('Mode: ' + mode + '\n');
 if (exitCode === 0) {
   process.stdout.write('[PASS] VS Code extension audit passed.\n');
-  process.stdout.write('       Package is suitable for internal beta distribution.\n');
+  if (isPublicRelease) {
+    process.stdout.write('       Package meets public-release requirements.\n');
+  } else {
+    process.stdout.write('       Package is suitable for internal beta distribution.\n');
+    process.stdout.write('       Re-run with --mode public-release before Marketplace submission.\n');
+  }
 } else {
   process.stderr.write('[FAIL] VS Code extension audit found issues.\n');
-  process.stderr.write('       Resolve FAIL items before Marketplace submission.\n');
+  process.stderr.write('       Resolve FAIL items before ' + (isPublicRelease ? 'Marketplace submission' : 'public release') + '.\n');
 }
 process.stdout.write('='.repeat(60) + '\n');
 

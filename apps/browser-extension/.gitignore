@@ -1,3 +1,4 @@
 dist-test/
+dist-package/
 test-results/
 playwright-report/

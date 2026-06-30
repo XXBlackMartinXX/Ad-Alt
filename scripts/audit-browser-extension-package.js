@@ -5,14 +5,20 @@
  * Checks:
  *   1. Source maps (.js.map files) - should be absent or documented
  *   2. Manifest.json reference integrity - all referenced files exist
- *   3. Required assets - popup.html, options.html, icons/
+ *   3. Required assets - icons/
  *   4. Disallowed content - no .env, no test artifacts, no dist-test/
  *   5. Content script integrity - only chatgpt.js (not fixture-test.ts)
  *   6. Host permissions - no localhost in production manifest
  *
  * Usage:
  *   node scripts/audit-browser-extension-package.js
+ *   node scripts/audit-browser-extension-package.js --mode internal-beta
+ *   node scripts/audit-browser-extension-package.js --mode public-release
  *   pnpm -w run package:browser:audit
+ *
+ * Modes:
+ *   internal-beta  (default) - LICENSE/icons/source-maps are WARN (not blockers)
+ *   public-release           - LICENSE/icons/source-maps are FAIL (hard blockers)
  */
 
 const fs   = require('fs');
@@ -23,6 +29,15 @@ const EXT_DIR   = path.join(REPO_ROOT, 'apps', 'browser-extension');
 const DIST_DIR  = path.join(EXT_DIR, 'dist');
 const MANIFEST  = path.join(EXT_DIR, 'manifest.json');
 
+// Parse --mode flag
+const modeIdx = process.argv.indexOf('--mode');
+const mode    = modeIdx !== -1 ? process.argv[modeIdx + 1] : 'internal-beta';
+if (mode !== 'internal-beta' && mode !== 'public-release') {
+  process.stderr.write('[XX] Unknown --mode: ' + mode + '. Use internal-beta or public-release.\n');
+  process.exit(2);
+}
+const isPublicRelease = mode === 'public-release';
+
 let exitCode = 0;
 
 function pass(msg)  { process.stdout.write('[PASS] ' + msg + '\n'); }
@@ -30,6 +45,11 @@ function fail(msg)  { process.stderr.write('[FAIL] ' + msg + '\n'); exitCode = 1
 function warn(msg)  { process.stdout.write('[WARN] ' + msg + '\n'); }
 function info(msg)  { process.stdout.write('[--]   ' + msg + '\n'); }
 function section(t) { process.stdout.write('\n== ' + t + ' ==\n'); }
+
+// In public-release mode, treat these categories as hard FAIL; otherwise WARN.
+function modeGatedFail(msg) {
+  if (isPublicRelease) { fail(msg); } else { warn(msg + ' [OK for internal-beta]'); }
+}
 
 // ---------------------------------------------------------------------------
 // Helper: walk directory
@@ -86,12 +106,12 @@ walkDir(DIST_DIR, (fp, name) => {
 if (mapFiles.length === 0) {
   pass('No .js.map files in dist/ (source maps excluded)');
 } else {
-  warn(mapFiles.length + ' .js.map file(s) found in dist/ - EXCLUDE before CWS submission:');
+  modeGatedFail(mapFiles.length + ' .js.map file(s) found in dist/ - EXCLUDE before CWS submission');
   for (const m of mapFiles) {
-    warn('  ' + m);
+    info('  ' + m);
   }
   info('Option 1: Set sourcemap: false in apps/browser-extension/scripts/bundle.mjs');
-  info('Option 2: Exclude *.map from the submission ZIP (safe for beta)');
+  info('Option 2: Use pnpm package:browser:beta which excludes *.map from the ZIP');
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +225,8 @@ if (fs.existsSync(iconDir)) {
   const iconFiles = fs.readdirSync(iconDir);
   pass('icons/ directory exists (' + iconFiles.join(', ') + ')');
 } else {
-  warn('icons/ directory not found - icon16.png, icon48.png, icon128.png required for CWS');
+  modeGatedFail('icons/ directory not found - icon16.png, icon48.png, icon128.png required for CWS');
+  info('  Create icons/ with PNG files before Chrome Web Store submission');
 }
 
 // LICENSE
@@ -213,7 +234,7 @@ const licenseFile = path.join(REPO_ROOT, 'LICENSE');
 if (fs.existsSync(licenseFile)) {
   pass('LICENSE file present');
 } else {
-  fail('No LICENSE file - required for Chrome Web Store and VS Code Marketplace');
+  modeGatedFail('No LICENSE file - required for Chrome Web Store and VS Code Marketplace');
   info('  See docs/LICENSE_DECISION_REQUIRED.md');
 }
 
@@ -266,13 +287,19 @@ if (dtsFiles.length > 0) {
 
 process.stdout.write('\n');
 process.stdout.write('='.repeat(60) + '\n');
+process.stdout.write('Mode: ' + mode + '\n');
 if (exitCode === 0) {
   process.stdout.write('[PASS] Browser extension package audit passed.\n');
-  process.stdout.write('       Package is ready for beta distribution.\n');
+  if (isPublicRelease) {
+    process.stdout.write('       Package meets public-release requirements.\n');
+  } else {
+    process.stdout.write('       Package is ready for internal beta distribution.\n');
+    process.stdout.write('       Re-run with --mode public-release before CWS submission.\n');
+  }
   process.stdout.write('       Run package:browser:beta to create the ZIP.\n');
 } else {
   process.stderr.write('[FAIL] Browser extension package audit found issues.\n');
-  process.stderr.write('       Resolve FAIL items before CWS submission.\n');
+  process.stderr.write('       Resolve FAIL items before ' + (isPublicRelease ? 'CWS submission' : 'public release') + '.\n');
 }
 process.stdout.write('='.repeat(60) + '\n');
 
