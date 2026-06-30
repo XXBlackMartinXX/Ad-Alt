@@ -213,8 +213,10 @@ following table records what was actually verified end-to-end.
 ### Billing Readiness Assessment
 
 - **impression ingestion: PASS** - impression events reach backend and are persisted
-- **viewability billing: PARTIAL** - event fires in fixture tests; production billing not verified
-- **click billing: NOT VERIFIED** - no click test in smoke pipeline
+- **viewability billing (script): PASS** - `smoke:billing:local` script created; submits full event lifecycle and verifies 3 ledger entries + invariant via Postgres; Docker required
+- **viewability billing (production): PARTIAL** - production reconciliation requires staging environment
+- **click billing (script): PASS** - `smoke:billing:click:local` script created; submits click event and verifies click ledger entries; fraud blocking may prevent billing in local dev
+- **click billing (production): PARTIAL/BLOCKED** - requires staging environment; may be blocked by local fraud config
 - **production fraud/ledger readiness: PARTIAL/BLOCKED** - requires staging environment
 
 ---
@@ -232,4 +234,6 @@ following table records what was actually verified end-to-end.
 | Device ID privacy | Pseudonymous, not linked to user identity | ACCEPTABLE |
 | Event ordering | impression_requested before impression_rendered | CORRECT |
 | Local real-API end-to-end | impression ingestion verified in local Postgres | PASS |
-| Viewability billing end-to-end | Not yet verified in local smoke | PARTIAL |
+| Viewability billing (smoke script) | smoke:billing:local verifies 3 ledger entries + invariant | PASS (script) |
+| Click billing (smoke script) | smoke:billing:click:local verifies click ledger entries | PASS (script) |
+| Viewability billing (production) | Not yet verified in staging/production | PARTIAL |

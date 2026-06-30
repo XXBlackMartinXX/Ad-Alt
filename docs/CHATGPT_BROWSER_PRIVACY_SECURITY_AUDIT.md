@@ -287,8 +287,32 @@ found zero instances of real ppft_ key patterns.
 - Chrome Web Store review requirements (CSP headers, remote code execution)
 - The PromptProfit API server itself (out of scope for browser extension audit)
 
-**Post-local-API smoke additions (this session):**
-- `service-worker.ts` deviceId/extensionVersion params — SAFE (no page data)
-- `expiresAt` normalisation — SAFE (numeric conversion, no new data read)
-- `run-local-real-api-smoke.ps1` preflight — SAFE (Authorization header not logged)
-- `query-local-browser-events.ps1` rewrite — SAFE (privacy-safe columns confirmed)
+**Post-local-API smoke additions (previous session):**
+- `service-worker.ts` deviceId/extensionVersion params - SAFE (no page data)
+- `expiresAt` normalisation - SAFE (numeric conversion, no new data read)
+- `run-local-real-api-smoke.ps1` preflight - SAFE (Authorization header not logged)
+- `query-local-browser-events.ps1` rewrite - SAFE (privacy-safe columns confirmed)
+
+**Post-billing-smoke additions (this session):**
+
+| Script | Pattern | Finding | Classification |
+|--------|---------|---------|----------------|
+| `run-local-billing-ledger-smoke.ps1` | API key handling | Key minted via get-local-dev-api-key.ps1; cleared from env after last event POST; never printed | SAFE |
+| `run-local-billing-ledger-smoke.ps1` | Event payloads | Only backend-assigned IDs (adDecisionId, campaignId, creativeId) + extension metadata; no page content | SAFE |
+| `run-local-billing-ledger-smoke.ps1` | Ledger API response | Logs entryType, amountMicrocents, referenceType only; no user data or page content | SAFE |
+| `run-local-billing-ledger-smoke.ps1` | Postgres query | Queries ledger_entries by reference_id; columns: entry_type, amount_microcents; no user-identifiable fields | SAFE |
+| `run-local-billing-ledger-smoke.ps1` | Report content | Contains event status, ledger amounts, invariant result; no keys, no page data | SAFE |
+| `run-local-click-billing-smoke.ps1` | Same patterns as billing smoke | Key cleared after click event POST; click payload has only adDecisionId + creativeId | SAFE |
+| `query-local-ledger.ps1` | Postgres query | Queries: entry_type, reference_type, account_type, amount_microcents, balance_after_microcents, created_at; no PII | SAFE |
+| `query-local-billing-events.ps1` | Postgres query | Queries: id, status, adapter_name, ad_decision_id, campaign_id, device_id, created_at; no page content | SAFE |
+| `query-local-ledger.ps1` | SQL injection | AccountType and ReferenceType validated against allowlist before use in SQL; no user input passed to psql | SAFE |
+| `query-local-billing-events.ps1` | SQL injection | Status validated against allowlist; Adapter validated as `^[a-zA-Z0-9_-]+$`; no raw user input in SQL | SAFE |
+| `package-browser-extension.mjs` | File access | Reads dist/ directory only; no network calls; no API key access | SAFE |
+| `audit-browser-extension-package.js` | File access | Reads dist/ and .vscodeignore; no network calls; no API key access | SAFE |
+| `audit-vsix-package.js` | File access | Reads apps/extension/dist/ and .vscodeignore; no network calls; no secrets | SAFE |
+
+All new billing smoke scripts refuse to run against non-local API URLs (exit 3) and
+non-local DATABASE_URL values (exit 3). Event payloads submitted to the local API
+contain only extension-internal metadata and backend-assigned identifiers - the same
+privacy constraints as the production extension. No forbidden fields (pageTitle,
+pageUrl, domText, cookies, authToken) appear in any request or report.

@@ -24,6 +24,10 @@ const PS1_FILES = [
   'scripts/run-local-real-api-smoke.ps1',
   'scripts/get-local-dev-api-key.ps1',
   'scripts/live-chatgpt-smoke.ps1',
+  'scripts/run-local-billing-ledger-smoke.ps1',
+  'scripts/run-local-click-billing-smoke.ps1',
+  'scripts/query-local-ledger.ps1',
+  'scripts/query-local-billing-events.ps1',
 ];
 
 let exitCode = 0;

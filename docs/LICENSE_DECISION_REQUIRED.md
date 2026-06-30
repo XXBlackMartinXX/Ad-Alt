@@ -26,14 +26,25 @@ a proper license declaration required by distribution channels.
 
 ---
 
-## What Must Be Decided
+## Decision Matrix
 
-Choose one of the following, then implement:
+Choose one option. Each has different implications for the Chrome Web Store,
+VS Code Marketplace, and downstream dependency compatibility.
+
+| Option | SPDX | CWS | Marketplace | Dep Audit | Risk |
+|--------|------|-----|-------------|-----------|------|
+| Proprietary | UNLICENSED | OK (state explicitly) | OK (state explicitly) | Not required | Cannot be forked |
+| MIT | MIT | OK | OK | Required (viral: none) | Can be forked freely |
+| Apache-2.0 | Apache-2.0 | OK | OK | Required (patent grant) | Can be forked, patent clause |
+| AGPL-3.0 | AGPL-3.0 | Possible (CWS discretion) | OK | Required (strong copyleft) | Network use triggers copyleft |
+| Delayed | None | NOT OK for public submission | NOT OK | N/A | Blocks store submission |
 
 ### Option A: Proprietary (Closed Source)
 
-Add a `LICENSE` file stating that the software is proprietary and all rights
-reserved. Example:
+Recommended for a commercial product where the source is not intended for
+redistribution. No dependency audit required for compatibility.
+
+1. Add a `LICENSE` file to the repository root with text such as:
 
 ```
 Copyright (c) 2026 PromptProfit, Inc. All Rights Reserved.
@@ -43,19 +54,61 @@ may be reproduced, distributed, or transmitted in any form without prior
 written permission from PromptProfit, Inc.
 ```
 
-Then update all `package.json` files:
-```json
-"license": "UNLICENSED"
-```
-(Already set to UNLICENSED, but add the LICENSE file for marketplace compliance.)
+2. Keep all `package.json` files at `"license": "UNLICENSED"`.
+3. Submit to CWS with "All Rights Reserved" declaration.
 
-### Option B: Open Source
+### Option B: MIT (Permissive Open Source)
 
-Choose an OSI-approved license (MIT, Apache-2.0, AGPL-3.0, etc.).
+Allows free use, modification, and redistribution. Simplest for developer tools.
 
-1. Add the full license text as `LICENSE` in the repository root.
-2. Update all `package.json` files to the chosen SPDX identifier.
+1. Add MIT license text as `LICENSE` in the repository root.
+2. Update all `package.json` files to `"license": "MIT"`.
 3. Run `pnpm licenses list` to audit third-party dependency compatibility.
+
+### Option C: Apache-2.0
+
+Similar to MIT but includes an explicit patent grant. Preferred by larger
+organizations. Compatible with all current runtime dependencies (MIT/Apache).
+
+1. Add Apache-2.0 license text as `LICENSE` in the repository root.
+2. Update all `package.json` files to `"license": "Apache-2.0"`.
+3. Run `pnpm licenses list` to confirm compatibility.
+
+### Option D: AGPL-3.0 (Strong Copyleft)
+
+Requires source disclosure for any network-accessible use. Suitable only if
+the entire platform is intended to be open source. NOT recommended for a
+commercial SaaS product with proprietary backend.
+
+1. Add AGPL-3.0 text as `LICENSE`.
+2. Audit all dependencies for AGPL compatibility.
+3. Note: Chrome Web Store may require additional review.
+
+### Option E: Delayed Decision
+
+Do not add a LICENSE file yet. This blocks Chrome Web Store and VS Code
+Marketplace submission but does not affect internal beta testing.
+
+---
+
+## Dependency License Audit
+
+Before selecting an open-source license, run:
+```bash
+pnpm licenses list
+```
+
+Spot check of known runtime dependencies:
+- `@ad-alt/platform-core`: Internal package (proprietary, not redistributed)
+- `vitest`: MIT
+- `playwright`: Apache-2.0
+- `esbuild`: MIT
+- `hono`: MIT
+- `drizzle-orm`: Apache-2.0
+- `zod`: MIT
+
+No GPL or AGPL runtime dependencies detected. MIT and Apache-2.0 are both
+compatible with current dependencies.
 
 ---
 

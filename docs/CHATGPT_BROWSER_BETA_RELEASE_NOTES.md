@@ -35,9 +35,16 @@ This release covers the **ChatGPT browser adapter only**.
 ### Automation Scripts
 
 - `run-local-real-api-smoke.ps1` - fully automated local smoke pipeline
+- `run-local-billing-ledger-smoke.ps1` - billing/ledger smoke (impression lifecycle + DB verification)
+- `run-local-click-billing-smoke.ps1` - click billing smoke (click event + ledger verification)
 - `query-local-browser-events.ps1` - privacy-safe DB event query (no local psql needed)
-- `check-ps1-ascii.js` - ensures all PS1 files are Windows-safe
-- `check-no-secret-leaks.js` - scans for leaked API key patterns
+- `query-local-ledger.ps1` - query ledger_entries and balances tables
+- `query-local-billing-events.ps1` - query impression_events with billing status
+- `package-browser-extension.mjs` - beta ZIP without source maps
+- `audit-browser-extension-package.js` - CWS submission readiness audit
+- `audit-vsix-package.js` - VS Code Marketplace submission readiness audit
+- `check-ps1-ascii.js` - ensures all 10 PS1 files are Windows-safe
+- `check-no-secret-leaks.js` - scans 326 source files for leaked API key patterns
 - `check-report-templates-ascii.js` - ensures report-generating files are ASCII-clean
 
 ---
@@ -102,8 +109,15 @@ logged, written to reports, or included in event payloads.
 **Severity:** Recommended to resolve before Chrome Web Store submission
 **Impact:** Source maps increase ZIP size and expose TypeScript structure
 **Current state:** esbuild emits `.map` files alongside `.js` in `dist/`
-**Resolution:** Exclude `.map` files from submission ZIP, or configure
-`sourcemap: false` in the production esbuild config
+**Resolution:** Use `pnpm package:browser:beta` which creates a ZIP excluding
+`.map` files, or configure `sourcemap: false` in `scripts/bundle.mjs`
+
+### 3. Missing UI Assets
+
+**Severity:** Pre-CWS-submission blocker
+**Impact:** `manifest.json` references `popup.html`, `options.html`, and icon
+PNG files that do not yet exist in the repository
+**Resolution:** Create placeholder or production UI assets before CWS submission
 
 ---
 
@@ -111,8 +125,8 @@ logged, written to reports, or included in event payloads.
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Click billing | NOT VERIFIED | No click tracking in live smoke |
-| Viewability billing/ledger | PARTIAL | Event fires verified; billing reconciliation not tested |
+| Click billing | PARTIAL | Click smoke script created; billing in local dev may be PARTIAL/BLOCKED |
+| Viewability billing/ledger | PARTIAL | Billing smoke script created; reconciliation requires staging |
 | Production fraud signals | NOT VERIFIED | Local dev does not test fraud detection |
 | Multi-user concurrent impressions | NOT VERIFIED | Single-user smoke only |
 | Extension update behavior | NOT VERIFIED | Manifest version bump not tested |

@@ -36,6 +36,10 @@ const REPORT_TEMPLATE_FILES = [
   'scripts/list-local-api-smoke-reports.js',
   'scripts/list-smoke-reports.js',
   'scripts/clean-smoke-reports.js',
+  'scripts/run-local-billing-ledger-smoke.ps1',
+  'scripts/run-local-click-billing-smoke.ps1',
+  'scripts/query-local-ledger.ps1',
+  'scripts/query-local-billing-events.ps1',
 ];
 
 let exitCode = 0;
