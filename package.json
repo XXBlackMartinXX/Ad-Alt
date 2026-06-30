@@ -36,7 +36,9 @@
     "smoke:chatgpt:reports:clean": "node scripts/clean-smoke-reports.js",
     "local:dev-api-key": "node scripts/run-ps1.js scripts/get-local-dev-api-key.ps1",
     "query:local-events": "node scripts/run-ps1.js scripts/query-local-browser-events.ps1",
-    "check:ps1": "node scripts/check-ps1-ascii.js"
+    "check:ps1": "node scripts/check-ps1-ascii.js",
+    "check:secrets:local": "node scripts/check-no-secret-leaks.js",
+    "check:report-ascii": "node scripts/check-report-templates-ascii.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

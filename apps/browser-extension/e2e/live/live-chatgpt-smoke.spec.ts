@@ -1,5 +1,5 @@
 /**
- * Guided live ChatGPT smoke test — human operator required.
+ * Guided live ChatGPT smoke test -human operator required.
  *
  * What this test does (and does NOT do):
  *
@@ -7,10 +7,10 @@
  *   - Launch a real Chromium window with the PromptProfit extension loaded
  *   - Configure the extension to POST ad events to a local mock API (so events
  *     are captured without touching any external service)
- *   - Enable the extension debug panel (opt-in overlay — controlled entirely by
+ *   - Enable the extension debug panel (opt-in overlay -controlled entirely by
  *     the extension, never reads page content)
  *   - Navigate to chatgpt.com and wait for a human to log in and submit a prompt
- *   - Verify the sponsored banner appears (by ID — extension-owned DOM only)
+ *   - Verify the sponsored banner appears (by ID -extension-owned DOM only)
  *   - Verify ad events arrive at the local mock API
  *   - Write a JSON + Markdown smoke report to test-results/live/
  *
@@ -28,9 +28,9 @@
  * No ChatGPT page content is read at any point.
  *
  * RESULT SEMANTICS:
- *   PASSED      — all checks verified; banner appeared; events received.
- *   FAILED      — wait state was detected but one or more checks failed.
- *   INCONCLUSIVE — wait state was never detected (no prompt submitted,
+ *   PASSED      -all checks verified; banner appeared; events received.
+ *   FAILED      -wait state was detected but one or more checks failed.
+ *   INCONCLUSIVE -wait state was never detected (no prompt submitted,
  *                 login timed out, or extension not active). Nothing is
  *                 verified; re-run after fixing the precondition.
  */
@@ -113,7 +113,7 @@ async function buildLiveExtensionContext(): Promise<BrowserContext> {
   const customPath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
 
   return chromium.launchPersistentContext("", {
-    // No --headless=new — this is a fully visible browser for human interaction.
+    // No --headless=new -this is a fully visible browser for human interaction.
     headless: false,
     ...(customPath ? { executablePath: customPath } : {}),
     args,
@@ -157,7 +157,7 @@ interface SmokeCheck {
   elapsedMs: number;
 }
 
-/** Three distinct outcomes — never conflate timeout with genuine failure. */
+/** Three distinct outcomes -never conflate timeout with genuine failure. */
 type SmokeResult = "passed" | "failed" | "inconclusive";
 
 interface SmokeReport {
@@ -192,7 +192,7 @@ function writeReport(report: SmokeReport): void {
   };
 
   const statusIcon = (r: CheckResult) =>
-    r === "pass" ? "✓" : r === "skip" ? "–" : "✗";
+    r === "pass" ? "[PASS]" : r === "skip" ? "[SKIP]" : "[FAIL]";
 
   const checksTable = report.checks
     .map(
@@ -203,7 +203,7 @@ function writeReport(report: SmokeReport): void {
 
   const inconclusiveNote =
     report.result === "inconclusive"
-      ? "\n> **INCONCLUSIVE** — The wait state was never detected.\n" +
+      ? "\n> **INCONCLUSIVE** - The wait state was never detected.\n" +
         "> This usually means no prompt was submitted, the extension did not\n" +
         "> activate, or the debug panel could not mount.\n" +
         "> Re-run after verifying the extension is loaded and submit a prompt\n" +
@@ -214,7 +214,7 @@ function writeReport(report: SmokeReport): void {
     ? "Local real API (http://127.0.0.1:3001)"
     : "Embedded MockApiServer";
 
-  const md = `# Live ChatGPT Smoke Test — ${resultLabel[report.result]}
+  const md = `# Live ChatGPT Smoke Test - ${resultLabel[report.result]}
 
 **Test ID:** \`${report.testId}\`
 **Timestamp:** ${report.timestamp}
@@ -253,7 +253,7 @@ test.beforeAll(async () => {
   await waitForExtensionServiceWorker(context);
 
   if (LOCAL_API_MODE) {
-    // Real local API mode — no MockApiServer.
+    // Real local API mode -no MockApiServer.
     // SECURITY: apiKey is consumed from env, stored in chrome.storage.local,
     // and forwarded as Authorization: Bearer by the service worker only.
     // It is never written to reports, event payloads, or debug panel.
@@ -296,7 +296,7 @@ test.afterAll(async () => {
   }
 });
 
-test("live ChatGPT smoke — banner appears and events fire", async () => {
+test("live ChatGPT smoke -banner appears and events fire", async () => {
   if (!context) throw new Error("Setup failed: browser context is null");
   if (!LOCAL_API_MODE && !mockApi) throw new Error("Setup failed: no mockApi in mock mode");
 
@@ -350,7 +350,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
     waitStateDetected = true;
   } catch {
     notes.push(
-      `Wait-state timed out after ${Math.round(WAIT_TIMEOUT_MS / 60000)} min — ` +
+      `Wait-state timed out after ${Math.round(WAIT_TIMEOUT_MS / 60000)} min - ` +
         "was a prompt submitted and did the debug panel mount?",
     );
   }
@@ -360,7 +360,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
     result: waitStateDetected ? "pass" : "fail",
     detail: waitStateDetected
       ? "debug panel reported data-wait-state=true"
-      : `timed out after ${Math.round(WAIT_TIMEOUT_MS / 60000)} min — no wait state`,
+      : `timed out after ${Math.round(WAIT_TIMEOUT_MS / 60000)} min - no wait state`,
     elapsedMs: elapsed(),
   });
 
@@ -369,11 +369,11 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   // from "ran and failed," then mark the overall result as INCONCLUSIVE.
   if (!waitStateDetected) {
     checks.push(
-      { name: "banner_rendered",            result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
-      { name: "debug_panel_banner_rendered", result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
-      { name: "impression_requested_sent",  result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
-      { name: "impression_rendered_sent",   result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
-      { name: "events_privacy_safe",        result: "skip", detail: "skipped — no events to verify",     elapsedMs: elapsed() },
+      { name: "banner_rendered",            result: "skip", detail: "skipped - wait state not detected", elapsedMs: elapsed() },
+      { name: "debug_panel_banner_rendered", result: "skip", detail: "skipped - wait state not detected", elapsedMs: elapsed() },
+      { name: "impression_requested_sent",  result: "skip", detail: "skipped - wait state not detected", elapsedMs: elapsed() },
+      { name: "impression_rendered_sent",   result: "skip", detail: "skipped - wait state not detected", elapsedMs: elapsed() },
+      { name: "events_privacy_safe",        result: "skip", detail: "skipped - no events to verify",     elapsedMs: elapsed() },
     );
 
     const durationMs = elapsed();
@@ -396,7 +396,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
 
   // ------------------------------------------------------------------
   // Wait for sponsored banner to appear.
-  // Privacy: we only check for the element by ID — no content is read.
+  // Privacy: we only check for the element by ID -no content is read.
   // ------------------------------------------------------------------
   let bannerRendered = false;
   try {
@@ -407,7 +407,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   } catch {
     notes.push(
       "#promptprofit-sponsored-banner did not appear within " +
-        `${ASSERT_TIMEOUT_MS / 1000}s — ad decision may be null or API unreachable.`,
+        `${ASSERT_TIMEOUT_MS / 1000}s - ad decision may be null or API unreachable.`,
     );
   }
 
@@ -443,13 +443,13 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
       result: panelShowsRendered ? "pass" : "fail",
       detail: panelShowsRendered
         ? "data-banner-rendered=true confirmed on debug panel"
-        : "debug panel state mismatch — banner in DOM but panel not updated",
+        : "debug panel state mismatch - banner in DOM but panel not updated",
       elapsedMs: elapsed(),
     });
   }
 
   // ------------------------------------------------------------------
-  // Event verification — mock mode vs local-API mode.
+  // Event verification -mock mode vs local-API mode.
   // ------------------------------------------------------------------
   // Give events a moment to arrive if the banner just appeared.
   if (bannerRendered) {
@@ -491,7 +491,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
       result: hasImpressionRequested ? "pass" : "fail",
       detail: hasImpressionRequested
         ? "impression_requested received by mock API"
-        : `not found — ${eventCount} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
+        : `not found - ${eventCount} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
       elapsedMs: elapsed(),
     });
 
@@ -500,11 +500,11 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
       result: hasImpressionRendered ? "pass" : "fail",
       detail: hasImpressionRendered
         ? "impression_rendered received by mock API"
-        : `not found — ${eventCount} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
+        : `not found - ${eventCount} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
       elapsedMs: elapsed(),
     });
 
-    // Verify events contain no private fields (skip if no events — avoid vacuous truth).
+    // Verify events contain no private fields (skip if no events -avoid vacuous truth).
     const FORBIDDEN_FIELDS = [
       "pageUrl", "pageTitle", "domText", "promptText",
       "aiResponse", "chatHistory", "cookies", "authToken", "sessionCookie", "apiKey",
@@ -514,7 +514,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
       checks.push({
         name: "events_privacy_safe",
         result: "skip",
-        detail: "no events captured — privacy check not applicable",
+        detail: "no events captured - privacy check not applicable",
         elapsedMs: elapsed(),
       });
       notes.push("events_privacy_safe skipped: 0 events received by mock API.");
@@ -535,7 +535,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
         result: privacyViolations.length === 0 ? "pass" : "fail",
         detail:
           privacyViolations.length === 0
-            ? `${eventCount} event(s) inspected — no forbidden fields`
+            ? `${eventCount} event(s) inspected - no forbidden fields`
             : privacyViolations.join("; "),
         elapsedMs: elapsed(),
       });

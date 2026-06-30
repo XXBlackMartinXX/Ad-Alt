@@ -2,8 +2,8 @@
 
 **Date:** 2026-06-30
 **Branch:** `claude/ecstatic-maxwell-h0d8d8`
-**Overall label:** beta-readiness candidate; blockers documented
-**Last updated:** local real-API smoke hardening (preflight, seed fix, service worker fixes)
+**Overall label:** beta-readiness candidate with local-real-API smoke verified
+**Last updated:** beta report hardening (ASCII cleanup, secret checks, unified report tooling)
 
 ---
 
@@ -107,6 +107,10 @@
 | Service worker never logs page content | PASS | SW audit clean |
 | Events use only backend-assigned IDs | PASS | ad-event-sender.ts |
 | eventId is per-event UUID (dedup safe) | PASS | crypto.randomUUID() per event |
+| Secret leak scan (ppft_ key patterns) | PASS | check-no-secret-leaks.js; 317 files scanned |
+| Report template ASCII compliance | PASS | check-report-templates-ascii.js; 4 files clean |
+| Local API key never printed or committed | PASS | env-only; cleared post-run; redacted in logs |
+| Smoke script audit (preflight, reports, DB query) | PASS | docs/CHATGPT_BROWSER_PRIVACY_SECURITY_AUDIT.md |
 | Full audit documented | PASS | docs/CHATGPT_BROWSER_PRIVACY_SECURITY_AUDIT.md |
 
 ---
@@ -137,9 +141,11 @@
 | src/ excluded from VSIX | PASS | .vscodeignore entry |
 | No dist-test/ in VSIX | PASS | Different app package |
 | No .env / secrets in VSIX | PASS | git-ignored |
-| Source maps not in VSIX | PASS | browser ext separate from VS Code ext |
-| LICENSE file present | BLOCKED | No LICENSE file — required for marketplace |
-| Browser ext ZIP: source maps stripped | NOT STARTED | Strip .map before CWS submission |
+| VSIX source maps (VS Code ext) | PASS | Beta-acceptable; exclude before Marketplace submission |
+| Browser ext source maps (dist/) | NOT STARTED | Strip .map before CWS submission; OK for beta |
+| LICENSE file present | BLOCKED | No LICENSE file; see docs/LICENSE_DECISION_REQUIRED.md |
+| License decision documented | PASS | docs/LICENSE_DECISION_REQUIRED.md created |
+| Beta release notes created | PASS | docs/CHATGPT_BROWSER_BETA_RELEASE_NOTES.md |
 | Full hygiene documented | PASS | docs/RELEASE_PACKAGE_HYGIENE.md |
 
 ---
@@ -171,10 +177,12 @@
 | CANARY 4: No ChatGPT login automation | PASS | No auth code present |
 | CANARY 5: No ChatGPT content/URL/cookie reads | PASS | Privacy audit clean |
 | CANARY 6: No generated artifacts committed | PASS | All in .gitignore |
-| CANARY 7: Local-real-API not faked | PASS | Marked BLOCKED, not claimed PASSED |
-| CANARY 8: No events = skip privacy check | PASS | Fixture tests verify event content |
-| CANARY 9: Not claimed production-ready | PASS | Label is beta-readiness candidate |
-| CANARY 10: Valid final label | PASS | beta-readiness candidate |
+| CANARY 7: Local-real-API verified (not faked) | PASS | Windows run passed at c5167e2 |
+| CANARY 8: No events = skip privacy check | PASS | Spec skips; 0 events = vacuous truth avoided |
+| CANARY 9: Inconclusive labeled INCONCLUSIVE | PASS | Spec uses distinct SmokeResult type |
+| CANARY 10: No mojibake in reports | PASS | All em-dash/checkmark Unicode fixed; ASCII-clean |
+| CANARY 11: Not claimed production-ready | PASS | Label is beta-readiness candidate |
+| CANARY 12: No context drift detected | PASS | All source verified against command output |
 
 ---
 
@@ -190,33 +198,56 @@
 | smoke:chatgpt:local-api | PASS | Fully automated; still needs Docker on host |
 | smoke:chatgpt:local-api:help | PASS | Documents all flags |
 | smoke:chatgpt:local-api:report | PASS | Lists and prints latest local-API report |
-| smoke:chatgpt:reports:list | PASS | Lists reports dir contents |
-| smoke:chatgpt:reports:clean | PASS | Removes old reports with confirm |
-| check:ps1 covers all PS1 files | PASS | 6 files ASCII-clean |
-| query-local-browser-events.ps1 | PASS | Rewritten: no local psql, correct table/DB defaults, filters |
+| smoke:chatgpt:reports:list | PASS | Lists both live and local-API reports |
+| smoke:chatgpt:reports:clean | PASS | Cleans both live and local-API reports; confirm required |
+| check:ps1 | PASS | 6 PS1 files ASCII-clean |
+| check:secrets:local | PASS | 317 source files scanned; 0 leaks |
+| check:report-ascii | PASS | 4 report template files ASCII-clean |
+| query-local-browser-events.ps1 | PASS | No local psql; correct table/DB defaults; filters |
+| Generated report mojibake | PASS | All em-dash/checkmark chars removed from report strings |
 
 ---
 
 ## 12. Outstanding Beta Blockers (Summary)
 
-| Blocker | Category | Path to Resolve |
-|---------|----------|----------------|
-| No LICENSE file | Release | Add LICENSE.md before store submission |
-| Local-real-API smoke needs Docker on host | Testing | Run `pnpm smoke:chatgpt:local-api` on Windows with Docker Desktop |
-| Source maps not stripped for CWS | Release | esbuild `sourcemap: false` in prod |
+| Blocker | Category | Severity | Path to Resolve |
+|---------|----------|----------|----------------|
+| No LICENSE file | Release | Store-submission blocker | See docs/LICENSE_DECISION_REQUIRED.md |
+| Browser ext source maps not stripped | Release | Pre-CWS-submission | `sourcemap: false` in esbuild OR exclude .map from ZIP |
+| Viewability billing not end-to-end verified | Testing | Pre-production | Staging environment test required |
+| Click billing not verified | Testing | Pre-production | Staging environment test required |
+
+**Resolved in this session:**
+- "No automated API key seed" - RESOLVED (auto-minting in script)
+- "Report mojibake" - RESOLVED (all Unicode fixed in report strings)
+- "Local-real-API smoke BLOCKED" - RESOLVED (passed on Windows at c5167e2)
+
+---
+
+## 13. Event and Billing Status
+
+| Event | Status | Notes |
+|-------|--------|-------|
+| impression_requested ingested | PASS | Verified in local Postgres |
+| impression_rendered ingested | PASS | Verified in local Postgres |
+| viewability_threshold_met fires | PASS (fixture) | Production threshold not waited in smoke |
+| viewability billing reconciled | PARTIAL | Reconciler not running in local dev |
+| click event | NOT VERIFIED | No click test in smoke |
+| ledger billing end-to-end | PARTIAL/BLOCKED | Requires staging environment |
 
 ---
 
 ## Final Label
 
-**beta-readiness candidate; blockers documented**
+**beta-readiness candidate with local-real-API smoke verified**
 
 The ChatGPT browser adapter passes all automated fixture tests, unit tests,
-TypeScript checks, lint, and Windows live smoke validation. Privacy and
-security audits are clean. The local real-API smoke pipeline is fully
-automated (Docker, migrate, seed, key mint, preflight, build, smoke, event
-query) and the service worker now sends all required parameters to the real
-API. Two outstanding blockers (LICENSE and source maps) do not affect core
-adapter correctness. The adapter is suitable for internal beta testing;
-public store submission requires resolving the LICENSE and source-map
-blockers.
+TypeScript checks, lint, and Windows live smoke validation. The local
+real-API smoke pipeline runs end-to-end (Docker, migrate, seed, key mint,
+preflight, build, smoke, DB event verification) and was verified on Windows
+at commit c5167e2. Privacy and security audits are clean. Generated reports
+are now ASCII-only. Secret leak checks pass on all 317 source files. Two
+outstanding blockers (LICENSE and source maps before CWS submission) do not
+affect core adapter correctness. The adapter is suitable for internal beta
+testing. Public store submission requires resolving the LICENSE and
+source-map blockers.

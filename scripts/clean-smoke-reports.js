@@ -1,49 +1,77 @@
 'use strict';
 /**
- * Remove all live ChatGPT smoke test reports (keeps the directory).
+ * Remove all smoke test reports (live and local-API), keeping the directories.
  *
  * Usage:
- *   node scripts/clean-smoke-reports.js [--force]
+ *   node scripts/clean-smoke-reports.js [--force] [--live-only] [--local-api-only]
  *   pnpm -w run smoke:chatgpt:reports:clean
  *
- * Pass --force to skip the confirmation prompt.
+ * Flags:
+ *   --force          Skip confirmation prompt.
+ *   --live-only      Only clean live (mock) reports.
+ *   --local-api-only Only clean local-API reports.
+ *   --yes            Alias for --force.
+ *
+ * SAFETY:
+ *   - Only removes .md and .json files inside known report directories.
+ *   - Never removes source files, scripts, dist/, or node_modules.
+ *   - Requires explicit confirmation unless --force / --yes is passed.
  */
 
 const fs       = require('fs');
 const path     = require('path');
 const readline = require('readline');
 
-const REPORT_DIR = path.resolve(
+const LIVE_DIR = path.resolve(
   __dirname,
   '../apps/browser-extension/test-results/live',
 );
 
-const force = process.argv.includes('--force');
+const LOCAL_API_DIR = path.resolve(
+  __dirname,
+  '../apps/browser-extension/test-results/local-api',
+);
 
-if (!fs.existsSync(REPORT_DIR)) {
-  process.stdout.write('[--] No live smoke reports directory found; nothing to clean.\n');
+const args        = process.argv.slice(2);
+const force       = args.includes('--force') || args.includes('--yes');
+const liveOnly    = args.includes('--live-only');
+const localOnly   = args.includes('--local-api-only');
+
+const scanDirs = [];
+if (!localOnly) scanDirs.push({ dir: LIVE_DIR,      label: 'Live smoke (mock API)' });
+if (!liveOnly)  scanDirs.push({ dir: LOCAL_API_DIR, label: 'Local-API smoke (real API)' });
+
+function collectReportFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((f) => f.endsWith('.md') || f.endsWith('.json'))
+    .map((f) => path.join(dir, f));
+}
+
+const allFiles = [];
+for (const { dir, label } of scanDirs) {
+  const files = collectReportFiles(dir);
+  if (files.length > 0) {
+    process.stdout.write('[--] ' + label + ': ' + files.length + ' file(s) in:\n');
+    process.stdout.write('     ' + dir + '\n');
+    for (const f of files) {
+      process.stdout.write('  ' + path.basename(f) + '\n');
+    }
+    process.stdout.write('\n');
+  }
+  allFiles.push(...files);
+}
+
+if (allFiles.length === 0) {
+  process.stdout.write('[--] No report files found; nothing to clean.\n');
   process.exit(0);
 }
 
-const files = fs.readdirSync(REPORT_DIR)
-  .filter((f) => f.endsWith('.md'))
-  .map((f) => path.join(REPORT_DIR, f));
-
-if (files.length === 0) {
-  process.stdout.write('[--] No .md reports found; nothing to clean.\n');
-  process.exit(0);
-}
-
-process.stdout.write('[--] Found ' + files.length + ' report(s) in:\n');
-process.stdout.write('     ' + REPORT_DIR + '\n\n');
-for (const f of files) {
-  process.stdout.write('  ' + path.basename(f) + '\n');
-}
-process.stdout.write('\n');
+process.stdout.write('[--] ' + allFiles.length + ' report file(s) will be removed.\n\n');
 
 function doDelete() {
   let removed = 0;
-  for (const f of files) {
+  for (const f of allFiles) {
     try {
       fs.unlinkSync(f);
       removed++;
@@ -51,7 +79,7 @@ function doDelete() {
       process.stderr.write('[ERR] Could not remove ' + f + ': ' + err.message + '\n');
     }
   }
-  process.stdout.write('[OK]  Removed ' + removed + ' report(s).\n');
+  process.stdout.write('[OK]  Removed ' + removed + ' file(s).\n');
 }
 
 if (force) {
@@ -60,7 +88,7 @@ if (force) {
 }
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-rl.question('Remove all ' + files.length + ' report(s)? [y/N] ', (answer) => {
+rl.question('Remove all ' + allFiles.length + ' report file(s)? [y/N] ', (answer) => {
   rl.close();
   if (answer.trim().toLowerCase() === 'y') {
     doDelete();

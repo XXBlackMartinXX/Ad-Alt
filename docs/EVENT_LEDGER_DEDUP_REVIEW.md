@@ -192,7 +192,34 @@ is the correct trust boundary.
 
 ---
 
-## 10. Summary
+## 10. Local Real-API Smoke Verification Results
+
+Now that local-real-API smoke has passed on Windows (commit c5167e2), the
+following table records what was actually verified end-to-end.
+
+| Stage | Method | Status |
+|-------|--------|--------|
+| Ad-decision preflight | GET /v1/ads/decision returned 200 OK | PASS |
+| browser_chatgpt adapter eligibility | Campaign includes browser_chatgpt in targetAdapterNames | PASS |
+| Banner rendered on ChatGPT | #promptprofit-sponsored-banner in DOM after wait-state | PASS |
+| impression_events row in Postgres | query-local-browser-events.ps1 returned >= 1 row | PASS |
+| deviceId consistency | local-real-api-smoke-device in preflight, service worker, storage | PASS |
+| API key handling | PROMPTPROFIT_DEV_API_KEY cleared from env after run; never printed | PASS |
+| Viewability event | NOT VERIFIED - 5000ms production threshold exceeds smoke run | NOT VERIFIED |
+| Click event | NOT VERIFIED - no click automation in smoke | NOT VERIFIED |
+| Ledger/billing reconciliation | NOT VERIFIED - local dev has no billing reconciler | NOT VERIFIED |
+| Fraud signal pipeline | NOT VERIFIED - not running in local dev stack | NOT VERIFIED |
+
+### Billing Readiness Assessment
+
+- **impression ingestion: PASS** - impression events reach backend and are persisted
+- **viewability billing: PARTIAL** - event fires in fixture tests; production billing not verified
+- **click billing: NOT VERIFIED** - no click test in smoke pipeline
+- **production fraud/ledger readiness: PARTIAL/BLOCKED** - requires staging environment
+
+---
+
+## 11. Summary
 
 | Concern | Finding | Status |
 |---------|---------|--------|
@@ -204,3 +231,5 @@ is the correct trust boundary.
 | Service worker payload inspection | Pass-through, no modification | ACCEPTABLE |
 | Device ID privacy | Pseudonymous, not linked to user identity | ACCEPTABLE |
 | Event ordering | impression_requested before impression_rendered | CORRECT |
+| Local real-API end-to-end | impression ingestion verified in local Postgres | PASS |
+| Viewability billing end-to-end | Not yet verified in local smoke | PARTIAL |

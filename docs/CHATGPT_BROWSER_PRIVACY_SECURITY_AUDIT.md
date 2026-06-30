@@ -201,7 +201,60 @@ PromptProfit API (telemetry endpoint)
 
 ---
 
-## 9. Threat Model Alignment
+## 9. Smoke Script and Report Pipeline Audit
+
+The following files generate output visible to the user and were audited in
+addition to the extension source.
+
+### scripts/run-local-real-api-smoke.ps1
+
+| Pattern | Finding | Classification |
+|---------|---------|----------------|
+| `$env:PROMPTPROFIT_DEV_API_KEY` | Key held in process env only; never written to output | SAFE |
+| `Authorization` header | Set once in preflight; value never written to any stream | SAFE |
+| `Get-Content $latest.FullName -Raw` | Reads ASCII-only MD file; key is not in reports | SAFE |
+| `Sanitize()` function | Strips non-printable bytes from child output | SAFE |
+| DB query | Calls query-local-browser-events.ps1 with `-Adapter chatgpt` only | SAFE |
+
+### scripts/query-local-browser-events.ps1
+
+| Pattern | Finding | Classification |
+|---------|---------|----------------|
+| Selected columns | `id, created_at, adapter_name, status, ad_decision_id, campaign_id, creative_id, device_id, requested_at, rendered_at` | SAFE |
+| Never selected | `user_id, fraud_signals, idempotency_key, payload JSON` | SAFE |
+| Adapter filter | Parameterized `LIKE '%chatgpt%'` — no SQL injection (value validated with `^[a-zA-Z0-9_-]+$`) | SAFE |
+
+### scripts/check-no-secret-leaks.js
+
+Scans for `ppft_[0-9a-f]{48,}` in source and generated reports. All 317
+source files pass clean. Confirmed: no real key pattern exists in committed code.
+
+### apps/browser-extension/e2e/live/live-chatgpt-smoke.spec.ts
+
+| Pattern | Finding | Classification |
+|---------|---------|----------------|
+| `process.env["PROMPTPROFIT_DEV_API_KEY"]` | Read once, passed to `configureExtensionStorage` only | SAFE |
+| `console.log("... (key: [redacted])")` | API key value is NOT logged; only the literal string `[redacted]` | SAFE |
+| `apiKey` in `configureExtensionStorage` | Written to `chrome.storage.local` by service worker evaluate; not to reports | SAFE |
+| Report JSON/MD fields | `testId, timestamp, result, checks, eventCount, eventTypes, notes` — no key fields | SAFE |
+| `page.goto(CHATGPT_URL)` | Navigation only; no content read | SAFE |
+| `page.waitForSelector(...)` | Selector targets extension-owned elements only | SAFE |
+
+### scripts/list-local-api-smoke-reports.js
+
+Reads `.md` and `.json` files from `test-results/local-api/`. JSON fields
+read: `result`, `apiBackend`, `checks[].name`, `checks[].result`. No
+sensitive fields are read or printed. Classification: SAFE.
+
+### Generated Reports (test-results/)
+
+Reports contain: `testId`, `timestamp`, `result`, `checks`, `eventCount`,
+`eventTypes`, `notes`. None of these fields include API keys, page content,
+URLs, or user data. Reports are git-ignored and ASCII-only after spec fix.
+
+---
+
+## 10. Threat Model Alignment
 
 Cross-referenced against `docs/03-threat-model.md`:
 
@@ -217,16 +270,25 @@ Cross-referenced against `docs/03-threat-model.md`:
 
 ---
 
-## 10. Audit Conclusion
+## 11. Audit Conclusion
 
-No privacy violations or security issues were found in the production source.
-All grep searches returned only expected hits (privacy guard definitions,
-documentation comments, or extension-owned DOM writes). The data flow is
-restricted to structural DOM signals (element presence) and API-supplied
-content.
+No privacy violations or security issues were found in the production source,
+test scripts, or report-generating code. All grep searches returned only
+expected hits (privacy guard definitions, documentation comments, or
+extension-owned DOM writes). The data flow is restricted to structural DOM
+signals (element presence) and API-supplied content.
+
+The secret leak check (`check-no-secret-leaks.js`) scanned 317 files and
+found zero instances of real ppft_ key patterns.
 
 **Coverage gaps (not audited in this pass):**
 - Third-party npm dependencies (a full `npm audit` + license scan is
   recommended before public release)
 - Chrome Web Store review requirements (CSP headers, remote code execution)
 - The PromptProfit API server itself (out of scope for browser extension audit)
+
+**Post-local-API smoke additions (this session):**
+- `service-worker.ts` deviceId/extensionVersion params — SAFE (no page data)
+- `expiresAt` normalisation — SAFE (numeric conversion, no new data read)
+- `run-local-real-api-smoke.ps1` preflight — SAFE (Authorization header not logged)
+- `query-local-browser-events.ps1` rewrite — SAFE (privacy-safe columns confirmed)
