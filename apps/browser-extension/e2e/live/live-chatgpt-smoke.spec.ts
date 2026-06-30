@@ -62,6 +62,25 @@ const REPORT_DIR = path.resolve(
   fileURLToPath(new URL("../../test-results/live", import.meta.url)),
 );
 
+// ---------------------------------------------------------------------------
+// Local real-API mode
+// Set LIVE_SMOKE_USE_LOCAL_API=1 (via run-local-real-api-smoke.ps1) to route
+// the extension at the real local PromptProfit API instead of MockApiServer.
+// In this mode the spec does NOT verify in-process event capture; instead the
+// orchestrating PS1 script queries local Postgres for event rows post-run.
+//
+// SECURITY: The PROMPTPROFIT_DEV_API_KEY value is passed into the extension's
+// chrome.storage.local as "apiKey" so the service worker can send
+// Authorization: Bearer headers. It is NEVER printed, logged, written to
+// reports, or included in event payloads.
+// ---------------------------------------------------------------------------
+const LOCAL_API_MODE = process.env["LIVE_SMOKE_USE_LOCAL_API"] === "1";
+const LOCAL_API_BASE_URL = process.env["PLAYWRIGHT_API_BASE_URL"] ?? "http://127.0.0.1:3001";
+const LOCAL_REPORT_DIR = path.resolve(
+  fileURLToPath(new URL("../../test-results/local-api", import.meta.url)),
+);
+const ACTIVE_REPORT_DIR = LOCAL_API_MODE ? LOCAL_REPORT_DIR : REPORT_DIR;
+
 // The Playwright spec timeout (set in playwright.config.live.ts).
 const SPEC_TIMEOUT_MS = parseInt(
   process.env["LIVE_SMOKE_TIMEOUT_MS"] ?? "600000",
@@ -147,6 +166,8 @@ interface SmokeReport {
   result: SmokeResult;
   /** @deprecated kept for backward-compat scripts that read `passed` */
   passed: boolean;
+  /** "mock" = embedded MockApiServer; "local-api" = real local PromptProfit API */
+  apiBackend: "mock" | "local-api";
   checks: SmokeCheck[];
   eventCount: number;
   eventTypes: string[];
@@ -156,11 +177,11 @@ interface SmokeReport {
 }
 
 function writeReport(report: SmokeReport): void {
-  fs.mkdirSync(REPORT_DIR, { recursive: true });
+  fs.mkdirSync(ACTIVE_REPORT_DIR, { recursive: true });
 
   const slug = report.testId.replace(/[^a-z0-9-]/gi, "-");
-  const jsonPath = path.join(REPORT_DIR, `${slug}.json`);
-  const mdPath = path.join(REPORT_DIR, `${slug}.md`);
+  const jsonPath = path.join(ACTIVE_REPORT_DIR, `${slug}.json`);
+  const mdPath = path.join(ACTIVE_REPORT_DIR, `${slug}.md`);
 
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
 
@@ -189,11 +210,16 @@ function writeReport(report: SmokeReport): void {
         "> within the wait window.\n"
       : "";
 
+  const backendLabel = report.apiBackend === "local-api"
+    ? "Local real API (http://127.0.0.1:3001)"
+    : "Embedded MockApiServer";
+
   const md = `# Live ChatGPT Smoke Test — ${resultLabel[report.result]}
 
 **Test ID:** \`${report.testId}\`
 **Timestamp:** ${report.timestamp}
 **Duration:** ${(report.durationMs / 1000).toFixed(1)}s of ${(report.waitTimeoutMs / 1000).toFixed(0)}s budget
+**API backend:** ${backendLabel}
 **Overall:** ${resultLabel[report.result]}
 ${inconclusiveNote}
 ## Checks
@@ -223,18 +249,39 @@ let context: BrowserContext | null = null;
 let mockApi: MockApiServer | null = null;
 
 test.beforeAll(async () => {
-  mockApi = new MockApiServer();
-  await mockApi.start();
-
   context = await buildLiveExtensionContext();
   await waitForExtensionServiceWorker(context);
 
-  await configureExtensionStorage(context, {
-    apiBaseUrl: `http://127.0.0.1:${mockApi.getPort()}`,
-    killSwitchEnabled: false,
-    disabledAdapters: [],
-    debugMode: true,
-  });
+  if (LOCAL_API_MODE) {
+    // Real local API mode — no MockApiServer.
+    // SECURITY: apiKey is consumed from env, stored in chrome.storage.local,
+    // and forwarded as Authorization: Bearer by the service worker only.
+    // It is never written to reports, event payloads, or debug panel.
+    const apiKey = process.env["PROMPTPROFIT_DEV_API_KEY"];
+    if (!apiKey) {
+      throw new Error(
+        "LIVE_SMOKE_USE_LOCAL_API=1 is set but PROMPTPROFIT_DEV_API_KEY is missing. " +
+        "Run run-local-real-api-smoke.ps1 to auto-mint a key."
+      );
+    }
+    await configureExtensionStorage(context, {
+      apiBaseUrl: LOCAL_API_BASE_URL,
+      killSwitchEnabled: false,
+      disabledAdapters: [],
+      debugMode: true,
+      apiKey,
+    });
+    console.log(`[local-api] Extension configured -> ${LOCAL_API_BASE_URL} (key: [redacted])`);
+  } else {
+    mockApi = new MockApiServer();
+    await mockApi.start();
+    await configureExtensionStorage(context, {
+      apiBaseUrl: `http://127.0.0.1:${mockApi.getPort()}`,
+      killSwitchEnabled: false,
+      disabledAdapters: [],
+      debugMode: true,
+    });
+  }
 });
 
 test.afterAll(async () => {
@@ -247,7 +294,8 @@ test.afterAll(async () => {
 });
 
 test("live ChatGPT smoke — banner appears and events fire", async () => {
-  if (!context || !mockApi) throw new Error("Setup failed");
+  if (!context) throw new Error("Setup failed: browser context is null");
+  if (!LOCAL_API_MODE && !mockApi) throw new Error("Setup failed: no mockApi in mock mode");
 
   const testStartMs = Date.now();
   const elapsed = () => Date.now() - testStartMs;
@@ -255,7 +303,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   const checks: SmokeCheck[] = [];
   const notes: string[] = [];
 
-  mockApi.clearEvents();
+  if (mockApi) mockApi.clearEvents();
 
   const page: Page = await context.newPage();
 
@@ -331,6 +379,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
     const testId = `live-chatgpt-smoke-${timestamp.slice(0, 19).replace(/[T:]/g, "-")}`;
     writeReport({
       testId, timestamp, result: "inconclusive", passed: false,
+      apiBackend: LOCAL_API_MODE ? "local-api" : "mock",
       checks, eventCount: 0, eventTypes: [], durationMs,
       waitTimeoutMs: WAIT_TIMEOUT_MS, notes,
     });
@@ -338,7 +387,7 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
       "INCONCLUSIVE: wait state was never detected.\n" +
         "Ensure the extension is loaded, log in to ChatGPT, and submit a prompt " +
         `within the ${Math.round(WAIT_TIMEOUT_MS / 60000)}-minute window.\n` +
-        `Report written to ${REPORT_DIR}/`,
+        `Report written to ${ACTIVE_REPORT_DIR}/`,
     );
   }
 
@@ -397,85 +446,97 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   }
 
   // ------------------------------------------------------------------
-  // Verify events captured by local mock API.
+  // Event verification — mock mode vs local-API mode.
   // ------------------------------------------------------------------
   // Give events a moment to arrive if the banner just appeared.
   if (bannerRendered) {
     await page.waitForTimeout(2_000);
   }
 
-  const capturedEvents = mockApi.getCapturedEvents();
-  const eventTypes: string[] = capturedEvents
-    .map((e) => {
-      const body = e.body as Record<string, unknown> | null;
-      return typeof body?.["eventType"] === "string"
-        ? body["eventType"]
-        : "unknown";
-    })
-    .filter((t): t is string => t !== "unknown");
+  let eventCount = 0;
+  let eventTypes: string[] = [];
 
-  const hasImpressionRequested = eventTypes.includes("impression_requested");
-  const hasImpressionRendered = eventTypes.includes("impression_rendered");
-
-  checks.push({
-    name: "impression_requested_sent",
-    result: hasImpressionRequested ? "pass" : "fail",
-    detail: hasImpressionRequested
-      ? "impression_requested received by mock API"
-      : `not found — ${capturedEvents.length} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
-    elapsedMs: elapsed(),
-  });
-
-  checks.push({
-    name: "impression_rendered_sent",
-    result: hasImpressionRendered ? "pass" : "fail",
-    detail: hasImpressionRendered
-      ? "impression_rendered received by mock API"
-      : `not found — ${capturedEvents.length} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
-    elapsedMs: elapsed(),
-  });
-
-  // ------------------------------------------------------------------
-  // Verify events contain no private fields.
-  //
-  // This check is only meaningful when events were actually received.
-  // Passing with 0 events would be a vacuous truth — skip instead.
-  // ------------------------------------------------------------------
-  const FORBIDDEN_FIELDS = [
-    "pageUrl", "pageTitle", "domText", "promptText",
-    "aiResponse", "chatHistory", "cookies", "authToken", "sessionCookie",
-  ];
-
-  if (capturedEvents.length === 0) {
-    // No events to inspect — skip rather than vacuously pass.
+  if (LOCAL_API_MODE) {
+    // In local-API mode there is no in-process event collector.
+    // Event verification is done post-run by query-local-browser-events.ps1
+    // which queries local Postgres with sanitized column selection.
     checks.push({
-      name: "events_privacy_safe",
+      name: "events_db_verification",
       result: "skip",
-      detail: "no events captured — privacy check not applicable",
+      detail: "local-api mode: event ingestion verified via DB query post-run (see PS1 output)",
       elapsedMs: elapsed(),
     });
-    notes.push("events_privacy_safe skipped: 0 events received by mock API.");
+    notes.push(
+      "local-api mode: run 'pnpm query:local-events' after this test to verify DB ingestion."
+    );
   } else {
-    const privacyViolations: string[] = [];
-    for (const evt of capturedEvents) {
-      const body = evt.body as Record<string, unknown> | null;
-      if (body && typeof body === "object") {
-        for (const field of FORBIDDEN_FIELDS) {
-          if (field in body) {
-            privacyViolations.push(`event contains forbidden field: ${field}`);
+    // Mock API mode: verify event capture in-process.
+    const capturedEvents = mockApi!.getCapturedEvents();
+    eventCount = capturedEvents.length;
+    eventTypes = capturedEvents
+      .map((e) => {
+        const body = e.body as Record<string, unknown> | null;
+        return typeof body?.["eventType"] === "string" ? body["eventType"] : "unknown";
+      })
+      .filter((t): t is string => t !== "unknown");
+
+    const hasImpressionRequested = eventTypes.includes("impression_requested");
+    const hasImpressionRendered = eventTypes.includes("impression_rendered");
+
+    checks.push({
+      name: "impression_requested_sent",
+      result: hasImpressionRequested ? "pass" : "fail",
+      detail: hasImpressionRequested
+        ? "impression_requested received by mock API"
+        : `not found — ${eventCount} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
+      elapsedMs: elapsed(),
+    });
+
+    checks.push({
+      name: "impression_rendered_sent",
+      result: hasImpressionRendered ? "pass" : "fail",
+      detail: hasImpressionRendered
+        ? "impression_rendered received by mock API"
+        : `not found — ${eventCount} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
+      elapsedMs: elapsed(),
+    });
+
+    // Verify events contain no private fields (skip if no events — avoid vacuous truth).
+    const FORBIDDEN_FIELDS = [
+      "pageUrl", "pageTitle", "domText", "promptText",
+      "aiResponse", "chatHistory", "cookies", "authToken", "sessionCookie", "apiKey",
+    ];
+
+    if (eventCount === 0) {
+      checks.push({
+        name: "events_privacy_safe",
+        result: "skip",
+        detail: "no events captured — privacy check not applicable",
+        elapsedMs: elapsed(),
+      });
+      notes.push("events_privacy_safe skipped: 0 events received by mock API.");
+    } else {
+      const privacyViolations: string[] = [];
+      for (const evt of capturedEvents) {
+        const body = evt.body as Record<string, unknown> | null;
+        if (body && typeof body === "object") {
+          for (const field of FORBIDDEN_FIELDS) {
+            if (field in body) {
+              privacyViolations.push(`event contains forbidden field: ${field}`);
+            }
           }
         }
       }
+      checks.push({
+        name: "events_privacy_safe",
+        result: privacyViolations.length === 0 ? "pass" : "fail",
+        detail:
+          privacyViolations.length === 0
+            ? `${eventCount} event(s) inspected — no forbidden fields`
+            : privacyViolations.join("; "),
+        elapsedMs: elapsed(),
+      });
     }
-    checks.push({
-      name: "events_privacy_safe",
-      result: privacyViolations.length === 0 ? "pass" : "fail",
-      detail:
-        privacyViolations.length === 0
-          ? `${capturedEvents.length} event(s) inspected — no forbidden fields`
-          : privacyViolations.join("; "),
-      elapsedMs: elapsed(),
-    });
   }
 
   // ------------------------------------------------------------------
@@ -484,19 +545,19 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   const durationMs = elapsed();
 
   // A run is "passed" only when every non-skipped check passed.
-  // A run is "failed" (not "inconclusive") because the wait state WAS
-  // detected — something ran, but a verifiable assertion failed.
   const nonSkipped = checks.filter((c) => c.result !== "skip");
   const anyFailed  = nonSkipped.some((c) => c.result === "fail");
   const result: SmokeResult = anyFailed ? "failed" : "passed";
 
   const now = new Date();
   const timestamp = now.toISOString();
-  const testId = `live-chatgpt-smoke-${timestamp.slice(0, 19).replace(/[T:]/g, "-")}`;
+  const prefix = LOCAL_API_MODE ? "local-api-chatgpt-smoke" : "live-chatgpt-smoke";
+  const testId = `${prefix}-${timestamp.slice(0, 19).replace(/[T:]/g, "-")}`;
 
   writeReport({
     testId, timestamp, result, passed: result === "passed",
-    checks, eventCount: capturedEvents.length, eventTypes,
+    apiBackend: LOCAL_API_MODE ? "local-api" : "mock",
+    checks, eventCount, eventTypes,
     durationMs, waitTimeoutMs: WAIT_TIMEOUT_MS, notes,
   });
 

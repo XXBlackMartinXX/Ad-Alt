@@ -23,6 +23,12 @@ export interface ExtensionConfig {
    * never reads it, ensuring production thresholds are never weakened in the field.
    */
   testViewabilityThresholdMs?: number;
+  /**
+   * Local-dev-only API key forwarded as Authorization: Bearer in the service
+   * worker. NEVER included in event payloads, debug panel, or reports.
+   * Only used for local real-API smoke tests — never set in production.
+   */
+  apiKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,17 +130,19 @@ export async function configureExtensionStorage(
     config.disabledAdapters ?? [],
     config.debugMode ?? false,
     config.testViewabilityThresholdMs ?? null,
-  ] as [string, boolean, string[], boolean, number | null];
+    config.apiKey ?? null,
+  ] as [string, boolean, string[], boolean, number | null, string | null];
 
   const doEvaluate = async () => {
     const sw = await getOrWaitForServiceWorker(context);
     await sw.evaluate(
-      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs]: [
+      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey]: [
         string,
         boolean,
         string[],
         boolean,
         number | null,
+        string | null,
       ]) => {
         return new Promise<void>((resolve, reject) => {
           const items: Record<string, unknown> = {
@@ -151,9 +159,12 @@ export async function configureExtensionStorage(
           if (testViewabilityThresholdMs !== null) {
             items["testViewabilityThresholdMs"] = testViewabilityThresholdMs;
           } else {
-            // Explicitly clear so previous test runs don't bleed into new ones.
             items["testViewabilityThresholdMs"] = null;
           }
+          // apiKey: local-dev-only; null clears it (never bleeds across tests).
+          // SECURITY: apiKey is stored in extension storage only — never written
+          // to event payloads, debug panel, or any generated report.
+          items["apiKey"] = apiKey ?? null;
           // @ts-ignore — running inside Chrome extension service worker context
           chrome.storage.local.set(items, () => {
             // @ts-ignore

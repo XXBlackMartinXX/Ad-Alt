@@ -126,7 +126,7 @@ $ReportDir  = Join-Path $ExtDir   "test-results/live"
 $Timestamp  = Get-Date -Format "yyyyMMdd-HHmmss"
 
 Write-Host ""
-Write-Host "PromptProfit — Live ChatGPT Smoke Test" -ForegroundColor White
+Write-Host "PromptProfit  -  Live ChatGPT Smoke Test" -ForegroundColor White
 Write-Host "=======================================" -ForegroundColor White
 Write-Verbose-Safe "Repository root : $RepoRoot"
 Write-Verbose-Safe "Extension dir   : $ExtDir"
@@ -134,7 +134,7 @@ Write-Verbose-Safe "Mode            : $(if ($UseMockApi) { 'Fixture/Mock' } else
 Write-Verbose-Safe "API target      : $(if ($UseLocalApi) { 'local (127.0.0.1:3001)' } else { 'embedded mock' })"
 
 # ---------------------------------------------------------------------------
-# Step 1 — Prerequisites
+# Step 1  -  Prerequisites
 # ---------------------------------------------------------------------------
 
 Write-Step "Checking prerequisites"
@@ -179,12 +179,12 @@ $playwrightChromiumOverride = $env:PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 if ($playwrightChromiumOverride -and (Test-Path $playwrightChromiumOverride)) {
     Write-Ok "Chromium override: $playwrightChromiumOverride"
 } else {
-    # Let Playwright find its own managed binary — no explicit check needed.
+    # Let Playwright find its own managed binary  -  no explicit check needed.
     Write-Ok "Chromium: Playwright managed binary (or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)"
 }
 
 # ---------------------------------------------------------------------------
-# Step 2 — Build extension
+# Step 2  -  Build extension
 # ---------------------------------------------------------------------------
 
 if (-not $SkipBuild) {
@@ -209,7 +209,7 @@ if (-not (Test-Path (Join-Path $DistTestDir "manifest.json"))) {
 Write-Verbose-Safe "dist-test/manifest.json present"
 
 # ---------------------------------------------------------------------------
-# Step 3 — Start Docker services (if needed for live + real API mode)
+# Step 3  -  Start Docker services (if needed for live + real API mode)
 # ---------------------------------------------------------------------------
 
 if (-not $SkipDocker -and -not $UseMockApi -and $UseLocalApi) {
@@ -232,7 +232,7 @@ if (-not $SkipDocker -and -not $UseMockApi -and $UseLocalApi) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 4 — Local API health check (if -UseLocalApi)
+# Step 4  -  Local API health check (if -UseLocalApi)
 # ---------------------------------------------------------------------------
 
 if ($UseLocalApi) {
@@ -257,7 +257,7 @@ if ($UseLocalApi) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 5 — Run Playwright
+# Step 5  -  Run Playwright
 # ---------------------------------------------------------------------------
 
 $PlaywrightEnv = @{}
@@ -314,7 +314,7 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# Step 6 — Report summary
+# Step 6  -  Report summary
 # ---------------------------------------------------------------------------
 
 $reportResult = "UNKNOWN"
@@ -329,7 +329,7 @@ if (-not $NoReport) {
             $mdContent = Get-Content $latest.FullName -Raw
 
             # Detect result from the report heading (PASSED / FAILED / INCONCLUSIVE).
-            if ($mdContent -match "# Live ChatGPT Smoke Test — (PASSED|FAILED|INCONCLUSIVE)") {
+            if ($mdContent -match "# Live ChatGPT Smoke Test  -  (PASSED|FAILED|INCONCLUSIVE)") {
                 $reportResult = $Matches[1]
             }
 
@@ -338,7 +338,7 @@ if (-not $NoReport) {
             Write-Host $mdContent -ForegroundColor White
         } else {
             Write-Warn "No .md reports found in $ReportDir"
-            Write-Warn "The report may not have been written — check for a Playwright timeout."
+            Write-Warn "The report may not have been written  -  check for a Playwright timeout."
         }
     } else {
         if ($UseMockApi) {
@@ -361,11 +361,11 @@ switch ($reportResult) {
     }
     "INCONCLUSIVE" {
         Write-Host "Smoke test INCONCLUSIVE" -ForegroundColor Yellow
-        Write-Host "  The wait state was not detected — no prompt was submitted or the extension did not activate." -ForegroundColor Yellow
+        Write-Host "  The wait state was not detected  -  no prompt was submitted or the extension did not activate." -ForegroundColor Yellow
         Write-Host "  Re-run after confirming the extension loads and submitting a ChatGPT prompt within the window." -ForegroundColor Yellow
     }
     "FAILED" {
-        Write-Host "Smoke test FAILED — banner or events did not appear as expected." -ForegroundColor Red
+        Write-Host "Smoke test FAILED  -  banner or events did not appear as expected." -ForegroundColor Red
         Write-Host "  Check the report above for the specific failing check." -ForegroundColor Red
     }
     default {

@@ -51,28 +51,52 @@ async function refreshFlags(): Promise<FeatureFlags> {
 }
 
 /**
+ * Read apiBaseUrl from storage. Returns null if absent or invalid.
+ */
+async function getApiBaseUrl(): Promise<string | null> {
+  try {
+    const stored = await chrome.storage.local.get("apiBaseUrl") as Record<string, unknown>;
+    const v = stored["apiBaseUrl"];
+    return typeof v === "string" && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build request headers including Authorization when an apiKey is configured.
+ * SECURITY: The apiKey is never logged, never included in event payloads,
+ * never written to reports, and never sent to any domain other than apiBaseUrl.
+ */
+async function buildHeaders(contentType = "application/json"): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { "Content-Type": contentType };
+  try {
+    const stored = await chrome.storage.local.get("apiKey") as Record<string, unknown>;
+    const key = stored["apiKey"];
+    if (typeof key === "string" && key.length > 0) {
+      headers["Authorization"] = `Bearer ${key}`;
+    }
+  } catch {
+    // No key available — proceed without auth (caller handles 401)
+  }
+  return headers;
+}
+
+/**
  * Post a single telemetry event to the PromptProfit API.
  * Returns true on HTTP 2xx; false on any error or missing API configuration.
  * The payload is passed through as-is — privacy validation is the content
  * script's responsibility (ad-event-sender.ts never includes page data).
  */
 async function postEvent(event: unknown): Promise<boolean> {
-  let apiBaseUrl: string | null = null;
-  try {
-    const stored = await chrome.storage.local.get("apiBaseUrl") as Record<string, unknown>;
-    if (typeof stored["apiBaseUrl"] === "string" && stored["apiBaseUrl"].length > 0) {
-      apiBaseUrl = stored["apiBaseUrl"];
-    }
-  } catch {
-    return false;
-  }
-
+  const apiBaseUrl = await getApiBaseUrl();
   if (!apiBaseUrl) return false;
 
   try {
+    const headers = await buildHeaders();
     const resp = await fetch(`${apiBaseUrl}/v1/events`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(event),
     });
     return resp.ok;
@@ -89,24 +113,13 @@ async function postEvent(event: unknown): Promise<boolean> {
  * no request is made — the caller shows no ad (fail-closed on unconfigured state).
  */
 async function getAdDecision(adapterId: string): Promise<Record<string, unknown> | null> {
-  let apiBaseUrl: string | null = null;
-  try {
-    const stored = await chrome.storage.local.get("apiBaseUrl") as Record<string, unknown>;
-    if (typeof stored["apiBaseUrl"] === "string" && stored["apiBaseUrl"].length > 0) {
-      apiBaseUrl = stored["apiBaseUrl"];
-    }
-  } catch {
-    return null;
-  }
-
+  const apiBaseUrl = await getApiBaseUrl();
   if (!apiBaseUrl) return null;
 
   try {
     const url = `${apiBaseUrl}/v1/ads/decision?adapterName=${encodeURIComponent(adapterId)}`;
-    const resp = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
+    const headers = await buildHeaders();
+    const resp = await fetch(url, { method: "GET", headers });
     if (!resp.ok) return null;
     const outer = await resp.json() as Record<string, unknown>;
     // Support both wrapped { data: { ... } } and flat response shapes

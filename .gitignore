@@ -72,3 +72,8 @@ yarn-error.log*
 # ==============================
 postgres_data/
 redis_data/
+
+# ==============================
+# Temporary local-dev files (generated, never commit)
+# ==============================
+.tmp/

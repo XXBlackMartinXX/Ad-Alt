@@ -1,8 +1,18 @@
 # Local Real-API Smoke Mode
 
 This document describes how to run the ChatGPT browser adapter smoke test
-against a locally running PromptProfit API instead of the embedded mock, and
-what blockers currently prevent a fully automated end-to-end run.
+against a locally running PromptProfit API (fully automated).
+
+---
+
+## Quick Start
+
+```powershell
+pnpm -w run smoke:chatgpt:local-api
+```
+
+The script handles everything: Docker services, migrations, seed, API health,
+API key minting, extension build, smoke run, event query, and report.
 
 ---
 
@@ -10,96 +20,151 @@ what blockers currently prevent a fully automated end-to-end run.
 
 The fixture E2E suite (`pnpm smoke:chatgpt:fixture`) uses an in-process
 `MockApiServer` that always returns a canned ad decision. Real-API mode
-means pointing the extension at `http://127.0.0.1:3001` (the local
-PromptProfit API) so that ad decisions, impression events, and viewability
-events flow through the full backend stack.
+points the extension at `http://127.0.0.1:3001` so that ad decisions,
+impression events, and viewability events flow through the full backend stack
+and are persisted to the local Postgres database.
 
 ---
 
-## Configuration
+## Prerequisites
 
-Set `apiBaseUrl` in `chrome.storage.local` to point at the local API:
+| Requirement | Check |
+|---|---|
+| Docker daemon running | `docker info` |
+| pnpm 9.4.0+ | `pnpm -v` |
+| Node 20+ | `node -v` |
+| PowerShell 5.1 or pwsh | `$PSVersionTable` |
 
-```typescript
-await configureExtensionStorage(context, {
-  apiBaseUrl: 'http://127.0.0.1:3001',
-  killSwitchEnabled: false,
-  disabledAdapters: [],
-});
+No local Postgres or psql install is needed - the script uses
+`docker compose exec postgres psql`.
+
+---
+
+## Automation Steps
+
+`scripts/run-local-real-api-smoke.ps1` runs these steps in order:
+
+1. **Safety check** - Validates `--ApiUrl` is localhost/127.0.0.1 only. Refuses
+   non-local targets (exit 3).
+2. **Load .env** - Reads `.env` from the repo root. Existing environment
+   variables take precedence (no overwrite).
+3. **Validate DATABASE_URL** - Confirms the database URL is local. Refuses
+   non-local database targets (exit 3).
+4. **Check Docker** - Verifies the Docker daemon is reachable (exit 2 if not).
+5. **Start services** - Runs `docker compose up -d` (skip with `-SkipDocker`).
+6. **Migrate + seed** - Runs `pnpm db:migrate` and `pnpm db:seed` (idempotent;
+   skip with `-SkipMigrate`).
+7. **API health** - Waits for `GET /health` to return 200. Auto-starts the
+   API as a background job if not running (skip auto-start with `-NoStartApi`).
+8. **Mint API key** - Calls `scripts/get-local-dev-api-key.ps1` to find the
+   seeded `dev@example.com` user in local Postgres and exchange their ID for
+   a local-dev-only API key via `POST /v1/auth/exchange`. The raw key is held
+   in the current process environment only.
+9. **Build extension** - Runs the test bundle build (skip with `-SkipBuild`).
+10. **Run smoke** - Runs Playwright with `LIVE_SMOKE_USE_LOCAL_API=1` and
+    `PLAYWRIGHT_API_BASE_URL` set.
+11. **Clear key** - Clears `PROMPTPROFIT_DEV_API_KEY` from the process
+    environment after the test completes.
+12. **Query events** - Runs `query-local-browser-events.ps1` to show sanitized
+    recent event rows from local Postgres.
+13. **Show report** - Prints the latest local-API smoke report.
+14. **Cleanup** - Stops any API background job started in step 7.
+
+---
+
+## Script Flags
+
+```powershell
+pnpm -w run smoke:chatgpt:local-api:help
 ```
 
-The `-UseLocalApi` flag in `scripts/live-chatgpt-smoke.ps1` does this
-automatically when starting the full live-smoke pipeline.
+| Flag | Default | Description |
+|---|---|---|
+| `-ApiUrl` | `http://127.0.0.1:3001` | Local API base URL |
+| `-SkipDocker` | off | Skip `docker compose up -d` |
+| `-SkipMigrate` | off | Skip migrate + seed |
+| `-NoStartApi` | off | Do not auto-start API (must be running) |
+| `-SkipBuild` | off | Skip extension build |
+| `-SinceMinutes` | 10 | Event query lookback window |
+| `-Help` | off | Print usage and exit |
 
 ---
 
-## Current Blockers
+## API Key Security Rules
 
-### 1. No seeded API key / campaign
+The minted API key is LOCAL DEVELOPMENT ONLY. These rules are enforced:
 
-The local API requires a valid campaign and API key before it returns an ad
-decision. Without them, `/v1/ads/decision` returns 401 or an empty response,
-and the extension shows no banner.
+- The raw key is **never** printed by default.
+- The raw key is **never** included in smoke reports, event payloads, or the
+  debug panel.
+- The raw key is **never** written to disk unless `-OutFile` is explicitly
+  passed to `get-local-dev-api-key.ps1`.
+- The raw key is cleared from the process environment immediately after the
+  test run completes (step 11).
+- The script refuses to mint a key if the API URL is not local (exit 3).
+- The script refuses to run if DATABASE_URL points to a non-local host (exit 3).
 
-**Blocker:** No seed script populates a campaign record or issues an
-extension API key for local development. Until a seed exists, real-API mode
-produces an empty decision and the fixture tests fall back to inconclusive.
-
-**Workaround:** Use the embedded `MockApiServer` (default). It always returns
-a synthetic ad decision and accepts all event POSTs.
-
-### 2. Local API server not started by default
-
-The `@ad-alt/api` package must be running (`pnpm dev:api`) before the
-extension can reach `http://127.0.0.1:3001`. The E2E test suite does not
-start the API server automatically.
-
-**Workaround:** Start the API manually in a separate terminal before running
-the live-smoke script with `-UseLocalApi`.
-
-### 3. Database migration and seed not automated in E2E
-
-The API depends on a Postgres database. Migrations and seed data must be
-applied manually (`pnpm db:migrate && pnpm db:seed`) before the API will
-serve ad decisions.
-
-**Workaround:** Run migrations and seed before starting the API server.
-
-### 4. No Docker orchestration in the E2E runner
-
-The `scripts/live-chatgpt-smoke.ps1` script has a `-SkipDocker` flag but
-the E2E suite itself has no mechanism to start or verify Docker services.
-If Postgres or Redis is not running, the API crashes on startup.
+The key flows: `POST /v1/auth/exchange` response -> `$env:PROMPTPROFIT_DEV_API_KEY`
+-> `configureExtensionStorage` -> `chrome.storage.local["apiKey"]` ->
+`buildHeaders()` -> `Authorization: Bearer` on API requests only. It never
+appears in any log, report, or event payload.
 
 ---
 
-## What Would Enable Real-API Smoke
+## Reports
 
-To enable a fully automated real-API fixture E2E run:
+Local-API smoke reports are written to:
 
-1. **Add a dev seed script** that creates a test campaign, a test advertiser
-   account, and an API key, and exports the key as an environment variable
-   `PROMPTPROFIT_DEV_API_KEY`.
+```
+apps/browser-extension/test-results/local-api/
+```
 
-2. **Add an `apiKey` field to `ExtensionConfig`** in `extension-context.ts`.
-   The content script would then include it in the `Authorization` header when
-   calling the local API.
+This directory is gitignored (covered by `test-results/`). To list and read
+the latest report:
 
-3. **Add a Playwright global setup** (`playwright.config.ts` `globalSetup`)
-   that starts the API server and waits for a health-check endpoint before
-   tests begin.
-
-4. **Update `configureExtensionStorage`** to write the `apiKey` alongside
-   `apiBaseUrl`.
-
-Until those steps are completed, use the embedded `MockApiServer` for
-automated E2E and the manual live-smoke script for real-API validation.
+```powershell
+pnpm -w run smoke:chatgpt:local-api:report
+```
 
 ---
 
-## Privacy Note
+## Event Verification
 
-Real-API mode does not change any privacy guarantees. The extension content
-scripts never read page content regardless of which API backend is configured.
-Only the API base URL changes; all data flowing through the events pipeline
-remains the same backend-assigned identifiers and extension metadata.
+After the smoke run, the script queries local Postgres for sanitized event rows.
+The query selects only: `id`, `event_type`, `adapter_id`, `created_at`, and
+`session_id`. It never reads: `page_url`, `page_title`, `dom_text`,
+`prompt_text`, `response_text`, or any user-identifying fields.
+
+If no events are captured, the report includes `events_captured: 0` and all
+downstream event-content checks are skipped (not vacuously passed).
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|---|---|
+| 0 | All steps passed |
+| 1 | Smoke test failed |
+| 2 | Blocked (Docker unavailable, API unreachable, seed missing) |
+| 3 | Unsafe (non-local API or DB URL detected) |
+
+---
+
+## Privacy Guarantees
+
+Real-API mode does not weaken any privacy guarantees. The content script
+never reads page content regardless of which API backend is configured.
+
+The following are **never** read, stored, logged, or transmitted:
+- ChatGPT prompt text, response text, or chat history
+- Page title or full URL path/query
+- Conversation IDs
+- DOM text from the ChatGPT page
+- Cookies, auth tokens, localStorage, or sessionStorage
+- Screenshots, videos, or Playwright traces containing user content
+- ChatGPT private API calls or network traffic
+
+Only the API base URL changes between mock and real-API mode. All data
+flowing through the events pipeline is backend-assigned identifiers and
+extension-owned metadata.

@@ -22,6 +22,8 @@ const PS1_FILES = [
   'scripts/run-live-chatgpt-stability.ps1',
   'scripts/query-local-browser-events.ps1',
   'scripts/run-local-real-api-smoke.ps1',
+  'scripts/get-local-dev-api-key.ps1',
+  'scripts/live-chatgpt-smoke.ps1',
 ];
 
 let exitCode = 0;

@@ -1,12 +1,12 @@
 # Local End-to-End Testing
 
-This walks through exercising the full wait-state → impression → ledger-credit flow on a local machine, without needing a real AI coding assistant installed and without using the web dashboard's OAuth login. It assumes you've completed [`SETUP.md`](./SETUP.md): infrastructure is running, `.env` is configured, migrations have been applied, and `pnpm db:seed` has been run.
+This walks through exercising the full wait-state -> impression -> ledger-credit flow on a local machine, without needing a real AI coding assistant installed and without using the web dashboard's OAuth login. It assumes you've completed [`SETUP.md`](./SETUP.md): infrastructure is running, `.env` is configured, migrations have been applied, and `pnpm db:seed` has been run.
 
 All commands below assume the API is running locally on `http://localhost:3001` (the default).
 
 ## 1. Get a developer API key
 
-The seed script (`packages/database/src/seed.ts`) creates a developer user (`dev@example.com`) but does not mint an API key for it — keys are normally issued by the web dashboard's `/dashboard/api-key` page after OAuth sign-in. To skip OAuth locally, exchange the seeded developer's user ID directly against the auth endpoint.
+The seed script (`packages/database/src/seed.ts`) creates a developer user (`dev@example.com`) but does not mint an API key for it  -  keys are normally issued by the web dashboard's `/dashboard/api-key` page after OAuth sign-in. To skip OAuth locally, exchange the seeded developer's user ID directly against the auth endpoint.
 
 Find the seeded developer's user ID:
 
@@ -26,7 +26,7 @@ curl -s -X POST http://localhost:3001/v1/auth/exchange \
   }'
 ```
 
-The response includes `data.apiKey` (prefixed `ppft_...`). This is shown exactly once — the server stores only its hash. Save it:
+The response includes `data.apiKey` (prefixed `ppft_...`). This is shown exactly once  -  the server stores only its hash. Save it:
 
 ```bash
 export PP_API_KEY="ppft_..."
@@ -39,13 +39,13 @@ curl -s "http://localhost:3001/v1/ads/decision?deviceId=local-test-device-1&adap
   -H "Authorization: Bearer $PP_API_KEY"
 ```
 
-A `200` response returns `data` containing an ad decision (`adDecisionId`, `campaignId`, `creativeId`, headline/body/displayUrl text). A `204 No Content` means no eligible campaign matched — check that the seed ran and that `feature_flags.kill_switch_all_ads` is `false`.
+A `200` response returns `data` containing an ad decision (`adDecisionId`, `campaignId`, `creativeId`, headline/body/displayUrl text). A `204 No Content` means no eligible campaign matched  -  check that the seed ran and that `feature_flags.kill_switch_all_ads` is `false`.
 
 Save the returned `data.adDecisionId` as `DECISION_ID`, `data.campaignId` as `CAMPAIGN_ID`, `data.creativeId` as `CREATIVE_ID`.
 
 ## 3. Walk the impression lifecycle via `/v1/events`
 
-Impressions move through `requested → rendered → viewable/billable` and only become billable (crediting the ledger) once a `viewability_threshold_met` event reports at least 3 seconds of display time and fraud scoring passes. Each event needs a fresh `eventId` (UUID) and a `sessionId` (UUID, can be reused across events in the same session).
+Impressions move through `requested -> rendered -> viewable/billable` and only become billable (crediting the ledger) once a `viewability_threshold_met` event reports at least 3 seconds of display time and fraud scoring passes. Each event needs a fresh `eventId` (UUID) and a `sessionId` (UUID, can be reused across events in the same session).
 
 Generate IDs:
 
@@ -116,7 +116,7 @@ curl -s -X POST http://localhost:3001/v1/events \
   }"
 ```
 
-Each call should return `{"data":{"status":"accepted",...}}`. Replaying the same `eventId` returns `{"data":{"status":"duplicate",...}}` instead of double-processing — this is the dedup path, not an error.
+Each call should return `{"data":{"status":"accepted",...}}`. Replaying the same `eventId` returns `{"data":{"status":"duplicate",...}}` instead of double-processing  -  this is the dedup path, not an error.
 
 ## 4. Verify the ledger was credited
 
@@ -127,11 +127,11 @@ curl -s http://localhost:3001/v1/ledger/me \
 
 After step 3c, `data.entries` should contain a new ledger entry and `data.totalEarnedMicrocents` should have increased. If it's unchanged:
 
-- Check the API logs for `impression_fraud_blocked` or `viewability_without_rendered_impression` — the fraud scorer or lifecycle guard rejected the event.
+- Check the API logs for `impression_fraud_blocked` or `viewability_without_rendered_impression`  -  the fraud scorer or lifecycle guard rejected the event.
 - Confirm `displayedDurationMs` was >= 3000 in step 3c.
 - Confirm steps 3a/3b/3c were sent in order with the same `adDecisionId`.
 
-Each ledger entry's `balanceAfterMicrocents` reflects the real running balance for its account (advertiser, developer, or platform) at the time of the write — the `balances` table is updated atomically in the same transaction as the ledger-entry insert. Verify directly in Postgres: `SELECT account_id, account_type, balance_microcents FROM balances;` should match the latest `balanceAfterMicrocents` per account in `ledger_entries`, and `SELECT entry_type, sum(amount_microcents) FROM ledger_entries GROUP BY entry_type;` — `developer_credit + platform_fee` should equal `advertiser_charge`.
+Each ledger entry's `balanceAfterMicrocents` reflects the real running balance for its account (advertiser, developer, or platform) at the time of the write  -  the `balances` table is updated atomically in the same transaction as the ledger-entry insert. Verify directly in Postgres: `SELECT account_id, account_type, balance_microcents FROM balances;` should match the latest `balanceAfterMicrocents` per account in `ledger_entries`, and `SELECT entry_type, sum(amount_microcents) FROM ledger_entries GROUP BY entry_type;`  -  `developer_credit + platform_fee` should equal `advertiser_charge`.
 
 ## 5. Test the click flow (optional)
 
@@ -169,9 +169,9 @@ Rather than calling the API directly, you can let the extension drive this flow 
 
 1. Set `promptprofit.adapter` to `"mock"` in VS Code settings (see `SETUP.md`).
 2. Launch the Extension Development Host (`F5`).
-3. The bundled mock adapter (`apps/extension/src/adapters/mock.adapter.ts`) fires a synthetic wait-state every 15 seconds (configurable via its `cycleMs` constructor parameter), lasting 8 seconds each time — long enough to clear the 3-second viewability threshold.
+3. The bundled mock adapter (`apps/extension/src/adapters/mock.adapter.ts`) fires a synthetic wait-state every 15 seconds (configurable via its `cycleMs` constructor parameter), lasting 8 seconds each time  -  long enough to clear the 3-second viewability threshold.
 4. Watch the status bar for the sponsored text line, and check the API's stdout logs for `event_ingested` lines confirming the extension is sending real events through the same `/v1/events` path exercised above.
 
 ## Privacy note
 
-Every payload in this walkthrough only ever carries the fields defined in `packages/shared/src/schemas/events.ts` (`TelemetryEventSchema`). There is no field for source code, prompt text, file paths, or AI responses anywhere in this flow — see [`PRIVACY.md`](./PRIVACY.md) for the full guarantee and how it's enforced.
+Every payload in this walkthrough only ever carries the fields defined in `packages/shared/src/schemas/events.ts` (`TelemetryEventSchema`). There is no field for source code, prompt text, file paths, or AI responses anywhere in this flow  -  see [`PRIVACY.md`](./PRIVACY.md) for the full guarantee and how it's enforced.
