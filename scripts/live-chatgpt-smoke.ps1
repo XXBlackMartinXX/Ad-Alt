@@ -317,6 +317,8 @@ try {
 # Step 6 — Report summary
 # ---------------------------------------------------------------------------
 
+$reportResult = "UNKNOWN"
+
 if (-not $NoReport) {
     Write-Step "Report summary"
 
@@ -324,17 +326,26 @@ if (-not $NoReport) {
         $reports = Get-ChildItem -Path $ReportDir -Filter "*.md" | Sort-Object LastWriteTime -Descending
         if ($reports.Count -gt 0) {
             $latest = $reports[0]
+            $mdContent = Get-Content $latest.FullName -Raw
+
+            # Detect result from the report heading (PASSED / FAILED / INCONCLUSIVE).
+            if ($mdContent -match "# Live ChatGPT Smoke Test — (PASSED|FAILED|INCONCLUSIVE)") {
+                $reportResult = $Matches[1]
+            }
+
             Write-Ok "Latest report: $($latest.FullName)"
             Write-Host ""
-            Write-Host (Get-Content $latest.FullName -Raw) -ForegroundColor White
+            Write-Host $mdContent -ForegroundColor White
         } else {
             Write-Warn "No .md reports found in $ReportDir"
+            Write-Warn "The report may not have been written — check for a Playwright timeout."
         }
     } else {
         if ($UseMockApi) {
             Write-Verbose-Safe "Fixture suite does not write to $ReportDir (see playwright-report/)."
         } else {
             Write-Warn "Report directory not found: $ReportDir"
+            Write-Warn "The spec may have been killed before writing a report."
         }
     }
 }
@@ -344,10 +355,26 @@ if (-not $NoReport) {
 # ---------------------------------------------------------------------------
 
 Write-Host ""
-if ($exitCode -eq 0) {
-    Write-Host "Smoke test PASSED" -ForegroundColor Green
-} else {
-    Write-Host "Smoke test FAILED (exit code $exitCode)" -ForegroundColor Red
+switch ($reportResult) {
+    "PASSED" {
+        Write-Host "Smoke test PASSED" -ForegroundColor Green
+    }
+    "INCONCLUSIVE" {
+        Write-Host "Smoke test INCONCLUSIVE" -ForegroundColor Yellow
+        Write-Host "  The wait state was not detected — no prompt was submitted or the extension did not activate." -ForegroundColor Yellow
+        Write-Host "  Re-run after confirming the extension loads and submitting a ChatGPT prompt within the window." -ForegroundColor Yellow
+    }
+    "FAILED" {
+        Write-Host "Smoke test FAILED — banner or events did not appear as expected." -ForegroundColor Red
+        Write-Host "  Check the report above for the specific failing check." -ForegroundColor Red
+    }
+    default {
+        if ($exitCode -eq 0) {
+            Write-Host "Smoke test completed (exit 0)" -ForegroundColor Green
+        } else {
+            Write-Host "Smoke test FAILED (exit code $exitCode)" -ForegroundColor Red
+        }
+    }
 }
 Write-Host ""
 exit $exitCode

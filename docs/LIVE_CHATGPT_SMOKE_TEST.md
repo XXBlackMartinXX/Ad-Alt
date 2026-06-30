@@ -119,18 +119,35 @@ A JSON and Markdown report are written to:
 apps/browser-extension/test-results/live/live-chatgpt-smoke-YYYY-MM-DD-HH-MM-SS.{json,md}
 ```
 
+### Understand the three result states
+
+The smoke report has one of three outcomes — never conflate them:
+
+| Result | Meaning | Action |
+|--------|---------|--------|
+| **PASSED** | All checks verified; banner appeared; events received | Ship |
+| **FAILED** | Wait state detected, but a verifiable check failed | Debug the specific failing check |
+| **INCONCLUSIVE** | Wait state was never detected; checks could not run | Re-run after fixing the precondition (login, submit a prompt) |
+
+An INCONCLUSIVE run is **not a pass** even if exit code 0 is shown — it means
+the test did not get far enough to verify anything.
+
 ### Verify the smoke report
 
-Open the `.md` report. All checks should show `✓`:
+Open the `.md` report. For a **PASSED** run, all non-skipped checks show `✓`:
 
-| Check | Description |
-|-------|-------------|
-| `wait_state_detected` | Extension detected ChatGPT wait state |
-| `banner_rendered` | `#promptprofit-sponsored-banner` appeared in DOM |
-| `debug_panel_banner_rendered` | Debug panel reflected `data-banner-rendered=true` |
-| `impression_requested_sent` | Mock API received `impression_requested` event |
-| `impression_rendered_sent` | Mock API received `impression_rendered` event |
-| `events_privacy_safe` | Events contain no forbidden private fields |
+| Check | Status | Description |
+|-------|--------|-------------|
+| `wait_state_detected` | always run | Extension detected ChatGPT wait state via debug panel |
+| `banner_rendered` | always run | `#promptprofit-sponsored-banner` appeared in DOM |
+| `debug_panel_banner_rendered` | only when banner rendered | Debug panel reflected `data-banner-rendered=true` |
+| `impression_requested_sent` | always run | Mock API received `impression_requested` event |
+| `impression_rendered_sent` | always run | Mock API received `impression_rendered` event |
+| `events_privacy_safe` | only when ≥1 event received | Events contain no forbidden private fields (skipped when 0 events) |
+
+`–` (dash) in the Status column means the check was skipped — this is normal
+for `events_privacy_safe` when no events were captured (already covered by the
+failing `impression_*` checks).
 
 ### Optional: Query the database (if using -UseLocalApi)
 

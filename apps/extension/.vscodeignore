@@ -1,6 +1,7 @@
 src/**
 scripts/**
 .vscode-test/**
+.turbo/**
 .gitignore
 tsconfig.json
 vitest.config.ts

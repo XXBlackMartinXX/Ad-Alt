@@ -26,6 +26,13 @@
  *   #promptprofit-sponsored-banner
  *   #promptprofit-debug-panel[data-*]
  * No ChatGPT page content is read at any point.
+ *
+ * RESULT SEMANTICS:
+ *   PASSED      — all checks verified; banner appeared; events received.
+ *   FAILED      — wait state was detected but one or more checks failed.
+ *   INCONCLUSIVE — wait state was never detected (no prompt submitted,
+ *                 login timed out, or extension not active). Nothing is
+ *                 verified; re-run after fixing the precondition.
  */
 
 import { test, expect } from "@playwright/test";
@@ -55,10 +62,16 @@ const REPORT_DIR = path.resolve(
   fileURLToPath(new URL("../../test-results/live", import.meta.url)),
 );
 
-const WAIT_TIMEOUT_MS = parseInt(
+// The Playwright spec timeout (set in playwright.config.live.ts).
+const SPEC_TIMEOUT_MS = parseInt(
   process.env["LIVE_SMOKE_TIMEOUT_MS"] ?? "600000",
   10,
 );
+
+// Reserve 90 s for report writing + Playwright assertion overhead so the
+// waitForSelector always times out BEFORE Playwright kills the spec.
+// This guarantees the report is always written even on a full-timeout run.
+const WAIT_TIMEOUT_MS = Math.max(SPEC_TIMEOUT_MS - 90_000, 60_000);
 
 // Shorter timeout for post-interaction assertions (banner, events).
 const ASSERT_TIMEOUT_MS = 30_000;
@@ -113,23 +126,32 @@ async function waitForExtensionServiceWorker(
 }
 
 // ---------------------------------------------------------------------------
-// Report helpers
+// Report types and helpers
 // ---------------------------------------------------------------------------
+
+type CheckResult = "pass" | "fail" | "skip";
 
 interface SmokeCheck {
   name: string;
-  passed: boolean;
-  detail?: string;
+  result: CheckResult;
+  detail: string;
+  elapsedMs: number;
 }
+
+/** Three distinct outcomes — never conflate timeout with genuine failure. */
+type SmokeResult = "passed" | "failed" | "inconclusive";
 
 interface SmokeReport {
   testId: string;
   timestamp: string;
+  result: SmokeResult;
+  /** @deprecated kept for backward-compat scripts that read `passed` */
   passed: boolean;
   checks: SmokeCheck[];
   eventCount: number;
   eventTypes: string[];
   durationMs: number;
+  waitTimeoutMs: number;
   notes: string[];
 }
 
@@ -142,25 +164,42 @@ function writeReport(report: SmokeReport): void {
 
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
 
-  const statusEmoji = report.passed ? "PASS" : "FAIL";
+  const resultLabel: Record<SmokeResult, string> = {
+    passed: "PASSED",
+    failed: "FAILED",
+    inconclusive: "INCONCLUSIVE",
+  };
+
+  const statusIcon = (r: CheckResult) =>
+    r === "pass" ? "✓" : r === "skip" ? "–" : "✗";
+
   const checksTable = report.checks
     .map(
       (c) =>
-        `| ${c.passed ? "✓" : "✗"} | ${c.name} | ${c.detail ?? ""} |`,
+        `| ${statusIcon(c.result)} | ${c.name} | ${(c.elapsedMs / 1000).toFixed(1)}s | ${c.detail} |`,
     )
     .join("\n");
 
-  const md = `# Live ChatGPT Smoke Test — ${statusEmoji}
+  const inconclusiveNote =
+    report.result === "inconclusive"
+      ? "\n> **INCONCLUSIVE** — The wait state was never detected.\n" +
+        "> This usually means no prompt was submitted, the extension did not\n" +
+        "> activate, or the debug panel could not mount.\n" +
+        "> Re-run after verifying the extension is loaded and submit a prompt\n" +
+        "> within the wait window.\n"
+      : "";
+
+  const md = `# Live ChatGPT Smoke Test — ${resultLabel[report.result]}
 
 **Test ID:** \`${report.testId}\`
 **Timestamp:** ${report.timestamp}
-**Duration:** ${(report.durationMs / 1000).toFixed(1)}s
-**Overall:** ${report.passed ? "PASSED" : "FAILED"}
-
+**Duration:** ${(report.durationMs / 1000).toFixed(1)}s of ${(report.waitTimeoutMs / 1000).toFixed(0)}s budget
+**Overall:** ${resultLabel[report.result]}
+${inconclusiveNote}
 ## Checks
 
-| Status | Check | Detail |
-|--------|-------|--------|
+| Status | Check | Elapsed | Detail |
+|--------|-------|---------|--------|
 ${checksTable}
 
 ## Events Received (${report.eventCount})
@@ -173,7 +212,7 @@ ${report.notes.length > 0 ? report.notes.map((n) => `- ${n}`).join("\n") : "_non
 `;
 
   fs.writeFileSync(mdPath, md);
-  console.log(`\nSmoke report written:\n  ${jsonPath}\n  ${mdPath}`);
+  console.log(`\nSmoke report (${resultLabel[report.result]}):\n  ${jsonPath}\n  ${mdPath}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +249,9 @@ test.afterAll(async () => {
 test("live ChatGPT smoke — banner appears and events fire", async () => {
   if (!context || !mockApi) throw new Error("Setup failed");
 
-  const startMs = Date.now();
+  const testStartMs = Date.now();
+  const elapsed = () => Date.now() - testStartMs;
+
   const checks: SmokeCheck[] = [];
   const notes: string[] = [];
 
@@ -226,7 +267,10 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   //
   // The test waits here until the extension's wait-state detector fires,
   // which happens when ChatGPT is streaming/loading a response.
-  // Timeout is controlled by LIVE_SMOKE_TIMEOUT_MS (default 10 min).
+  // We use WAIT_TIMEOUT_MS (= spec timeout - 90 s) so that if the
+  // operator never acts, the waitForSelector times out cleanly, the
+  // report is written as INCONCLUSIVE, and the spec still has time to
+  // fail without being killed by Playwright's own timeout.
   // ------------------------------------------------------------------
   console.log(
     "\n" +
@@ -238,7 +282,8 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
       "  2. Submit any prompt (e.g. \"hello\").\n" +
       "  3. Wait for ChatGPT to begin generating a response.\n" +
       "  4. The test will automatically detect the wait state and continue.\n" +
-      `\n  Waiting up to ${Math.round(WAIT_TIMEOUT_MS / 60000)} minutes...\n` +
+      `\n  Waiting up to ${Math.round(WAIT_TIMEOUT_MS / 60000)} min ` +
+      `(spec timeout: ${Math.round(SPEC_TIMEOUT_MS / 60000)} min)...\n` +
       "=".repeat(70) +
       "\n",
   );
@@ -253,16 +298,49 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
     );
     waitStateDetected = true;
   } catch {
-    notes.push("Wait-state not detected within timeout — was a prompt submitted?");
+    notes.push(
+      `Wait-state timed out after ${Math.round(WAIT_TIMEOUT_MS / 60000)} min — ` +
+        "was a prompt submitted and did the debug panel mount?",
+    );
   }
 
   checks.push({
     name: "wait_state_detected",
-    passed: waitStateDetected,
+    result: waitStateDetected ? "pass" : "fail",
     detail: waitStateDetected
       ? "debug panel reported data-wait-state=true"
-      : "timed out waiting for wait state",
+      : `timed out after ${Math.round(WAIT_TIMEOUT_MS / 60000)} min — no wait state`,
+    elapsedMs: elapsed(),
   });
+
+  // If no wait state was detected, every downstream check is meaningless.
+  // Record them as skipped so the report clearly distinguishes "didn't run"
+  // from "ran and failed," then mark the overall result as INCONCLUSIVE.
+  if (!waitStateDetected) {
+    checks.push(
+      { name: "banner_rendered",            result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
+      { name: "debug_panel_banner_rendered", result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
+      { name: "impression_requested_sent",  result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
+      { name: "impression_rendered_sent",   result: "skip", detail: "skipped — wait state not detected", elapsedMs: elapsed() },
+      { name: "events_privacy_safe",        result: "skip", detail: "skipped — no events to verify",     elapsedMs: elapsed() },
+    );
+
+    const durationMs = elapsed();
+    const now = new Date();
+    const timestamp = now.toISOString();
+    const testId = `live-chatgpt-smoke-${timestamp.slice(0, 19).replace(/[T:]/g, "-")}`;
+    writeReport({
+      testId, timestamp, result: "inconclusive", passed: false,
+      checks, eventCount: 0, eventTypes: [], durationMs,
+      waitTimeoutMs: WAIT_TIMEOUT_MS, notes,
+    });
+    expect.fail(
+      "INCONCLUSIVE: wait state was never detected.\n" +
+        "Ensure the extension is loaded, log in to ChatGPT, and submit a prompt " +
+        `within the ${Math.round(WAIT_TIMEOUT_MS / 60000)}-minute window.\n` +
+        `Report written to ${REPORT_DIR}/`,
+    );
+  }
 
   // ------------------------------------------------------------------
   // Wait for sponsored banner to appear.
@@ -276,24 +354,28 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
     bannerRendered = true;
   } catch {
     notes.push(
-      "#promptprofit-sponsored-banner did not appear — ad decision may be null or API unreachable.",
+      "#promptprofit-sponsored-banner did not appear within " +
+        `${ASSERT_TIMEOUT_MS / 1000}s — ad decision may be null or API unreachable.`,
     );
   }
 
   checks.push({
     name: "banner_rendered",
-    passed: bannerRendered,
+    result: bannerRendered ? "pass" : "fail",
     detail: bannerRendered
       ? "#promptprofit-sponsored-banner found in DOM"
-      : "banner element not found",
+      : `banner element not found after ${ASSERT_TIMEOUT_MS / 1000}s`,
+    elapsedMs: elapsed(),
   });
 
   // ------------------------------------------------------------------
   // Verify debug panel reflects rendered state.
-  // Privacy: data attributes only — no page content.
+  // Only run this check when the banner actually appeared; otherwise
+  // there is nothing for the panel to reflect and the check cannot add
+  // information beyond what banner_rendered already captured.
   // ------------------------------------------------------------------
-  let panelShowsRendered = false;
   if (bannerRendered) {
+    let panelShowsRendered = false;
     try {
       await page.waitForSelector(
         '#promptprofit-debug-panel[data-banner-rendered="true"]',
@@ -303,17 +385,16 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
     } catch {
       notes.push("Debug panel did not reflect data-banner-rendered=true.");
     }
-  }
 
-  checks.push({
-    name: "debug_panel_banner_rendered",
-    passed: panelShowsRendered,
-    detail: panelShowsRendered
-      ? "data-banner-rendered=true confirmed"
-      : bannerRendered
-        ? "debug panel state mismatch"
-        : "skipped (banner not rendered)",
-  });
+    checks.push({
+      name: "debug_panel_banner_rendered",
+      result: panelShowsRendered ? "pass" : "fail",
+      detail: panelShowsRendered
+        ? "data-banner-rendered=true confirmed on debug panel"
+        : "debug panel state mismatch — banner in DOM but panel not updated",
+      elapsedMs: elapsed(),
+    });
+  }
 
   // ------------------------------------------------------------------
   // Verify events captured by local mock API.
@@ -327,7 +408,9 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
   const eventTypes: string[] = capturedEvents
     .map((e) => {
       const body = e.body as Record<string, unknown> | null;
-      return typeof body?.["eventType"] === "string" ? body["eventType"] : "unknown";
+      return typeof body?.["eventType"] === "string"
+        ? body["eventType"]
+        : "unknown";
     })
     .filter((t): t is string => t !== "unknown");
 
@@ -336,83 +419,89 @@ test("live ChatGPT smoke — banner appears and events fire", async () => {
 
   checks.push({
     name: "impression_requested_sent",
-    passed: hasImpressionRequested,
+    result: hasImpressionRequested ? "pass" : "fail",
     detail: hasImpressionRequested
       ? "impression_requested received by mock API"
-      : `not found in ${capturedEvents.length} captured events`,
+      : `not found — ${capturedEvents.length} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
+    elapsedMs: elapsed(),
   });
 
   checks.push({
     name: "impression_rendered_sent",
-    passed: hasImpressionRendered,
+    result: hasImpressionRendered ? "pass" : "fail",
     detail: hasImpressionRendered
       ? "impression_rendered received by mock API"
-      : `not found in ${capturedEvents.length} captured events`,
+      : `not found — ${capturedEvents.length} event(s) captured: [${eventTypes.join(", ") || "none"}]`,
+    elapsedMs: elapsed(),
   });
 
   // ------------------------------------------------------------------
   // Verify events contain no private fields.
-  // Privacy: confirm events only carry ad identifiers and metadata.
+  //
+  // This check is only meaningful when events were actually received.
+  // Passing with 0 events would be a vacuous truth — skip instead.
   // ------------------------------------------------------------------
   const FORBIDDEN_FIELDS = [
-    "pageUrl",
-    "pageTitle",
-    "domText",
-    "promptText",
-    "aiResponse",
-    "chatHistory",
-    "cookies",
-    "authToken",
-    "sessionCookie",
+    "pageUrl", "pageTitle", "domText", "promptText",
+    "aiResponse", "chatHistory", "cookies", "authToken", "sessionCookie",
   ];
-  const privacyViolations: string[] = [];
-  for (const evt of capturedEvents) {
-    const body = evt.body as Record<string, unknown> | null;
-    if (body && typeof body === "object") {
-      for (const field of FORBIDDEN_FIELDS) {
-        if (field in body) {
-          privacyViolations.push(`event contains forbidden field: ${field}`);
+
+  if (capturedEvents.length === 0) {
+    // No events to inspect — skip rather than vacuously pass.
+    checks.push({
+      name: "events_privacy_safe",
+      result: "skip",
+      detail: "no events captured — privacy check not applicable",
+      elapsedMs: elapsed(),
+    });
+    notes.push("events_privacy_safe skipped: 0 events received by mock API.");
+  } else {
+    const privacyViolations: string[] = [];
+    for (const evt of capturedEvents) {
+      const body = evt.body as Record<string, unknown> | null;
+      if (body && typeof body === "object") {
+        for (const field of FORBIDDEN_FIELDS) {
+          if (field in body) {
+            privacyViolations.push(`event contains forbidden field: ${field}`);
+          }
         }
       }
     }
+    checks.push({
+      name: "events_privacy_safe",
+      result: privacyViolations.length === 0 ? "pass" : "fail",
+      detail:
+        privacyViolations.length === 0
+          ? `${capturedEvents.length} event(s) inspected — no forbidden fields`
+          : privacyViolations.join("; "),
+      elapsedMs: elapsed(),
+    });
   }
-
-  checks.push({
-    name: "events_privacy_safe",
-    passed: privacyViolations.length === 0,
-    detail:
-      privacyViolations.length === 0
-        ? `${capturedEvents.length} event(s) contain no forbidden fields`
-        : privacyViolations.join("; "),
-  });
 
   // ------------------------------------------------------------------
   // Final report
   // ------------------------------------------------------------------
-  const durationMs = Date.now() - startMs;
-  const allPassed = checks.every((c) => c.passed);
+  const durationMs = elapsed();
+
+  // A run is "passed" only when every non-skipped check passed.
+  // A run is "failed" (not "inconclusive") because the wait state WAS
+  // detected — something ran, but a verifiable assertion failed.
+  const nonSkipped = checks.filter((c) => c.result !== "skip");
+  const anyFailed  = nonSkipped.some((c) => c.result === "fail");
+  const result: SmokeResult = anyFailed ? "failed" : "passed";
 
   const now = new Date();
   const timestamp = now.toISOString();
-  const testId = `live-chatgpt-smoke-${timestamp
-    .slice(0, 19)
-    .replace(/[T:]/g, "-")}`;
+  const testId = `live-chatgpt-smoke-${timestamp.slice(0, 19).replace(/[T:]/g, "-")}`;
 
-  const report: SmokeReport = {
-    testId,
-    timestamp,
-    passed: allPassed,
-    checks,
-    eventCount: capturedEvents.length,
-    eventTypes,
-    durationMs,
-    notes,
-  };
+  writeReport({
+    testId, timestamp, result, passed: result === "passed",
+    checks, eventCount: capturedEvents.length, eventTypes,
+    durationMs, waitTimeoutMs: WAIT_TIMEOUT_MS, notes,
+  });
 
-  writeReport(report);
-
-  // Playwright assertions — fail the test if any check failed.
-  for (const check of checks) {
-    expect(check.passed, `${check.name}: ${check.detail ?? ""}`).toBe(true);
+  // Fail the Playwright test if any non-skipped check failed.
+  for (const check of nonSkipped) {
+    expect(check.result, `${check.name}: ${check.detail}`).toBe("pass");
   }
 });
