@@ -15,6 +15,9 @@
     AI responses, cookies, auth tokens, or any private data. It only checks
     the result summary in the generated Markdown report.
 
+.PARAMETER Help
+    Show usage information and exit.
+
 .PARAMETER Runs
     Number of smoke-test runs to perform. Default: 3.
 
@@ -27,7 +30,7 @@
     results do not trigger a stop.
 
 .PARAMETER SkipBuild
-    Skip `pnpm build:test` before the first run. Use when dist-test/ is
+    Skip pnpm build:test before the first run. Use when dist-test/ is
     already up to date.
 
 .EXAMPLE
@@ -44,9 +47,9 @@
 
 .NOTES
     Results are written as individual .md reports to
-    apps/browser-extension/test-results/live/.
+    apps/browser-extension/test-results/live/
     INCONCLUSIVE typically means ChatGPT's wait-state was not detected
-    within the timeout — not that the extension failed.
+    within the timeout; it does not mean the adapter failed.
 #>
 
 [CmdletBinding()]
@@ -65,12 +68,12 @@ $ErrorActionPreference = "Continue"
 # Helpers
 # ---------------------------------------------------------------------------
 
-function Write-Step([string]$msg)    { Write-Host "[>>] $msg" -ForegroundColor Cyan }
-function Write-Ok([string]$msg)      { Write-Host "[OK] $msg" -ForegroundColor Green }
-function Write-Info([string]$msg)    { Write-Host "[--] $msg" -ForegroundColor Cyan }
-function Write-Warn([string]$msg)    { Write-Host "[!!] $msg" -ForegroundColor Yellow }
-function Write-Err([string]$msg)     { Write-Host "[XX] $msg" -ForegroundColor Red }
-function Write-Separator             { Write-Host ("-" * 60) -ForegroundColor DarkGray }
+function Write-Step([string]$msg)  { Write-Host ("[>>] " + $msg) -ForegroundColor Cyan }
+function Write-Ok([string]$msg)    { Write-Host ("[OK] " + $msg) -ForegroundColor Green }
+function Write-Info([string]$msg)  { Write-Host ("[--] " + $msg) -ForegroundColor Cyan }
+function Write-Warn([string]$msg)  { Write-Host ("[!!] " + $msg) -ForegroundColor Yellow }
+function Write-Err([string]$msg)   { Write-Host ("[XX] " + $msg) -ForegroundColor Red }
+function Write-Separator           { Write-Host ("-" * 60) -ForegroundColor DarkGray }
 
 # ---------------------------------------------------------------------------
 # Help mode
@@ -94,18 +97,18 @@ if ($Help) {
     Write-Host "  -DelayBetweenRunsSeconds   Seconds to wait between runs (default: 5)."
     Write-Host "  -StopOnFail                Stop immediately on any FAILED result."
     Write-Host "                             INCONCLUSIVE results do not trigger a stop."
-    Write-Host "  -SkipBuild                 Skip 'pnpm build:test' before the first run."
+    Write-Host "  -SkipBuild                 Skip pnpm build:test before the first run."
     Write-Host ""
     Write-Host "RESULTS"
-    Write-Host "  PASSED        — banner appeared and events fired."
-    Write-Host "  FAILED        — adapter ran but events or banner were wrong."
-    Write-Host "  INCONCLUSIVE  — ChatGPT wait-state was not detected within timeout."
-    Write-Host "                  Not a failure: re-run after manually prompting ChatGPT."
-    Write-Host "  ERROR         — Playwright did not write a report (build or launch failure)."
+    Write-Host "  PASSED        - banner appeared and events fired correctly."
+    Write-Host "  FAILED        - adapter ran but events or banner were wrong."
+    Write-Host "  INCONCLUSIVE  - ChatGPT wait-state was not detected within timeout."
+    Write-Host "                  Not a failure; re-run after manually prompting ChatGPT."
+    Write-Host "  ERROR         - Playwright did not write a report (build or launch failure)."
     Write-Host ""
     Write-Host "NOTES"
     Write-Host "  Reports are written to: apps/browser-extension/test-results/live/"
-    Write-Host "  (git-ignored — they stay local, never committed)"
+    Write-Host "  (git-ignored; reports stay local, never committed)"
     Write-Host "  View the latest report: pnpm -w run smoke:chatgpt:report"
     Write-Host ""
     exit 0
@@ -115,16 +118,16 @@ if ($Help) {
 # Setup
 # ---------------------------------------------------------------------------
 
-$ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$RepoRoot   = Split-Path -Parent $ScriptDir
-$ReportDir  = Join-Path $RepoRoot "apps/browser-extension/test-results/live"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$RepoRoot  = Split-Path -Parent $ScriptDir
+$ReportDir = Join-Path $RepoRoot "apps/browser-extension/test-results/live"
 
 Write-Host ""
 Write-Host "===== Live ChatGPT Stability Runner =====" -ForegroundColor Magenta
-Write-Host "  Runs:                $Runs"
-Write-Host "  Delay between runs:  ${DelayBetweenRunsSeconds}s"
-Write-Host "  Stop on failure:     $($StopOnFail.IsPresent)"
-Write-Host "  Report dir:          $ReportDir"
+Write-Host ("  Runs:                " + $Runs)
+Write-Host ("  Delay between runs:  " + $DelayBetweenRunsSeconds + "s")
+Write-Host ("  Stop on failure:     " + $StopOnFail.IsPresent)
+Write-Host ("  Report dir:          " + $ReportDir)
 Write-Host ""
 
 # ---------------------------------------------------------------------------
@@ -135,7 +138,7 @@ if (-not $SkipBuild) {
     Write-Step "Building dist-test/ bundle..."
     Push-Location $RepoRoot
     try {
-        pnpm --filter @ad-alt/browser-extension build:test
+        pnpm --filter "@ad-alt/browser-extension" build:test
         if ($LASTEXITCODE -ne 0) {
             Write-Err "Build failed. Aborting stability run."
             exit 1
@@ -150,16 +153,17 @@ if (-not $SkipBuild) {
 # Stability loop
 # ---------------------------------------------------------------------------
 
-$results = @()       # array of "PASSED" | "FAILED" | "INCONCLUSIVE" | "ERROR"
+$results = [System.Collections.Generic.List[string]]::new()
 
 for ($i = 1; $i -le $Runs; $i++) {
     Write-Separator
-    Write-Step "Run $i / $Runs"
+    Write-Step ("Run " + $i + " / " + $Runs)
 
-    # Snapshot existing reports so we can detect the new one.
+    # Snapshot existing reports so we can detect the new one after the run.
     $before = @()
     if (Test-Path $ReportDir) {
-        $before = (Get-ChildItem -Path $ReportDir -Filter "*.md" | Select-Object -ExpandProperty FullName)
+        $before = @(Get-ChildItem -Path $ReportDir -Filter "*.md" |
+                    Select-Object -ExpandProperty FullName)
     }
 
     # Run the smoke test.
@@ -174,9 +178,9 @@ for ($i = 1; $i -le $Runs; $i++) {
     # Find the new report (the one not present before the run).
     $after = @()
     if (Test-Path $ReportDir) {
-        $after = (Get-ChildItem -Path $ReportDir -Filter "*.md" |
-                  Sort-Object LastWriteTime -Descending |
-                  Select-Object -ExpandProperty FullName)
+        $after = @(Get-ChildItem -Path $ReportDir -Filter "*.md" |
+                   Sort-Object LastWriteTime -Descending |
+                   Select-Object -ExpandProperty FullName)
     }
 
     $newReport = $after | Where-Object { $before -notcontains $_ } | Select-Object -First 1
@@ -192,31 +196,30 @@ for ($i = 1; $i -le $Runs; $i++) {
         } elseif ($content -match "##\s+Result[^#]*\*\*(INCONCLUSIVE)\*\*") {
             $runResult = "INCONCLUSIVE"
         } else {
-            # Try to detect from heading line
-            if ($content -match "\bPASSED\b") { $runResult = "PASSED" }
-            elseif ($content -match "\bFAILED\b") { $runResult = "FAILED" }
+            if ($content -match "\bPASSED\b")      { $runResult = "PASSED" }
+            elseif ($content -match "\bFAILED\b")  { $runResult = "FAILED" }
             elseif ($content -match "\bINCONCLUSIVE\b") { $runResult = "INCONCLUSIVE" }
         }
     } elseif ($exitCode -eq 0) {
         $runResult = "PASSED"
     }
 
-    $results += $runResult
+    $results.Add($runResult)
 
     switch ($runResult) {
-        "PASSED"       { Write-Ok   "Run $i: PASSED" }
-        "FAILED"       { Write-Err  "Run $i: FAILED" }
-        "INCONCLUSIVE" { Write-Warn "Run $i: INCONCLUSIVE" }
-        "ERROR"        { Write-Err  "Run $i: ERROR (no report written; exit code $exitCode)" }
+        "PASSED"       { Write-Ok   ("Run " + $i + ": PASSED") }
+        "FAILED"       { Write-Err  ("Run " + $i + ": FAILED") }
+        "INCONCLUSIVE" { Write-Warn ("Run " + $i + ": INCONCLUSIVE") }
+        "ERROR"        { Write-Err  ("Run " + $i + ": ERROR (no report written; exit code " + $exitCode + ")") }
     }
 
     if ($StopOnFail -and $runResult -eq "FAILED") {
-        Write-Err "Stopping on first failure (--StopOnFail)."
+        Write-Err "Stopping on first failure (-StopOnFail)."
         break
     }
 
     if ($i -lt $Runs) {
-        Write-Info "  Waiting ${DelayBetweenRunsSeconds}s before next run..."
+        Write-Info ("Waiting " + $DelayBetweenRunsSeconds + "s before next run...")
         Start-Sleep -Seconds $DelayBetweenRunsSeconds
     }
 }
@@ -229,28 +232,33 @@ Write-Separator
 Write-Host ""
 Write-Host "===== Stability Summary =====" -ForegroundColor Magenta
 
-$passed       = ($results | Where-Object { $_ -eq "PASSED" }).Count
-$failed       = ($results | Where-Object { $_ -eq "FAILED" }).Count
-$inconclusive = ($results | Where-Object { $_ -eq "INCONCLUSIVE" }).Count
-$errors       = ($results | Where-Object { $_ -eq "ERROR" }).Count
+$passed       = @($results | Where-Object { $_ -eq "PASSED" }).Count
+$failed       = @($results | Where-Object { $_ -eq "FAILED" }).Count
+$inconclusive = @($results | Where-Object { $_ -eq "INCONCLUSIVE" }).Count
+$errors       = @($results | Where-Object { $_ -eq "ERROR" }).Count
 $total        = $results.Count
 
-Write-Host "  Total runs:    $total"
-Write-Host "  PASSED:        $passed" -ForegroundColor $(if ($passed -gt 0) { "Green" } else { "White" })
-Write-Host "  FAILED:        $failed" -ForegroundColor $(if ($failed -gt 0) { "Red" } else { "White" })
-Write-Host "  INCONCLUSIVE:  $inconclusive" -ForegroundColor $(if ($inconclusive -gt 0) { "Yellow" } else { "White" })
-Write-Host "  ERROR:         $errors" -ForegroundColor $(if ($errors -gt 0) { "Red" } else { "White" })
+$passedColor      = if ($passed -gt 0)       { "Green"  } else { "White" }
+$failedColor      = if ($failed -gt 0)       { "Red"    } else { "White" }
+$inconclusColor   = if ($inconclusive -gt 0) { "Yellow" } else { "White" }
+$errorsColor      = if ($errors -gt 0)       { "Red"    } else { "White" }
+
+Write-Host ("  Total runs:    " + $total)
+Write-Host ("  PASSED:        " + $passed)       -ForegroundColor $passedColor
+Write-Host ("  FAILED:        " + $failed)       -ForegroundColor $failedColor
+Write-Host ("  INCONCLUSIVE:  " + $inconclusive) -ForegroundColor $inconclusColor
+Write-Host ("  ERROR:         " + $errors)       -ForegroundColor $errorsColor
 Write-Host ""
 
 if ($failed -gt 0 -or $errors -gt 0) {
-    Write-Err "Stability run DEGRADED — $failed failure(s), $errors error(s) in $total runs."
+    Write-Err ("Stability run DEGRADED: " + $failed + " failure(s), " + $errors + " error(s) in " + $total + " runs.")
     exit 1
 } elseif ($inconclusive -gt 0) {
-    Write-Warn "Stability run INCONCLUSIVE — $inconclusive run(s) timed out without triggering a wait-state."
-    Write-Host "  Note: INCONCLUSIVE means ChatGPT's response-generation did not start within the"
+    Write-Warn ("Stability run INCONCLUSIVE: " + $inconclusive + " run(s) timed out without triggering a wait-state.")
+    Write-Host "  Note: INCONCLUSIVE means ChatGPT response-generation did not start within the"
     Write-Host "  timeout window, not that the adapter failed. Re-run after manually prompting ChatGPT."
     exit 0
 } else {
-    Write-Ok "Stability run PASSED — $passed/$total runs passed."
+    Write-Ok ("Stability run PASSED: " + $passed + "/" + $total + " runs passed.")
     exit 0
 }
