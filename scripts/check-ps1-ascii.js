@@ -20,6 +20,8 @@ const path = require('path');
 const PS1_FILES = [
   'scripts/open-latest-live-chatgpt-report.ps1',
   'scripts/run-live-chatgpt-stability.ps1',
+  'scripts/query-local-browser-events.ps1',
+  'scripts/run-local-real-api-smoke.ps1',
 ];
 
 let exitCode = 0;

@@ -29,6 +29,9 @@
     "smoke:chatgpt:fixture": "pnpm --filter @ad-alt/browser-extension test:e2e",
     "smoke:chatgpt:report": "node scripts/run-ps1.js scripts/open-latest-live-chatgpt-report.ps1 -PrintOnly",
     "smoke:chatgpt:report:open": "node scripts/run-ps1.js scripts/open-latest-live-chatgpt-report.ps1",
+    "smoke:chatgpt:local-api": "node scripts/run-ps1.js scripts/run-local-real-api-smoke.ps1",
+    "smoke:chatgpt:reports:list": "node scripts/list-smoke-reports.js",
+    "smoke:chatgpt:reports:clean": "node scripts/clean-smoke-reports.js",
     "check:ps1": "node scripts/check-ps1-ascii.js"
   },
   "devDependencies": {

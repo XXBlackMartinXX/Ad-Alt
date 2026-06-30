@@ -60,9 +60,12 @@ export async function buildExtensionContext(): Promise<BrowserContext> {
     args.push('--no-sandbox', '--disable-setuid-sandbox');
   }
 
-  // Allow an explicit override (e.g. CI pre-installs Chromium at a fixed path).
-  // When absent, Playwright uses its own managed Chromium installation.
-  const customPath = process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'];
+  // Allow an explicit override via env var; on Linux fall back to the
+  // pre-installed Chromium symlink so version-pinned Playwright still works
+  // when the managed binary revision differs from what is cached on the host.
+  const customPath =
+    process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] ??
+    (process.platform !== 'win32' ? '/opt/pw-browsers/chromium' : undefined);
 
   const context = await chromium.launchPersistentContext('', {
     // headless: false is required so Playwright does not inject --headless itself;
