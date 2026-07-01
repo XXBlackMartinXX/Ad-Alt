@@ -276,7 +276,8 @@ const iconEntries = entries.filter(e => /icon\d+\.png/.test(e.name));
 if (iconEntries.length > 0) {
   const largest = Math.max(...iconEntries.map(e => e.uncompSize));
   if (largest < 500) {
-    warn('Icons appear to be placeholder (largest is ' + largest + ' bytes). Replace before CWS submission.');
+    modeGatedFail('Icons appear to be placeholder (largest: ' + largest + ' bytes). Final brand icons required before CWS submission.');
+    info('  Run: pnpm icons:create for placeholder, or replace with final brand assets.');
     info('  See docs/PUBLIC_RELEASE_READINESS_MATRIX.md for brand asset requirements.');
   }
 }

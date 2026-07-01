@@ -316,3 +316,29 @@ non-local DATABASE_URL values (exit 3). Event payloads submitted to the local AP
 contain only extension-internal metadata and backend-assigned identifiers - the same
 privacy constraints as the production extension. No forbidden fields (pageTitle,
 pageUrl, domText, cookies, authToken) appear in any request or report.
+
+---
+
+**Post-public-release-gating additions (commit 25a156e + follow-up):**
+
+Scripts audited: `check-license-decision.js`, `audit-browser-extension-zip.js`,
+`audit-vsix-artifact.js`, `check-billing-reconciliation-readiness.js`,
+`create-placeholder-icons.mjs`, `package-browser-extension.mjs` (mode additions).
+Assets audited: `icons/icon16.png`, `icons/icon48.png`, `icons/icon128.png`.
+Docs audited: `PRODUCTION_BILLING_RECONCILIATION_PLAN.md`, `PUBLIC_RELEASE_READINESS_MATRIX.md`.
+
+| File | Pattern | Finding | Classification |
+|------|---------|---------|----------------|
+| `check-license-decision.js` | All patterns | None found; reads filesystem only | SAFE |
+| `audit-browser-extension-zip.js` | `screenshots`, `traces` | Pattern strings used as **filename filter regexes** to detect forbidden files in ZIP; not executed content | SAFE |
+| `audit-vsix-artifact.js` | `secret` in filename filter | `/secret/.test(name)` used to detect forbidden filenames; not a credential leak | SAFE |
+| `check-billing-reconciliation-readiness.js` | All patterns | None found; reads local markdown only | SAFE |
+| `create-placeholder-icons.mjs` | All patterns | None found; generates PNG binary via deflate; no network calls | SAFE |
+| `package-browser-extension.mjs` | All patterns | None found in mode additions; `modeGatedFail()` is a string formatter only | SAFE |
+| `icon16.png`, `icon48.png`, `icon128.png` | Embedded text | PNG chunks: IHDR + IDAT + IEND only; no tEXt, zTXt, or iTXt metadata chunks | SAFE |
+| `PRODUCTION_BILLING_RECONCILIATION_PLAN.md` | `ppft_` | Appears twice as documentation of what must NOT appear in staging logs; no real key | DOCUMENTATION-ONLY SAFE |
+| `PUBLIC_RELEASE_READINESS_MATRIX.md` | All patterns | Referenced only as verified-absent; no real values | DOCUMENTATION-ONLY SAFE |
+
+All 11 audited files: **CLEAN**. No privacy violations, no credential leaks, no
+forbidden DOM reads, no network calls to external systems. The `check:secrets:local`
+scan now covers 333 files (up from 317) and confirms zero ppft_ key leaks.
