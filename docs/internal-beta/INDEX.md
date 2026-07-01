@@ -1,43 +1,69 @@
----
-# PromptProfit — Internal Beta Release Packet Index
+# PromptProfit -- Internal Beta Packet Index
 
-**Version:** Internal Beta 1 | **Date:** 2026-07-01 | **Commit:** `5979b4e`
+**Version:** Internal Beta 1 | **Date:** 2026-07-01 | **Commit:** 6145fc7
+**Label:** Internal beta rollout packet ready for first tester dry-run.
+
+**This is an INTERNAL BETA. NOT a public release. NOT on the Chrome Web Store.**
 
 ---
 
 ## Start Here
 
-[README.md](./README.md) — Main beta handoff document: what is included, what is verified, known blockers, go/no-go table
+[README.md](./README.md) -- Main beta handoff document: what is included, what is verified, known blockers, go/no-go table.
 
 ---
 
-## For Beta Testers
+## Installation and Testing (For Testers)
 
 | Document | Purpose |
 |----------|---------|
-| [BETA_TESTER_INSTALLATION_GUIDE.md](./BETA_TESTER_INSTALLATION_GUIDE.md) | How to install the browser extension and VSIX; privacy warnings |
+| [TESTER_QUICK_START_CHECKLIST.md](./TESTER_QUICK_START_CHECKLIST.md) | Short actionable checklist -- Track A (non-engineer) and Track B (engineer) |
+| [BETA_TESTER_INSTALLATION_GUIDE.md](./BETA_TESTER_INSTALLATION_GUIDE.md) | Full installation guide with privacy warnings |
 | [BETA_TEST_PLAN.md](./BETA_TEST_PLAN.md) | Full test plan with commands, pass/fail criteria, bug report template |
-| [PRIVACY_SECURITY_ONE_PAGER.md](./PRIVACY_SECURITY_ONE_PAGER.md) | What data is collected and never collected; how to verify |
+| [FIRST_TESTER_DRY_RUN.md](./FIRST_TESTER_DRY_RUN.md) | Dry-run procedure: run before inviting multiple testers |
 
 ---
 
-## For Stakeholders / Decision Makers
+## Feedback and Triage
 
 | Document | Purpose |
 |----------|---------|
-| [STAKEHOLDER_DECISION_CHECKLIST.md](./STAKEHOLDER_DECISION_CHECKLIST.md) | Decisions required before public release: LICENSE, icons, privacy policy, staging |
+| [FEEDBACK_INTAKE.md](./FEEDBACK_INTAKE.md) | Feedback categories, severity levels, bug report template, privacy evidence policy |
+| [ISSUE_TEMPLATES.md](./ISSUE_TEMPLATES.md) | Copy-paste GitHub issue templates for 8 issue types |
+| [TRIAGE_LABELS.md](./TRIAGE_LABELS.md) | Full label set with triage rules and escalation matrix |
+| [TESTER_INVITATION_TEMPLATES.md](./TESTER_INVITATION_TEMPLATES.md) | 7 ready-to-use invitation and follow-up message templates |
+
+---
+
+## Risk, Privacy, and Billing
+
+| Document | Purpose |
+|----------|---------|
+| [PRIVACY_SECURITY_ONE_PAGER.md](./PRIVACY_SECURITY_ONE_PAGER.md) | What data IS and IS NOT collected; how to verify |
 | [BILLING_VERIFICATION_SUMMARY.md](./BILLING_VERIFICATION_SUMMARY.md) | Local billing smoke results; what is and is NOT verified |
 | [RISK_REGISTER.md](./RISK_REGISTER.md) | Risk table with severity, mitigation status, and required actions |
 
 ---
 
-## For Release Managers / Engineering
+## Release Management
 
 | Document | Purpose |
 |----------|---------|
+| [BETA_ROLLOUT_SCHEDULE.md](./BETA_ROLLOUT_SCHEDULE.md) | Day 0-7 rollout schedule with owner slots and sign-off blocks |
+| [BETA_OWNER_CHECKLIST.md](./BETA_OWNER_CHECKLIST.md) | Role roster: Release, QA, Privacy, Billing, Triage, Rollback, Stakeholder, Comms |
+| [ROLLBACK_AND_DISABLE_GUIDE.md](./ROLLBACK_AND_DISABLE_GUIDE.md) | How to disable, remove, rollback, and respond to incidents |
 | [RELEASE_MANAGER_CHECKLIST.md](./RELEASE_MANAGER_CHECKLIST.md) | Step-by-step pre-release verification checklist with commands |
-| [PR_DESCRIPTION_TEMPLATE.md](./PR_DESCRIPTION_TEMPLATE.md) | PR description template for reviewer checklist and evidence |
+| [PR_DESCRIPTION_TEMPLATE.md](./PR_DESCRIPTION_TEMPLATE.md) | PR description template with reviewer checklist and evidence |
 | [INTERNAL_BETA_RELEASE_NOTES.md](./INTERNAL_BETA_RELEASE_NOTES.md) | Concise release notes for testers and stakeholders |
+
+---
+
+## Stakeholder Handoff
+
+| Document | Purpose |
+|----------|---------|
+| [STAKEHOLDER_STATUS_UPDATE_TEMPLATE.md](./STAKEHOLDER_STATUS_UPDATE_TEMPLATE.md) | Fill-in-the-blank Day 6 status update template |
+| [STAKEHOLDER_DECISION_CHECKLIST.md](./STAKEHOLDER_DECISION_CHECKLIST.md) | 12 decisions required before public release: LICENSE, icons, privacy policy, staging |
 
 ---
 
@@ -51,26 +77,29 @@
 | [../PRODUCTION_BILLING_RECONCILIATION_PLAN.md](../PRODUCTION_BILLING_RECONCILIATION_PLAN.md) | Staging billing reconciliation checklist |
 | [../LICENSE_DECISION_REQUIRED.md](../LICENSE_DECISION_REQUIRED.md) | License decision options and blockers |
 | [../RELEASE_PACKAGE_HYGIENE.md](../RELEASE_PACKAGE_HYGIENE.md) | Package artifact hygiene and audit scripts |
-| [../EVENT_LEDGER_DEDUP_REVIEW.md](../EVENT_LEDGER_DEDUP_REVIEW.md) | Event dedup and billing invariant review |
 
 ---
 
 ## Quick Commands
 
 ```bash
-# Verify all internal-beta gates
+# Verify internal beta packet
 pnpm -w run check:internal-beta-packet
 
-# Run full pre-release check
-pnpm -w run check:ps1 && pnpm -w run check:secrets:local && pnpm -w run smoke:chatgpt:fixture && pnpm --filter @ad-alt/browser-extension test:unit
+# Verify rollout execution packet
+pnpm -w run check:internal-beta-rollout
 
-# Package browser extension
-pnpm -r build && pnpm -w run package:browser:beta && pnpm -w run package:browser:zip:audit -- --mode internal-beta
+# Full pre-distribution check
+pnpm -r build
+pnpm --filter @ad-alt/browser-extension test:e2e
+pnpm --filter @ad-alt/browser-extension test:unit
+pnpm -w run check:secrets:local
+pnpm -w run package:browser:beta
+pnpm -w run package:browser:zip:audit -- --mode internal-beta
+pnpm -w run package:vscode:vsix:audit -- --mode internal-beta
+pnpm -w run check:billing:reconciliation -- --mode internal-beta
 
-# Package VS Code extension
-pnpm --filter promptprofit package && pnpm -w run package:vscode:vsix:audit -- --mode internal-beta
-
-# Verify public-release gates still block (expected exit 1)
+# Verify public-release gates still block (expected exit 1 -- correct)
 pnpm -w run check:license -- --mode public-release
 pnpm -w run package:browser:zip:audit -- --mode public-release
 pnpm -w run check:billing:reconciliation -- --mode public-release

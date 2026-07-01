@@ -132,11 +132,33 @@ See `docs/internal-beta/RISK_REGISTER.md` for full risk register.
 
 ---
 
+## Rollout Execution Docs
+
+The following documents are ready for use in the active beta rollout:
+
+| Document | Purpose |
+|----------|---------|
+| [TESTER_INVITATION_TEMPLATES.md](./TESTER_INVITATION_TEMPLATES.md) | 7 message templates for inviting testers and following up |
+| [TESTER_QUICK_START_CHECKLIST.md](./TESTER_QUICK_START_CHECKLIST.md) | Short install + test checklist (Track A: product, Track B: engineer) |
+| [FEEDBACK_INTAKE.md](./FEEDBACK_INTAKE.md) | Severity levels, bug template, privacy evidence policy, escalation rules |
+| [ISSUE_TEMPLATES.md](./ISSUE_TEMPLATES.md) | 8 GitHub issue templates by type |
+| [TRIAGE_LABELS.md](./TRIAGE_LABELS.md) | Full label set with triage and escalation rules |
+| [FIRST_TESTER_DRY_RUN.md](./FIRST_TESTER_DRY_RUN.md) | Procedure for the first tester dry-run session |
+| [BETA_ROLLOUT_SCHEDULE.md](./BETA_ROLLOUT_SCHEDULE.md) | Day 0-7 rollout schedule |
+| [BETA_OWNER_CHECKLIST.md](./BETA_OWNER_CHECKLIST.md) | Role assignments and pre-beta sign-off |
+| [ROLLBACK_AND_DISABLE_GUIDE.md](./ROLLBACK_AND_DISABLE_GUIDE.md) | Disable, remove, rollback, and incident response |
+| [STAKEHOLDER_STATUS_UPDATE_TEMPLATE.md](./STAKEHOLDER_STATUS_UPDATE_TEMPLATE.md) | Fill-in-the-blank Day 6 stakeholder update |
+
+Verify rollout packet: `pnpm -w run check:internal-beta-rollout`
+
+---
+
 ## Go/No-Go Table
 
 | Gate | Status | Notes |
 |------|--------|-------|
 | Internal beta distribution | GO | All internal-beta checks pass |
+| First tester dry-run | READY | See FIRST_TESTER_DRY_RUN.md |
 | Public beta / CWS submission | HOLD | LICENSE, icons, staging reconciliation required |
 | Production billing | HOLD | Staging must pass first |
 | VS Code Marketplace | HOLD | LICENSE and source-map confirmation required |
