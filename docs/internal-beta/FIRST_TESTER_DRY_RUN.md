@@ -47,13 +47,31 @@ The dry-run tester should be:
 
 ---
 
+## Detailed Dry-Run Execution Documents
+
+For step-by-step session execution, use the documents in `docs/internal-beta/dry-runs/`:
+
+| Document | When to Use |
+|----------|-------------|
+| [dry-runs/ONE_TESTER_EXECUTION_RUNBOOK.md](./dry-runs/ONE_TESTER_EXECUTION_RUNBOOK.md) | Before and during the session -- exact commands and checklists for the owner |
+| [dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md](./dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md) | During the session -- mark off each step as it happens |
+| [dry-runs/DRY_RUN_RESULT_LOG_TEMPLATE.md](./dry-runs/DRY_RUN_RESULT_LOG_TEMPLATE.md) | After the session -- fill in results and observations |
+| [dry-runs/PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md](./dry-runs/PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md) | When filing any issue -- verify evidence safety before GitHub |
+| [dry-runs/GO_NO_GO_DECISION_RECORD.md](./dry-runs/GO_NO_GO_DECISION_RECORD.md) | After triage -- record the go/no-go decision |
+| [dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md](./dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md) | Within 24 hours of session -- triage meeting agenda |
+| [dry-runs/DRY_RUN_STATUS_TRACKER.md](./dry-runs/DRY_RUN_STATUS_TRACKER.md) | Ongoing -- track session status and decisions |
+
+**Current status: DRYRUN-001 NOT RUN YET. Decision: PENDING.**
+
+---
+
 ## Pre-Dry-Run Environment Checklist
 
 The dry-run owner must complete this checklist BEFORE the session begins.
 
 **Automated verification:**
 - [ ] git branch --show-current -> claude/ecstatic-maxwell-h0d8d8 (confirmed)
-- [ ] git log --oneline -3 -> 6145fc7 in the log (confirmed)
+- [ ] git log --oneline -3 -> 9adb441 in the log (confirmed)
 - [ ] pnpm -r build -> exit 0 (confirmed)
 - [ ] pnpm --filter @ad-alt/browser-extension test:e2e -> 13/13 (confirmed)
 - [ ] pnpm --filter @ad-alt/browser-extension test:unit -> 105/105 (confirmed)
@@ -62,6 +80,7 @@ The dry-run owner must complete this checklist BEFORE the session begins.
 - [ ] pnpm -w run package:browser:zip:audit -- --mode internal-beta -> PASS (confirmed)
 - [ ] pnpm -w run check:internal-beta-packet -> PASS (confirmed)
 - [ ] pnpm -w run check:internal-beta-rollout -> PASS (confirmed)
+- [ ] pnpm -w run check:first-dry-run-packet -> PASS (confirmed)
 
 **Distribution readiness:**
 - [ ] Beta package ZIP is prepared and ready to share via secure internal channel

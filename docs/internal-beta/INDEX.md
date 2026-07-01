@@ -24,6 +24,23 @@
 
 ---
 
+## Dry-Run Execution Documents
+
+The `dry-runs/` subdirectory contains detailed execution documents for DRYRUN-001.
+**Status: NOT RUN YET. Decision: PENDING.**
+
+| Document | Purpose |
+|----------|---------|
+| [dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md](./dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md) | Session-by-session execution worksheet with pre-run, install, test, and uninstall checklists |
+| [dry-runs/ONE_TESTER_EXECUTION_RUNBOOK.md](./dry-runs/ONE_TESTER_EXECUTION_RUNBOOK.md) | Step-by-step runbook for the dry-run owner (before, during, after) |
+| [dry-runs/DRY_RUN_RESULT_LOG_TEMPLATE.md](./dry-runs/DRY_RUN_RESULT_LOG_TEMPLATE.md) | Template for recording session results (copy once per session) |
+| [dry-runs/PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md](./dry-runs/PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md) | Privacy-safe issue capture form with evidence safety checklist |
+| [dry-runs/GO_NO_GO_DECISION_RECORD.md](./dry-runs/GO_NO_GO_DECISION_RECORD.md) | Decision record for DRYRUN-001 (PENDING until execution) |
+| [dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md](./dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md) | Post-session triage agenda, severity assignment, escalation paths |
+| [dry-runs/DRY_RUN_STATUS_TRACKER.md](./dry-runs/DRY_RUN_STATUS_TRACKER.md) | All dry-run sessions and their current status |
+
+---
+
 ## Feedback and Triage
 
 | Document | Purpose |
@@ -88,6 +105,9 @@ pnpm -w run check:internal-beta-packet
 
 # Verify rollout execution packet
 pnpm -w run check:internal-beta-rollout
+
+# Verify first dry-run packet
+pnpm -w run check:first-dry-run-packet
 
 # Full pre-distribution check
 pnpm -r build

@@ -48,6 +48,7 @@ Run all of the following. Every check must exit 0 before distribution:
   pnpm -w run check:billing:reconciliation -- --mode internal-beta
   pnpm -w run check:internal-beta-packet
   pnpm -w run check:internal-beta-rollout
+  pnpm -w run check:first-dry-run-packet
 
 ### Pre-Distribution Checks
 
@@ -72,7 +73,10 @@ Run all of the following. Every check must exit 0 before distribution:
 
 ### Procedure
 
-Follow FIRST_TESTER_DRY_RUN.md exactly.
+Follow FIRST_TESTER_DRY_RUN.md and dry-runs/ONE_TESTER_EXECUTION_RUNBOOK.md exactly.
+Use dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md to track each step during the session.
+Record results in dry-runs/DRY_RUN_RESULT_LOG_TEMPLATE.md (copy to DRY_RUN_RESULT_LOG_DRYRUN-001.md).
+Record decision in dry-runs/GO_NO_GO_DECISION_RECORD.md.
 
 Safe test prompt for tester: Count slowly from 1 to 10.
 

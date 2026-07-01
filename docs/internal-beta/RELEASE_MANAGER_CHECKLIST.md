@@ -99,11 +99,15 @@ Expected: all audits PASS.
 
 ```bash
 pnpm -w run check:internal-beta-packet
+pnpm -w run check:internal-beta-rollout
+pnpm -w run check:first-dry-run-packet
 ```
 
 Expected: all required docs present, no overclaiming detected.
 
 - [ ] Beta packet check: PASS
+- [ ] Rollout packet check: PASS
+- [ ] First dry-run packet check: PASS
 
 ---
 

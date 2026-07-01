@@ -1,0 +1,312 @@
+# PromptProfit -- One-Tester Execution Runbook
+
+**For use by the Dry-Run Owner during DRYRUN-001.**
+**INTERNAL BETA ONLY. Branch:** claude/ecstatic-maxwell-h0d8d8
+
+---
+
+> This runbook is for the person RUNNING the dry-run session, not the tester.
+> Complete each section in order. Do NOT skip steps.
+> Do NOT mark a step done unless it physically happened.
+
+---
+
+## 1. Before the Tester Session
+
+Complete ALL of the following before inviting the tester.
+
+### 1a. Confirm Branch and Commit
+
+```bash
+git branch --show-current
+# Expected: claude/ecstatic-maxwell-h0d8d8
+
+git log --oneline -1
+# Expected: 9adb441 or later
+```
+
+### 1b. Run Full Automated Check Suite
+
+Run these commands in order. All must exit 0.
+
+```bash
+pnpm -w run check:ps1
+# Expected: exit 0 (no non-ASCII in PowerShell scripts)
+
+pnpm -w run check:secrets:local
+# Expected: exit 0 (0 leaks detected)
+
+pnpm -w run check:internal-beta-packet
+# Expected: exit 0 (all 11 beta packet docs present and valid)
+
+pnpm -w run check:internal-beta-rollout
+# Expected: exit 0 (all 10 rollout docs present and valid)
+
+pnpm -w run check:first-dry-run-packet
+# Expected: exit 0 (all 7 dry-run docs present and valid)
+```
+
+If any check fails: STOP. Fix the issue. Re-run all checks before proceeding.
+
+### 1c. Build and Package
+
+```bash
+pnpm -r build
+# Expected: exit 0
+
+pnpm --filter @ad-alt/browser-extension test:unit
+# Expected: 105/105
+
+pnpm -w run package:browser:beta
+# Expected: exit 0
+# Artifact: apps/browser-extension/dist-package/promptprofit-browser-beta-*.zip
+
+pnpm -w run package:browser:zip:audit -- --mode internal-beta
+# Expected: PASS (warnings acceptable, no FAIL)
+```
+
+Record the artifact filename. You will need it for the result log.
+
+### 1d. Audit the ZIP
+
+Manually verify the ZIP does NOT contain:
+
+- [ ] dist-test/ directory
+- [ ] Any .js.map files
+- [ ] Any .env files
+- [ ] node_modules/ directory
+- [ ] Any file matching ppft_[0-9a-f]{8,}
+
+Verify the ZIP DOES contain:
+
+- [ ] manifest.json
+- [ ] background/service-worker.js
+- [ ] content/chatgpt.js
+- [ ] icons/ directory (16.png, 48.png, 128.png)
+
+### 1e. Optional: Run Fixture and Billing Smoke
+
+If Docker is available:
+
+```bash
+pnpm --filter @ad-alt/browser-extension test:e2e
+# Expected: 13/13
+
+docker compose up -d
+pnpm -w run smoke:billing:local
+# Expected: exit 0, invariant holds: developer_credit + platform_fee == advertiser_charge
+
+pnpm -w run smoke:billing:click:local
+# Expected: exit 0, click invariant holds
+```
+
+If Docker is NOT available, note the reason. This does not block Track A dry-run.
+
+### 1f. Confirm Tester Readiness
+
+- [ ] Tester has signed NDA or internal beta agreement
+- [ ] Tester has read PRIVACY_SECURITY_ONE_PAGER.md or equivalent privacy briefing
+- [ ] Tester confirmed Chrome version (must be recent stable)
+- [ ] Tester confirmed OS (Windows 10/11, macOS 12+, or Ubuntu 22.04+)
+- [ ] Delivery method confirmed: secure internal channel only (NOT unencrypted email, NOT public link)
+- [ ] ZIP delivered to tester
+
+**Pre-session checklist complete. Ready to start tester session.**
+
+---
+
+## 2. During Tester Install
+
+Have FIRST_TESTER_DRY_RUN_WORKSHEET.md open and track each step.
+
+**Observe** (do not do it for the tester):
+
+1. Tester unzips the package to a local folder
+2. Tester opens `chrome://extensions`
+3. Tester enables Developer Mode toggle (top right)
+4. Tester clicks "Load unpacked" and selects the `dist/` folder from the unzipped package
+5. Extension "PromptProfit" appears in the list with no error badge
+
+**If the tester hits an error at any step:**
+
+- Record which step failed in the worksheet
+- Classify: S1 (blocking all testers) or S2 (environment-specific)
+- If S1: call HOLD, fix before re-run
+- If S2: document and continue if tester can work around it
+
+**Record in worksheet:**
+- Chrome version
+- OS version
+- Any error messages seen (verbatim, no personal data)
+- Steps that required clarification
+
+---
+
+## 3. During Safe Test
+
+**Only one prompt is approved for this dry-run:**
+
+```
+Count slowly from 1 to 10.
+```
+
+**Do NOT allow** any other prompt. If the tester starts typing something else, politely redirect them to the approved prompt.
+
+**Observe and record (do NOT record ChatGPT content):**
+
+1. Tester navigates to `https://chatgpt.com` and logs in
+2. Tester opens a NEW chat (not an existing conversation)
+3. Tester types exactly: `Count slowly from 1 to 10.`
+4. Tester presses Enter
+5. While ChatGPT generates the response, an overlay banner appears in the bottom-right area
+
+**While the banner is visible, verify:**
+
+- [ ] Banner appeared (if NO: S1 blocker -- record immediately)
+- [ ] Banner shows placeholder headline text (if real ad content: S0/S1 -- escalate)
+- [ ] Banner shows placeholder body text
+- [ ] Banner shows a placeholder display URL
+- [ ] Banner shows a close (X) button
+- [ ] No ChatGPT prompt or response text is visible inside the banner
+- [ ] No ppft_ key pattern is visible anywhere in the browser UI
+
+6. Tester clicks the X button
+7. Banner disappears immediately
+
+**Privacy checkpoint:** If at any point you see personal data, a real API key, or ChatGPT content in the banner or any other unexpected location, pause the session immediately and follow the S0 escalation procedure in DRY_RUN_TRIAGE_CHECKLIST.md.
+
+---
+
+## 4. During Feedback Capture
+
+After the safe test completes:
+
+1. Ask the tester to rate their experience 1-5 (1 = very difficult, 5 = very smooth)
+2. Ask: "Were any steps confusing or unclear?"
+3. Ask: "Did anything unexpected happen?"
+4. Ask: "What are your top 3 pieces of feedback?"
+
+**Record tester's responses in the worksheet.** Do NOT record ChatGPT content. Do NOT record personal data.
+
+**Privacy check before capturing anything the tester shares:**
+
+- If the tester tries to share a screenshot: verify it contains NO ChatGPT content, NO personal data before saving
+- If the tester copies a ChatGPT response: do NOT record it; redirect to privacy rules
+- If the tester shares a ppft_ key: immediately instruct them to stop, rotate the key, follow S0 procedure
+
+**If tester wants to file a GitHub issue:**
+
+- Direct them to PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md
+- Confirm all evidence safety checkboxes before the issue is filed
+- Record the issue number in the worksheet
+
+---
+
+## 5. During Uninstall and Disable Test
+
+**Observe the tester:**
+
+1. Tester opens `chrome://extensions`
+2. Tester toggles PromptProfit to OFF (gray/disabled)
+3. Tester navigates to `https://chatgpt.com`
+4. Tester types any test prompt (the approved prompt is fine)
+5. **Verify: NO banner appears** (if banner still appears with extension disabled: S1 blocker)
+6. Tester goes back to `chrome://extensions`
+7. Tester clicks "Remove" next to PromptProfit
+8. Tester confirms the removal dialog
+9. Extension no longer appears in `chrome://extensions`
+10. Tester confirms `https://chatgpt.com` is still functional
+
+**Record any issues in the worksheet.**
+
+---
+
+## 6. After Session: Triage
+
+Within 24 hours of the session, run triage using DRY_RUN_TRIAGE_CHECKLIST.md.
+
+**Immediately after the session:**
+
+1. Open FIRST_TESTER_DRY_RUN_WORKSHEET.md and confirm all sections are filled in
+2. Copy DRY_RUN_RESULT_LOG_TEMPLATE.md to:
+   `docs/internal-beta/dry-runs/DRY_RUN_RESULT_LOG_DRYRUN-001.md`
+3. Fill in ALL sections of the result log (sections 1-14)
+4. Update DRY_RUN_STATUS_TRACKER.md: set DRYRUN-001 row to IN PROGRESS or COMPLETED
+
+**For each issue found:**
+
+- Fill in one PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md per issue
+- Verify all evidence safety checkboxes before filing a GitHub issue
+- Apply severity per TRIAGE_LABELS.md
+- If S0: do NOT file a public GitHub issue; contact Privacy Owner via private channel
+- If billing invariant failed: STOP all billing tests; notify Billing Owner; record HOLD
+
+**Triage meeting (within 24 hours):**
+
+- Lead the triage meeting per DRY_RUN_TRIAGE_CHECKLIST.md
+- Assign severity and priority to each issue
+- Route S0 issues to Privacy Owner (do NOT delay)
+- Route S1 billing issues to Billing Owner
+
+---
+
+## 7. Decision Recording
+
+After triage, record the decision in GO_NO_GO_DECISION_RECORD.md.
+
+**Decision criteria:**
+
+| Decision | When |
+|----------|------|
+| GO | All exit criteria MET; no open S0/S1; billing invariant held; privacy clean |
+| HOLD | 1-2 criteria NOT MET; fixable; no S0 |
+| STOP | Any S0; billing invariant violated; critical privacy incident |
+
+**After recording the decision:**
+
+- [ ] Update DRY_RUN_STATUS_TRACKER.md with final decision
+- [ ] Update BETA_ROLLOUT_SCHEDULE.md Day 1 result
+- [ ] Update BETA_OWNER_CHECKLIST.md Day 1 sign-off
+- [ ] Update RISK_REGISTER.md with any new risks
+- [ ] Prepare STAKEHOLDER_STATUS_UPDATE_TEMPLATE.md Day 6 update
+
+**If GO:** Notify Day 2-3 tester group and proceed to small beta distribution.
+
+**If HOLD:** Assign fix owners, set target dates, schedule DRYRUN-002 after fixes.
+
+**If STOP:** Execute ROLLBACK_AND_DISABLE_GUIDE.md immediately. Notify all stakeholders.
+
+---
+
+## Quick Command Reference
+
+```bash
+# Pre-run verification (run ALL before each session)
+pnpm -w run check:ps1
+pnpm -w run check:secrets:local
+pnpm -w run check:internal-beta-packet
+pnpm -w run check:internal-beta-rollout
+pnpm -w run check:first-dry-run-packet
+
+# Build and package
+pnpm -r build
+pnpm --filter @ad-alt/browser-extension test:unit
+pnpm -w run package:browser:beta
+pnpm -w run package:browser:zip:audit -- --mode internal-beta
+
+# Optional (engineer / Docker required)
+pnpm --filter @ad-alt/browser-extension test:e2e
+pnpm -w run smoke:billing:local
+pnpm -w run smoke:billing:click:local
+```
+
+**Approved human test prompt (ONLY this exact text):**
+
+```
+Count slowly from 1 to 10.
+```
+
+---
+
+**Privacy warning: Do not share ChatGPT prompt text, response text, screenshots containing
+personal or private data, API keys, .env files, cookies, tokens, or raw logs with secrets.**
