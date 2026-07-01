@@ -15,8 +15,22 @@ import type { FeatureFlags } from "@ad-alt/platform-core";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const chrome: any;
+// Injected at build time by esbuild define. Values: "internal-beta" | "production".
+// esbuild eliminates dead branches, so production builds contain no demo-mode code.
+declare const PROMPTPROFIT_BUILD_MODE: string;
 
 const FLAGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Hardcoded placeholder shown during internal dry-runs when dryRunDemoMode is active.
+// Never compiled into production builds.
+const DEMO_AD_DECISION = {
+  adDecisionId: "demo-00000000-0000-0000-0000-000000000001",
+  campaignId:   "demo-00000000-0000-0000-0000-000000000002",
+  creativeId:   "demo-00000000-0000-0000-0000-000000000003",
+  headline:     "[PromptProfit Demo] Sponsored Headline Placeholder",
+  body:         "Internal dry-run placeholder. Not a real advertisement.",
+  displayUrl:   "demo.promptprofit.internal",
+};
 
 let cachedFlags: FeatureFlags = FALLBACK_FLAGS_DISABLED;
 let flagsFetchedAt = 0;
@@ -139,6 +153,19 @@ async function postEvent(event: unknown): Promise<boolean> {
  * no request is made — the caller shows no ad (fail-closed on unconfigured state).
  */
 async function getAdDecision(adapterId: string): Promise<Record<string, unknown> | null> {
+  // Internal-beta only: return a local placeholder when dryRunDemoMode is active.
+  // esbuild dead-code eliminates this entire block in production builds.
+  if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+    try {
+      const demoStored = await chrome.storage.local.get("dryRunDemoMode") as Record<string, unknown>;
+      if (demoStored["dryRunDemoMode"] === true) {
+        return { ...DEMO_AD_DECISION, expiresAt: Date.now() + 3_600_000 };
+      }
+    } catch {
+      // fall through to normal API path
+    }
+  }
+
   const apiBaseUrl = await getApiBaseUrl();
   if (!apiBaseUrl) return null;
 
@@ -184,7 +211,13 @@ chrome.runtime.onInstalled.addListener(({ reason }: { reason: string }) => {
     chrome.storage.local.get("featureFlags").then((stored: Record<string, unknown>) => {
       if (!isValidFeatureFlags(stored["featureFlags"])) {
         const defaultFlags: FeatureFlags = { killSwitchEnabled: false, disabledAdapters: [], flags: {} };
-        chrome.storage.local.set({ featureFlags: defaultFlags }).catch(() => {});
+        const items: Record<string, unknown> = { featureFlags: defaultFlags };
+        // Internal-beta: enable demo mode so the banner shows without API config.
+        // esbuild dead-code eliminates this branch in production builds.
+        if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+          items["dryRunDemoMode"] = true;
+        }
+        chrome.storage.local.set(items).catch(() => {});
         cachedFlags = defaultFlags;
         flagsFetchedAt = Date.now();
       }

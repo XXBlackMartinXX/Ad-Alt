@@ -117,6 +117,11 @@ const zipAuditCheck = check('package:browser:zip:audit (internal-beta)', 'pnpm -
 const vsixAuditCheck = check('package:vscode:vsix:audit (internal-beta)', 'pnpm -w run package:vscode:vsix:audit -- --mode internal-beta');
 
 console.log('');
+console.log('-- Banner selftest (automated gate -- must pass before human test) --');
+
+const selftestCheck = check('dryrun:001:selftest', 'pnpm -w run dryrun:001:selftest');
+
+console.log('');
 console.log('-- Public-release gate confirmation (expected: FAIL/blocking) --');
 
 check('check:license (public-release)', 'pnpm -w run check:license -- --mode public-release', { expectFail: true });
@@ -207,6 +212,7 @@ if (fs.existsSync(DRAFT_PATH)) {
 | package:browser:beta | ${packageCheck.ok ? 'PASS' : 'FAIL'} |
 | ZIP audit (internal-beta) | ${zipAuditCheck.ok ? 'PASS' : 'FAIL'} |
 | VSIX audit (internal-beta) | ${vsixAuditCheck.ok ? 'PASS' : 'FAIL'} |
+| dryrun:001:selftest (banner gate) | ${selftestCheck.ok ? 'PASS' : 'BLOCKED BEFORE HUMAN TEST'} |
 
 ## Public-Release Gate Status (must remain FAIL/blocking)
 
@@ -287,7 +293,8 @@ if (zipPath) {
 console.log('');
 console.log('2. Tester: Open Chrome and navigate to chrome://extensions');
 console.log('   Tester: Enable Developer Mode (toggle, top right)');
-console.log('   Tester: Click "Load unpacked" and select the dist/ folder from the ZIP');
+console.log('   Tester: Click "Load unpacked" and select the EXTRACTED ZIP ROOT FOLDER')
+console.log('           (the folder that contains manifest.json directly -- NOT the dist/ subfolder)');
 console.log('   Tester: Confirm "PromptProfit" appears in the list with no error badge');
 console.log('');
 console.log('3. Tester: Navigate to https://chatgpt.com (manual login -- do not automate)');

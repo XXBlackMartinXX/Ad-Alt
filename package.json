@@ -59,7 +59,8 @@
     "dryrun:001:prepare": "node scripts/dryrun-001-prepare.js",
     "dryrun:001:finalize": "node scripts/dryrun-001-finalize.js",
     "dryrun:001:diagnose": "node scripts/dryrun-001-diagnose.js",
-    "check:browser:load-folder": "node scripts/check-browser-extension-load-folder.js"
+    "check:browser:load-folder": "node scripts/check-browser-extension-load-folder.js",
+    "dryrun:001:selftest": "node scripts/dryrun-001-selftest.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

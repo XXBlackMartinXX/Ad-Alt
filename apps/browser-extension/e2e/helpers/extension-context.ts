@@ -13,7 +13,8 @@ import type { BrowserContext, Page } from '@playwright/test';
 // ---------------------------------------------------------------------------
 
 export interface ExtensionConfig {
-  apiBaseUrl: string;
+  /** API base URL written to storage. Omit or leave empty to simulate no-API state. */
+  apiBaseUrl?: string;
   killSwitchEnabled?: boolean;
   disabledAdapters?: string[];
   debugMode?: boolean;
@@ -36,6 +37,13 @@ export interface ExtensionConfig {
    * the same deviceId used when minting the dev API key.
    */
   deviceId?: string;
+  /**
+   * When true, the service worker returns a hardcoded placeholder ad decision
+   * without contacting the API. Requires an internal-beta build. Used in the
+   * dry-run selftest to verify the banner renders without API configuration.
+   * Defaults to false — always explicitly written to storage for test isolation.
+   */
+  dryRunDemoMode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,19 +140,20 @@ export async function configureExtensionStorage(
   config: ExtensionConfig,
 ): Promise<void> {
   const args = [
-    config.apiBaseUrl,
+    config.apiBaseUrl ?? "",
     config.killSwitchEnabled ?? false,
     config.disabledAdapters ?? [],
     config.debugMode ?? false,
     config.testViewabilityThresholdMs ?? null,
     config.apiKey ?? null,
     config.deviceId ?? null,
-  ] as [string, boolean, string[], boolean, number | null, string | null, string | null];
+    config.dryRunDemoMode ?? false,
+  ] as [string, boolean, string[], boolean, number | null, string | null, string | null, boolean];
 
   const doEvaluate = async () => {
     const sw = await getOrWaitForServiceWorker(context);
     await sw.evaluate(
-      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey, deviceId]: [
+      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey, deviceId, dryRunDemoMode]: [
         string,
         boolean,
         string[],
@@ -152,6 +161,7 @@ export async function configureExtensionStorage(
         number | null,
         string | null,
         string | null,
+        boolean,
       ]) => {
         return new Promise<void>((resolve, reject) => {
           const items: Record<string, unknown> = {
@@ -177,6 +187,9 @@ export async function configureExtensionStorage(
           // deviceId: when set, the service worker uses this ID in /v1/ads/decision
           // requests. null clears any previously set value so the SW auto-generates.
           items["deviceId"] = deviceId ?? null;
+          // Always write dryRunDemoMode so each test starts with an explicit value
+          // (prevents onInstalled's write from bleeding into tests that don't set it).
+          items["dryRunDemoMode"] = dryRunDemoMode;
           // @ts-ignore — running inside Chrome extension service worker context
           chrome.storage.local.set(items, () => {
             // @ts-ignore

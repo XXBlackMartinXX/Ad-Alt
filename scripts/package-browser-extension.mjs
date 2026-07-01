@@ -146,6 +146,28 @@ if (!existsSync(MANIFEST)) {
   process.exit(2);
 }
 
+// ---------------------------------------------------------------------------
+// Rebuild with the correct build mode before packaging
+// ---------------------------------------------------------------------------
+// This ensures the bundled JS has the right PROMPTPROFIT_BUILD_MODE constant
+// baked in (demo mode for internal-beta; dead-code-eliminated for production).
+const bundleScript = join(EXT_DIR, 'scripts', 'bundle.mjs');
+const buildModeArg = isPublicRelease ? 'production' : 'internal-beta';
+log('Rebuilding extension with --build-mode ' + buildModeArg + ' ...');
+try {
+  execSync('node ' + bundleScript + ' --build-mode ' + buildModeArg, {
+    cwd: EXT_DIR,
+    stdio: 'inherit',
+  });
+  ok('Extension rebuilt with build mode: ' + buildModeArg);
+} catch (e) {
+  err('Rebuild failed: ' + (e.message ?? String(e)));
+  err('Run: pnpm --filter @ad-alt/browser-extension build');
+  process.exit(1);
+}
+
+process.stdout.write('\n');
+
 // Load manifest early so htmlRefs and reference checks can both use it
 const require  = createRequire(import.meta.url);
 const manifest = require(MANIFEST);

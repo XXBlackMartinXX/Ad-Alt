@@ -30,6 +30,11 @@ const sharedOpts = {
   target: "es2022",
   platform: "browser",
   logLevel: "info",
+  // Test builds always include internal-beta code paths (demo mode) so
+  // the selftest can exercise the banner without a live API server.
+  define: {
+    PROMPTPROFIT_BUILD_MODE: JSON.stringify("internal-beta"),
+  },
 };
 
 // ---------------------------------------------------------------------------

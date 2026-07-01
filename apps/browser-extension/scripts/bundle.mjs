@@ -13,12 +13,21 @@ import { mkdirSync } from "fs";
 mkdirSync("dist/content", { recursive: true });
 mkdirSync("dist/background", { recursive: true });
 
+const buildModeIdx = process.argv.indexOf("--build-mode");
+const buildMode =
+  buildModeIdx !== -1
+    ? process.argv[buildModeIdx + 1]
+    : (process.env.PROMPTPROFIT_BUILD_MODE ?? "production");
+
 const sharedOpts = {
   bundle: true,
   sourcemap: true,
   target: "es2022",
   platform: "browser",
   logLevel: "info",
+  define: {
+    PROMPTPROFIT_BUILD_MODE: JSON.stringify(buildMode),
+  },
 };
 
 await esbuild.build({
