@@ -15,7 +15,7 @@
 
 | ID | Date | Tester | Track | Status | Decision | Result Log | Notes |
 |----|------|--------|-------|--------|----------|------------|-------|
-| DRYRUN-001 | 2026-07-01 | [TBD] | [A/B] | INCONCLUSIVE / READY TO RERUN WITH LIVE DIAGNOSTICS | HOLD | DRYRUN-001_RESULT_LOG.md | Confirmed S1/P1 blocker (Issue 001) remains open. Live dry-run diagnostics panel added so the next rerun identifies the exact real-ChatGPT runtime failure point instead of an undifferentiated "no banner" report. |
+| DRYRUN-001 | 2026-07-01 | [TBD] | [A/B] | INCONCLUSIVE / RERUN-READY WITH FORCED DEMO FALLBACK | HOLD | DRYRUN-001_RESULT_LOG.md | Confirmed S1/P1 blocker (Issue 001) remains open pending human rerun. A deterministic internal-beta forced demo fallback now renders the banner independent of wait-state detection, generation timing, or API availability -- see DRYRUN-001_DEFINITIVE_BANNER_FIX.md. Selftest proves this in a synthetic fixture; a real ChatGPT rerun is still required to confirm it works there too. |
 
 ---
 
@@ -62,20 +62,21 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 | Field | Value |
 |-------|-------|
-| Status | INCONCLUSIVE / READY TO RERUN WITH LIVE DIAGNOSTICS |
+| Status | INCONCLUSIVE / RERUN-READY WITH FORCED DEMO FALLBACK |
 | Decision | HOLD |
 | Worksheet | docs/internal-beta/dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md |
 | Owner-Ready Note | docs/internal-beta/dry-runs/DRYRUN-001_OWNER_READY_NOTE.md |
 | Inconclusive Note (attempt 1) | docs/internal-beta/dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md |
 | Result Log (rerun after 682276f) | docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md |
 | Real-ChatGPT Runtime Investigation | docs/internal-beta/dry-runs/DRYRUN-001_REAL_CHATGPT_RUNTIME_INVESTIGATION.md |
+| Definitive Banner Fix | docs/internal-beta/dry-runs/DRYRUN-001_DEFINITIVE_BANNER_FIX.md |
 | Issues Found | 1 (DRYRUN-001-ISSUE-001, S1/P1 -- remains open until a successful rerun) |
 | Open S0 | NONE OBSERVED |
-| Open S1 | DRYRUN-001-ISSUE-001 -- banner confirmed not observed on real ChatGPT despite packaged selftest passing; GO blocked; remains open until a successful rerun with live diagnostics confirms the banner appears |
+| Open S1 | DRYRUN-001-ISSUE-001 -- banner confirmed not observed on real ChatGPT despite packaged selftest passing; GO blocked; remains open until a successful rerun confirms the banner appears |
 | Privacy Result | NOT RE-VERIFIED THIS SESSION -- not the subject of this triage; do not assume clean |
 | Billing Result | UNKNOWN -- TREAT AS CONCERN |
 | Rollback Result | NOT CONFIRMED -- session did not reach uninstall step |
-| Notes | Rerun after commit 682276f (demo mode + dryrun:001:selftest). Selftest PASSED (banner renders in packaged artifact with no API config). Real ChatGPT session still showed NO banner -- this is a CONFIRMED S1/P1 blocker, not an inconclusive/setup result. An earlier pass had mis-classified this at S4/P3; corrected to S1/P1. A live, privacy-safe dry-run diagnostics panel and a longer recommended safe prompt have now been added so the NEXT rerun identifies the exact real-runtime failure point instead of an undifferentiated "no banner" report. This status must not be finalized until that rerun succeeds. See the issue file and the runtime investigation doc for details. |
+| Notes | Rerun after commit 682276f showed the banner still did not appear on real ChatGPT despite the packaged selftest passing -- a CONFIRMED S1/P1 blocker (previously mis-classified at S4/P3; corrected). Root cause: the banner depended entirely on wait-state detection succeeding, which live diagnostics could observe but not fix. A deterministic internal-beta forced demo fallback has now been implemented: it renders the banner from extension-load + demo-mode + supported-host + kill-switch-off alone, with NO dependency on wait-state selectors, generation timing, or the ad-decision API. Proven in a synthetic fixture (`dryrun:001:selftest`); a real human rerun on actual chatgpt.com is still required before this can be marked resolved. See DRYRUN-001-ISSUE-001.md and DRYRUN-001_DEFINITIVE_BANNER_FIX.md. |
 
 ---
 
@@ -96,14 +97,16 @@ If no open S0/S1 issues: "None -- no blocking issues."
 **Total dry-run sessions:** 2 attempted (1 inconclusive/setup, 1 blocked/confirmed defect), 0 completed with GO
 
 **Current beta phase status:**
-- Dry-run packet: READY (all checks pass, including `dryrun:001:selftest`)
-- DRYRUN-001: INCONCLUSIVE / READY TO RERUN WITH LIVE DIAGNOSTICS -- Decision: HOLD.
-  Packaged selftest PASSED; real ChatGPT banner confirmed NOT to appear on the prior
-  attempt; S1/P1 blocker DRYRUN-001-ISSUE-001 remains open until a successful rerun; GO blocked.
+- Dry-run packet: READY (all checks pass, including `dryrun:001:selftest`, which now
+  proves the forced demo fallback -- not just the old wait-state path)
+- DRYRUN-001: INCONCLUSIVE / RERUN-READY WITH FORCED DEMO FALLBACK -- Decision: HOLD.
+  Real ChatGPT banner confirmed NOT to appear on the prior attempt; S1/P1 blocker
+  DRYRUN-001-ISSUE-001 remains open until a successful human rerun; GO blocked.
 - Wider beta (Day 2-3): BLOCKED on DRYRUN-001 GO decision
 - Public release: BLOCKED (LICENSE, icons, VSIX, staging reconciliation pending)
 
-**Next action:** Owner runs `pnpm -w run dryrun:001:live-checklist`, shares it with the tester,
-and schedules a rerun using the live dry-run diagnostics panel and the recommended longer
-safe prompt. This session must not be finalized as GO, and wider distribution must not be
-scheduled, until that rerun succeeds with the banner confirmed visible.
+**Next action:** Owner runs `pnpm -w run dryrun:001:live-checklist`, shares it with the
+tester, and schedules a rerun. The tester should expect the demo banner to appear within
+seconds of the chatgpt.com page loading -- no login or prompt required for the primary
+check. This session must not be finalized as GO, and wider distribution must not be
+scheduled, until that rerun succeeds with the banner confirmed visible on real ChatGPT.

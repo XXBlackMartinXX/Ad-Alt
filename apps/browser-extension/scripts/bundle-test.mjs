@@ -80,7 +80,7 @@ const manifest = {
   },
   content_scripts: [
     {
-      matches: ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      matches: ["https://chatgpt.com/*", "https://www.chatgpt.com/*", "https://chat.openai.com/*"],
       js: ["content/chatgpt.js"],
       run_at: "document_idle",
     },

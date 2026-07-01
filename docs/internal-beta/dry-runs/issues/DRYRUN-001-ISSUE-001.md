@@ -5,11 +5,30 @@
 **Priority:** P1 (Fix before next beta dry-run)
 **Area:** area:browser-extension, area:chatgpt-adapter, area:dry-run
 **Decision impact:** GO blocked
-**Status:** accepted / needs diagnosis
+**Status:** accepted / definitive fix implemented / human rerun pending
 
 ---
 
 > This issue was previously misclassified. See "Triage Correction" below.
+
+---
+
+## Definitive Fix Implemented (Pending Human Rerun Confirmation)
+
+The diagnostics-only fix (commit 39a4577) added observability but did not remove the
+underlying dependency on wait-state detection succeeding on real ChatGPT. A deterministic
+internal-beta forced demo fallback has now been implemented that renders the banner from
+extension-load + demo-mode + supported-host + kill-switch-off alone, with **no**
+dependency on wait-state selectors, generation timing, prompt length, or the ad-decision
+API. See `docs/internal-beta/dry-runs/DRYRUN-001_DEFINITIVE_BANNER_FIX.md` for the full
+before/after runtime path, and `pnpm -w run dryrun:001:selftest` (which now specifically
+proves the fallback renders with NO wait-state trigger at all).
+
+**This does not resolve the issue by itself.** Severity/priority remain S1/P1 and status
+remains open until a real human tester on real chatgpt.com confirms the banner appears.
+If it still does not appear after this fix, that would indicate a genuine content-script
+injection or extension-load failure (see the updated Root Cause Hypotheses below), which
+is a different and more serious class of problem than the original wait-state dependency.
 
 ---
 
@@ -177,18 +196,25 @@ recommended prompt, and the full diagnostics-panel status-line legend.
 
 ## Resolution Criteria
 
-**Partially addressed:** The privacy-safe live dry-run diagnostics panel
-(`src/diagnostics/dryrun-diagnostics.ts`, `DryRunDiagnosticsPanel`) and a longer
-recommended safe prompt have been added. This is NOT resolution -- it is the
-instrumentation needed to identify the real-runtime failure point on the next rerun.
+**Fix implemented, not yet resolved:** The deterministic internal-beta forced demo
+fallback (see "Definitive Fix Implemented" above) removes the dependency on wait-state
+detection, generation timing, and the ad-decision API entirely. The live diagnostics panel
+and longer recommended prompt from the prior fix remain in place as secondary aids. This
+is a real, testable fix (proven by `dryrun:001:selftest` in a synthetic fixture) but is
+**NOT resolution** -- only a real human tester on real chatgpt.com can confirm it works
+there too.
 
-**Resolved (downgrade permitted):** The exact failure point on real chatgpt.com is
-identified via the live diagnostics panel and fixed, `dryrun:001:selftest` (or a new
-targeted test) is extended to cover the identified gap (e.g. real-DOM selector check,
-install-vs-update path), and a subsequent real tester session confirms the banner appears
-on real chatgpt.com with the diagnostics panel reading "Banner visible."
+**Resolved (downgrade permitted):** A real human tester confirms the demo banner appears
+within seconds of the chatgpt.com page loading, without needing to log in or send a
+prompt, on real chatgpt.com with the packaged artifact.
 
-**Remains S1/P1 until then.** Do not schedule DRYRUN-002 wider distribution while this is open.
+**Escalate further (if the fix does not work on real ChatGPT):** If the banner still does
+not appear after this fix, treat it as a confirmed content-script injection or
+extension-load failure (see manifest/host-permission review in
+DRYRUN-001_DEFINITIVE_BANNER_FIX.md) -- a more fundamental problem than the original
+wait-state dependency, and file it as a new, distinct issue rather than reusing this one.
+
+**Remains S1/P1 until a successful rerun.** Do not schedule DRYRUN-002 wider distribution while this is open.
 
 ---
 

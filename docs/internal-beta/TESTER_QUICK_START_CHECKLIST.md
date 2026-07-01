@@ -44,20 +44,29 @@ Unzip the file to a folder you can find easily (e.g., Desktop/promptprofit-beta/
 - "PromptProfit" should now appear in the extension list at chrome://extensions.
 - The extension icon may appear in your Chrome toolbar (puzzle-piece icon area).
 
-### Step 6 -- Log in and open a new chat
+### Step 5a -- PRIMARY CHECK: the banner should appear right away (no login needed)
 1. Go to https://chatgpt.com in a NEW tab (open it AFTER loading the extension, not before).
-2. **REQUIRED: Confirm you are logged in.** If you see "Log in" or "Sign up for free": log in first.
-   The PromptProfit banner ONLY appears when you are logged in and ChatGPT is generating.
-3. Click "New chat" in the ChatGPT sidebar to start a fresh conversation.
-4. Type this exact safe test prompt in the message box (not the URL bar). The longer
-   prompt below is RECOMMENDED because it gives more time to observe the banner:
+2. **Watch the bottom-right corner of the browser window for about 5-10 seconds.**
+   You do NOT need to log in or type anything yet -- the demo banner should appear on its
+   own, even on the login/signup screen.
+3. If the banner appears: great, continue to Step 6. If it does NOT appear: this is now a
+   real problem to report (see Step 9) -- do not assume you need to log in first.
+
+### Step 6 -- Log in and open a new chat (optional secondary check)
+1. Confirm you are logged in. If you see "Log in" or "Sign up for free": log in first.
+   (This step is only needed for the secondary check below -- the banner in Step 5a does
+   not require login.)
+2. Click "New chat" in the ChatGPT sidebar to start a fresh conversation.
+3. Type this exact safe test prompt in the message box (not the URL bar). The longer
+   prompt below is RECOMMENDED because it gives more time to observe:
 
    Count slowly from 1 to 100, one number per line.
 
    (The shorter prompt "Count slowly from 1 to 10." is also approved, but the longer
    one is recommended for this rerun.)
 
-5. Press Enter and **watch the bottom-right corner** while ChatGPT responds.
+4. Press Enter and watch the bottom-right corner while ChatGPT responds (the banner from
+   Step 5a may already be showing -- that's expected, not a bug).
 
 ### Step 6a -- Live dry-run diagnostics panel (internal beta only)
 
@@ -69,31 +78,32 @@ if it gets in your way. Example status lines and what they mean:
 
 | Status line shown | What it means |
 |---|---|
-| "Waiting for generation state" | Normal until you send a prompt |
-| "Generation detected; ad decision missing" or "...API not configured" | The extension detected your prompt but did not get an ad to show |
+| "Waiting for generation state" (persists even without sending a prompt) | The forced fallback did not trigger -- likely demo mode was not enabled; report this |
+| "Generation detected; ad decision missing" or "...API not configured" | Relevant only to the secondary (Step 6) check |
 | "Banner attempted; not visible" | The banner was added to the page but is not visible (report this exactly) |
-| "Banner visible" | Everything worked |
+| "Banner visible" | Everything worked -- expected within seconds of Step 5a, before any prompt |
 
 ### Step 7 -- What success looks like
-WHILE ChatGPT is generating its response (the streaming/typing phase), look for:
+The banner should appear within seconds of Step 5a (page load), without needing to send a
+prompt. If you're doing the optional Step 6 secondary check too, it will look the same
+during ChatGPT's response. Look for:
 
 - A small rectangular banner/overlay in the **bottom-right corner** of the browser window.
 - The banner shows placeholder text: a headline, a short body line, and a display URL.
 - These are placeholders, NOT real advertisements.
 - A close button (X) appears in the corner of the banner.
 
-Important: Watch the bottom-right corner FROM THE MOMENT you press Enter. The banner appears
-during generation. If you look away and back after ChatGPT finishes, you may have missed it.
+Important: the banner appears on its own within seconds of Step 5a -- you do not need to
+send a prompt or watch during generation for the primary check to pass.
 
 ### Step 8 -- Test the close button
 Click the X button on the banner. It should disappear immediately.
 
-### Step 9 -- What to do if no banner appears
+### Step 9 -- What to do if no banner appears (in Step 5a)
 - Check: Is the extension toggle ON (blue) in chrome://extensions?
-- Check: Are you logged into chatgpt.com? (No "Log in" or "Sign up" visible?)
-- Check: Did you open a NEW chat (not an existing one)?
-- Check: Were you watching the bottom-right corner DURING generation?
+- Check: Did you open chatgpt.com in a NEW tab (opened AFTER loading the extension)?
 - Check: What does the diagnostics panel (Step 6a) say, exactly?
+- Note: being logged in is NOT required for the Step 5a banner -- do not assume that's the cause.
 - Do NOT guess at a cause. Report the exact diagnostics panel status line if you saw one,
   and file a bug report using the template in FEEDBACK_INTAKE.md.
   Do NOT share ChatGPT content in the bug report -- only describe extension behavior.
@@ -236,8 +246,8 @@ personal or private data, API keys, .env files, cookies, tokens, or raw logs wit
 
 | Situation | Action |
 |-----------|--------|
-| Banner does not appear | Check: logged in? Extension ON? New chat? Watched during generation? Read the diagnostics panel status line (internal beta) instead of guessing. |
-| Not logged into chatgpt.com | Log in first, reload tab, try again from Step 6 |
+| Banner does not appear at Step 5a (no login needed for this check) | Check: Extension ON? New tab opened after loading extension? Read the diagnostics panel status line (internal beta) instead of guessing. |
+| Not logged into chatgpt.com | Only blocks Step 6 (optional secondary check) -- log in, reload tab, try again |
 | Extension shows error badge | Click "Details" -> "Errors" -- record error text (no personal data) |
 | Banner text looks wrong | File a bug report with severity S2 |
 | Chrome crashes | File a bug report with severity S1 |

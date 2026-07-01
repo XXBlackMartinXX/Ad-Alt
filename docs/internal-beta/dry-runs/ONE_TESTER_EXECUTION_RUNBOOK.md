@@ -163,14 +163,25 @@ Have FIRST_TESTER_DRY_RUN_WORKSHEET.md open and track each step.
    The `dist/` subfolder only has JS files — Chrome will reject it (no `manifest.json` there).
 5. Extension "PromptProfit" appears in the list with no error badge
 
-**LOGGED-IN REQUIREMENT (verify before proceeding to safe test):**
+**PRIMARY CHECK (do this immediately, before worrying about login):**
 
-Before proceeding to the safe test, confirm the tester is logged into chatgpt.com:
+The internal-beta demo banner no longer requires ChatGPT generation OR login to appear —
+it renders via a deterministic forced fallback within a few seconds of the page loading.
 
-- Ask the tester to navigate to `https://chatgpt.com`
-- If they see "Log in" or "Sign up for free": STOP. The tester must log in before the test.
-- The PromptProfit banner ONLY appears when the user is authenticated and ChatGPT is generating.
-- An unauthenticated user will see no banner even if the extension is correctly installed.
+- Ask the tester to navigate to `https://chatgpt.com` in a NEW tab (opened after the
+  extension was loaded).
+- Watch the bottom-right corner. The banner should appear within ~5 seconds, even on the
+  login/signup screen.
+- If it does NOT appear: this is now a genuine failure signal, not a login issue. Read the
+  live dry-run diagnostics panel (top-left corner) and record its exact status line before
+  doing anything else. See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md.
+
+**LOGGED-IN REQUIREMENT (only needed for the optional secondary check below):**
+
+- Ask the tester to navigate to `https://chatgpt.com` and log in if not already.
+- If they see "Log in" or "Sign up for free": have the tester log in before the secondary check.
+- The secondary (wait-state-driven) check requires an authenticated, real ChatGPT
+  generation — the primary forced-fallback check above does not.
 
 **If the tester hits an error at any step:**
 
@@ -188,6 +199,10 @@ Before proceeding to the safe test, confirm the tester is logged into chatgpt.co
 ---
 
 ## 3. During Safe Test
+
+**This is the OPTIONAL secondary check** — the primary check (forced fallback banner
+appearing immediately after page load, no login/prompt required) should already have been
+completed in Section 2 above. This section exercises the normal wait-state-driven path.
 
 **Two prompts are approved for this dry-run. Use the RECOMMENDED one for this rerun:**
 

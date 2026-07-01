@@ -116,7 +116,25 @@ Track B additions (Engineer):
 
 ---
 
-## SAFE TEST CHECKLIST
+## PRIMARY CHECK: Forced Demo Fallback (No Login, No Prompt Required)
+
+The internal-beta demo banner renders deterministically within a few seconds of the
+chatgpt.com page loading -- it does NOT wait for ChatGPT to generate a response, and does
+NOT require the tester to be logged in. Do this check FIRST, before the login-dependent
+secondary check below.
+
+- [ ] Tester navigated to https://chatgpt.com in a NEW tab (opened AFTER loading the extension)
+- [ ] Banner appeared in the bottom-right corner within ~5-10 seconds, with NO prompt sent
+- [ ] Banner content is placeholder only (no real ad, no personal data)
+- [ ] Close button works
+
+If the banner did NOT appear here: STOP and record the diagnostics panel status line
+(see below) before proceeding. Do not assume login is the cause -- it is not required for
+this check.
+
+---
+
+## SAFE TEST CHECKLIST (Optional Secondary Check -- Normal Wait-State Path)
 
 **Approved test prompts -- use the RECOMMENDED one for this rerun:**
 
@@ -129,9 +147,10 @@ a very short generation can complete before the ad-decision round-trip finishes.
 **Forbidden prompts:** any prompt containing personal data, work content, or sensitive information.
 No prompt other than the two above is allowed.
 
-**LOGGED-IN PREREQUISITE (MUST confirm before proceeding):**
+**LOGGED-IN PREREQUISITE (only needed for this secondary check, not the primary check above):**
 - [ ] Tester confirmed they are logged into chatgpt.com (no "Log in" / "Sign up" visible)
-  If NOT logged in: STOP. Have tester log in first. Banner will not appear without authentication.
+  If NOT logged in: have tester log in first. This secondary check requires a real,
+  authenticated ChatGPT generation to exercise the normal wait-state path.
 
 **What you should see (banner description for the owner's reference):**
 While ChatGPT is generating (the streaming phase), watch the BOTTOM-RIGHT corner.

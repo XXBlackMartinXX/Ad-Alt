@@ -98,13 +98,35 @@ console.log('');
 console.log('-- ChatGPT login (manual -- never automate this) --');
 console.log('  [ ] Navigate to https://chatgpt.com in a NEW tab (opened AFTER loading the extension)');
 console.log('  [ ] Confirm you see the chat interface, NOT "Log in" / "Sign up for free"');
-console.log('  [ ] Click "New chat" (not an existing conversation)');
 console.log('');
 
 // ---------------------------------------------------------------------------
-// 6. Recommended prompt
+// 5a. THE KEY BEHAVIOR CHANGE -- read this before anything else
 // ---------------------------------------------------------------------------
-console.log('-- Recommended safe test prompt --');
+console.log('-- IMPORTANT: the banner should appear WITHOUT sending any prompt --');
+console.log('  As of this build, the internal-beta demo banner no longer waits for');
+console.log('  ChatGPT to generate a response. It should appear in the BOTTOM-RIGHT');
+console.log('  corner within a few seconds of the chatgpt.com page finishing load --');
+console.log('  BEFORE you type or send anything.');
+console.log('');
+console.log('  [ ] Banner appeared in the bottom-right corner within ~5 seconds of page load');
+console.log('      (do NOT type a prompt yet -- just watch after the page loads)');
+console.log('');
+console.log('  If it does NOT appear at this point, do not proceed to the prompt step --');
+console.log('  go straight to the diagnostics panel legend below and record what it says.');
+console.log('  There is no more "maybe I need to send a prompt first" ambiguity: if demo');
+console.log('  mode is on and the banner still does not appear immediately, that IS the bug.');
+console.log('');
+
+// ---------------------------------------------------------------------------
+// 6. Recommended prompt (optional secondary check)
+// ---------------------------------------------------------------------------
+console.log('-- Optional secondary check: the normal wait-state path --');
+console.log('  Once the banner above has appeared (or been recorded as missing), you may');
+console.log('  ALSO click "New chat" and send an approved prompt to exercise the normal');
+console.log('  (non-fallback) wait-state path used once real ad decisions are wired up.');
+console.log('  This is a secondary check, not the primary pass/fail signal.');
+console.log('');
 console.log('  RECOMMENDED (gives more observation time):');
 console.log('');
 console.log('    Count slowly from 1 to 100, one number per line.');
@@ -152,14 +174,25 @@ console.log('  "Banner attempted; not visible"');
 console.log('    -> The banner was added to the page but has zero visible size -- a CSS');
 console.log('       or host-page conflict. Record this exact status line.');
 console.log('  "Banner visible"');
-console.log('    -> Everything worked. This is the expected state while ChatGPT generates.');
+console.log('    -> Everything worked. In this build, this should happen within seconds');
+console.log('       of page load via the forced demo fallback -- NOT only during generation.');
+console.log('');
+console.log('  Two additional fields on the panel (data-demo-fallback-active /');
+console.log('  data-demo-fallback-rendered) specifically indicate the NEW deterministic');
+console.log('  path: if demo-fallback-active is true but the banner still never appears,');
+console.log('  that is a genuine content-script or renderer bug -- record it exactly.');
+console.log('');
+console.log('  IF NEITHER the banner NOR the diagnostics panel appears at all:');
+console.log('  suspect a content-script injection or extension-load failure, not a demo-mode');
+console.log('  or wait-state problem -- check for a red error badge in chrome://extensions');
+console.log('  and confirm the extension is actually enabled before investigating further.');
 console.log('');
 
 // ---------------------------------------------------------------------------
 // 8. How to answer finalize
 // ---------------------------------------------------------------------------
 console.log('-- How to answer pnpm -w run dryrun:001:finalize based on what you saw --');
-console.log('  If the banner appeared: answer Q7 "yes".');
+console.log('  If the banner appeared (immediately, without sending a prompt): answer Q7 "yes".');
 console.log('  If the banner did NOT appear:');
 console.log('    - Answer Q7 "no" (NOT "unknown" -- you have a diagnostic panel reading now).');
 console.log('    - When asked for issue details, paste the EXACT diagnostic panel status');
@@ -168,6 +201,10 @@ console.log('    - A confirmed "no" with the selftest passing is filed as S1/P1 
 console.log('      -- you cannot downgrade it, and that is intentional.');
 console.log('  If you could not tell (e.g. panel not visible, unsure): answer "unknown" --');
 console.log('    this still blocks GO but is tracked separately from a confirmed failure.');
+console.log('  No more guessing: read the panel, record it exactly.');
+console.log('');
+console.log('DRYRUN-001 remains HOLD/BLOCKED until a real human rerun confirms the banner');
+console.log('appears on real ChatGPT. This checklist does not itself constitute a pass.');
 console.log('');
 
 line();

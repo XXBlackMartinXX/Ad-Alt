@@ -30,13 +30,29 @@ pnpm -w run dryrun:001:live-checklist
 
 ---
 
+## Key Behavior Change: the Banner No Longer Waits for Generation or Login
+
+As of the forced internal-beta demo fallback
+(`docs/internal-beta/dry-runs/DRYRUN-001_DEFINITIVE_BANNER_FIX.md`), the demo banner
+appears within a few seconds of the chatgpt.com page loading -- **before any prompt is
+sent, and regardless of whether the tester is logged in**. It no longer depends on
+ChatGPT's wait-state selectors matching, on generation completing, or on authentication.
+
+This means the OLD assumption "the banner only appears once you're logged in and ChatGPT
+is generating" (checklist item A1 below) is **no longer true** for the forced-fallback
+path. If the banner still does not appear immediately after page load, do not assume the
+tester needs to log in and try again -- treat it as a genuine failure and read the
+diagnostics panel first (below). Section A below remains relevant only for the OPTIONAL
+secondary check of the normal wait-state-driven path.
+
 ## Read the Live Diagnostics Panel First -- Do Not Guess
 
 The packaged selftest (`pnpm -w run dryrun:001:selftest`) already proves the banner CAN
-render in the shipped artifact using internal-beta demo mode with no API configuration.
-If the banner still does not appear on real ChatGPT, that means something in the REAL
-runtime path is failing -- not a packaging problem. Guessing at which of the checklist
-items below applies wastes the tester's time and produces vague reports.
+render in the shipped artifact via the forced demo fallback, with no wait-state trigger
+and no API configuration. If the banner still does not appear on real ChatGPT, that means
+something in the REAL runtime path is failing -- not a packaging problem. Guessing at
+which of the checklist items below applies wastes the tester's time and produces vague
+reports.
 
 Instead: look for the small panel labeled "PromptProfit Dry-Run Diagnostics" in the
 **top-left** corner of the page (internal-beta builds only). It never shows any ChatGPT
@@ -48,11 +64,16 @@ content -- only extension-owned state. Read its status line and record it EXACTL
 | "Platform not detected" | Hostname mismatch | Confirm you are on chatgpt.com or chat.openai.com |
 | "Kill-switch active -- banner suppressed" | A stored flag is blocking the banner | See section B below |
 | "Adapter inactive" | Extension loaded but did not start | Check for an error badge; see section B |
-| "Waiting for generation state" (never changes after sending a prompt) | Wait-state selector may not match this ChatGPT build | File an issue referencing this exact status; see RF-2 in DRYRUN-001_BANNER_NOT_OBSERVED_ROOT_CAUSE.md |
+| "Waiting for generation state" (persists indefinitely, even with demo mode on and no prompt sent) | The forced fallback never triggered -- `demo_fallback_active` is false. Likely demo mode was never enabled | See section B5: confirm `dryRunDemoMode` was written (fresh install, not reused folder) |
 | "Generation detected; API not configured" | Demo mode/API never got configured -- likely a reused extraction folder (see section B5) | Reload into a fresh folder; re-verify install was a genuine "install" not "update" |
 | "Generation detected; ad decision failed" | Demo mode or API IS configured but still failed | This is a genuine runtime bug -- report it, do not treat as setup |
 | "Banner attempted; not visible" | Banner is in the page but has zero visible size | Report this exactly -- likely a CSS/host-page conflict |
-| "Banner visible" | Everything worked | No issue |
+| "Banner visible" | Everything worked -- this should happen within seconds of page load, with no prompt needed | No issue |
+
+Also check the panel's `demo_fallback_active` / `demo_fallback_rendered` fields directly:
+if `demo_fallback_active` is `true` but `demo_fallback_rendered` stays `false` and the
+banner never appears, that is a genuine renderer bug -- report the exact panel state, it
+is not a setup issue.
 
 If the panel itself is not visible at all: this only happens if
 `dryRunDiagnosticsEnabled` was never written to storage, which (like the demo-mode issue
@@ -66,10 +87,14 @@ folder.
 
 Work through each item in order. Check each box when confirmed.
 
-### A. Tester Is Not Logged Into ChatGPT (Most Common Cause)
+### A. Tester Is Not Logged Into ChatGPT (Relevant Only to the Optional Secondary Check)
 
-- [ ] **A1. Verify the tester is logged into chatgpt.com.**
-  The PromptProfit banner ONLY appears when the user is authenticated.
+The forced demo fallback banner does NOT require login -- it appears on any supported
+ChatGPT hostname regardless of authentication state. This section only matters if you are
+running the OPTIONAL secondary check of the normal wait-state-driven path (which does
+require a real, authenticated ChatGPT session to generate a response).
+
+- [ ] **A1. Verify the tester is logged into chatgpt.com (only needed for the wait-state secondary check).**
   If the chatgpt.com page shows "Log in" or "Sign up for free": the tester is NOT logged in.
   Fix: Have the tester log in to their ChatGPT account BEFORE loading the extension.
   After logging in: reload the ChatGPT tab, open a new chat, then run the safe test prompt.
@@ -104,9 +129,14 @@ Work through each item in order. Check each box when confirmed.
 
 ### C. ChatGPT Tab State
 
-- [ ] **C1. Open a BRAND NEW chat tab after loading the extension.**
+- [ ] **C1. Open a BRAND NEW tab after loading the extension (applies to the primary check too).**
   The content script injects when the page loads. If ChatGPT was already open before loading
   the extension: the script did not run. Fix: open a new tab, navigate to chatgpt.com, then test.
+  This is required for the forced fallback banner too -- it only appears in tabs where the
+  content script actually ran.
+
+The remaining items in this section (C2-C4) apply ONLY to the optional secondary check of
+the normal wait-state-driven path, not to the primary forced-fallback banner check.
 
 - [ ] **C2. The tester must open a NEW chat (not continue an existing conversation).**
   Click "New chat" in the ChatGPT sidebar. Do NOT resume a previous conversation.
@@ -150,18 +180,25 @@ Work through each item in order. Check each box when confirmed.
 
 ## What the Banner Should Look Like
 
-When correctly installed and logged in:
+When correctly installed (primary check -- forced demo fallback, no login or prompt required):
 
-1. Tester submits the safe test prompt: `Count slowly from 1 to 10.`
-2. ChatGPT begins generating (streaming output).
-3. **In the BOTTOM-RIGHT corner of the browser window**, a small rectangular overlay appears.
-4. The banner contains:
+1. Tester loads chatgpt.com in a new tab, after loading the extension.
+2. Within a few seconds, **in the BOTTOM-RIGHT corner of the browser window**, a small
+   rectangular overlay appears -- with NO prompt sent and regardless of login state.
+3. The banner contains:
    - A short placeholder headline (not real ad content)
    - A short placeholder description line
    - A placeholder display URL (e.g. "example.com" or similar placeholder)
    - An X close button in the top-right corner of the banner
-5. The banner may disappear automatically or remain visible until the X is clicked.
-6. The X button dismisses the banner immediately.
+4. The banner stays visible for at least ~12 seconds, or until the X is clicked.
+5. The X button dismisses the banner immediately.
+
+Optional secondary check (normal wait-state-driven path, requires login and a real prompt):
+
+1. Tester submits the safe test prompt: `Count slowly from 1 to 100, one number per line.`
+2. ChatGPT begins generating (streaming output).
+3. The banner appears (or, if the forced-fallback banner is already up, stays as-is --
+   see "no duplicate banners" in DRYRUN-001_DEFINITIVE_BANNER_FIX.md).
 
 If any of the above is different (real ad content, personal data visible, API key visible):
 STOP and follow the S0 escalation procedure in DRY_RUN_TRIAGE_CHECKLIST.md.

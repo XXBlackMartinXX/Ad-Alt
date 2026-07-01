@@ -60,6 +60,15 @@ export interface DryRunDiagnosticState {
   content_script_loaded: boolean;
   platform_detected: PlatformDetectedState;
   adapter_active: boolean;
+  /**
+   * True once the internal-beta forced demo fallback (see chatgpt.ts) has
+   * determined all preconditions hold and has begun rendering, independent
+   * of wait-state detection. This is the deterministic path DRYRUN-001 relies
+   * on -- it does not require a live ChatGPT generation to occur at all.
+   */
+  demo_fallback_active: boolean;
+  /** True once the forced demo fallback banner has actually entered the DOM. */
+  demo_fallback_rendered: boolean;
   wait_state_detected: boolean;
   wait_state_started_at: string | null;
   wait_state_duration_ms: number | null;
@@ -114,6 +123,8 @@ export const DEFAULT_DRYRUN_DIAGNOSTIC_STATE: DryRunDiagnosticState = {
   content_script_loaded: false,
   platform_detected: "unknown",
   adapter_active: false,
+  demo_fallback_active: false,
+  demo_fallback_rendered: false,
   wait_state_detected: false,
   wait_state_started_at: null,
   wait_state_duration_ms: null,
@@ -137,6 +148,12 @@ export const DEFAULT_DRYRUN_DIAGNOSTIC_STATE: DryRunDiagnosticState = {
  * Reduces the full diagnostic state to a single tester-facing status line,
  * so a non-engineer can read the panel instead of guessing. Order matters:
  * each check is a necessary precondition for the ones below it.
+ *
+ * The forced demo fallback (demo_fallback_active/demo_fallback_rendered) is a
+ * SEPARATE, deterministic path that does not depend on wait-state detection
+ * or an ad-decision round-trip -- so those two later checks are skipped
+ * whenever the fallback is in play, letting this function reach "Banner
+ * visible" without ever requiring a real ChatGPT generation to occur.
  */
 export function computeStatusLabel(state: DryRunDiagnosticState): string {
   if (!state.extension_loaded || !state.content_script_loaded) {
@@ -148,13 +165,19 @@ export function computeStatusLabel(state: DryRunDiagnosticState): string {
   if (state.kill_switch_active) {
     return "Kill-switch active -- banner suppressed";
   }
-  if (!state.adapter_active) {
+  // Checked before banner_visible: once closed, banner_visible reverts to
+  // false, and without this check first that would misreport a deliberate
+  // user action as "not visible" (implying failure).
+  if (state.banner_closed) {
+    return "Banner visible; closed by user";
+  }
+  if (!state.adapter_active && !state.demo_fallback_active) {
     return "Adapter inactive";
   }
-  if (!state.wait_state_detected) {
+  if (!state.wait_state_detected && !state.demo_fallback_active && !state.demo_fallback_rendered) {
     return "Waiting for generation state";
   }
-  if (!state.ad_decision_received) {
+  if (!state.ad_decision_received && !state.demo_fallback_rendered) {
     if (state.missing_api_config) {
       return "Generation detected; API not configured";
     }
@@ -171,9 +194,6 @@ export function computeStatusLabel(state: DryRunDiagnosticState): string {
   }
   if (!state.banner_visible) {
     return "Banner attempted; not visible";
-  }
-  if (state.banner_closed) {
-    return "Banner visible; closed by user";
   }
   return "Banner visible";
 }
@@ -278,6 +298,8 @@ export class DryRunDiagnosticsPanel extends DryRunDiagnosticsState {
     this.el.setAttribute("data-content-script-loaded", String(s.content_script_loaded));
     this.el.setAttribute("data-platform-detected", s.platform_detected);
     this.el.setAttribute("data-adapter-active", String(s.adapter_active));
+    this.el.setAttribute("data-demo-fallback-active", String(s.demo_fallback_active));
+    this.el.setAttribute("data-demo-fallback-rendered", String(s.demo_fallback_rendered));
     this.el.setAttribute("data-wait-state-detected", String(s.wait_state_detected));
     this.el.setAttribute("data-ad-decision-received", String(s.ad_decision_received));
     this.el.setAttribute("data-banner-render-attempted", String(s.banner_render_attempted));
@@ -309,6 +331,7 @@ export class DryRunDiagnosticsPanel extends DryRunDiagnosticsState {
         `demo mode: ${yn(s.dry_run_demo_mode)}`,
         `platform detected: ${s.platform_detected === "chatgpt" ? ok("chatgpt") : err("unknown")}`,
         `adapter active: ${yn(s.adapter_active)}`,
+        `demo fallback: ${yn(s.demo_fallback_active)}${s.demo_fallback_rendered ? ok(" rendered") : ""}`,
         `wait-state detected: ${yn(s.wait_state_detected)}`,
         `ad decision received: ${yn(s.ad_decision_received)}`,
         `banner render attempted: ${yn(s.banner_render_attempted)}`,

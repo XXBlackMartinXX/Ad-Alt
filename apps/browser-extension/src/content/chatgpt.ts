@@ -35,7 +35,63 @@ declare const chrome: any;
 // see scripts/audit-browser-extension-zip.js Check 3b, which verifies this.
 declare const PROMPTPROFIT_BUILD_MODE: string;
 
+// ---------------------------------------------------------------------------
+// Internal-beta forced demo fallback (DRYRUN-001)
+// ---------------------------------------------------------------------------
+// The normal path below (adapter.start() -> wait-state detector -> ad-decision
+// round-trip -> render) depends on live ChatGPT selector matching, generation
+// timing, and a service-worker round-trip -- none of which are reliable
+// enough for a deterministic internal-beta dry-run. See
+// docs/internal-beta/dry-runs/DRYRUN-001_DEFINITIVE_BANNER_FIX.md.
+//
+// The fallback below renders a hardcoded placeholder locally, with NO
+// dependency on wait-state detection, apiBaseUrl, or the ad-decision API --
+// only extension-owned storage reads and one already-required kill-switch
+// check. Fully gated behind PROMPTPROFIT_BUILD_MODE === "internal-beta" and
+// never present in a production build (see Check 3b in
+// scripts/audit-browser-extension-zip.js).
+
+/** Minimum time the forced fallback banner stays up unless the user closes it. */
+const FORCED_FALLBACK_MIN_DISPLAY_MS = 12_000;
+
+const FORCED_DEMO_MOMENT: SponsoredMoment = {
+  adDecisionId: "demo-forced-00000000-0000-0000-0000-000000000001",
+  campaignId: "demo-forced-00000000-0000-0000-0000-000000000002",
+  creativeId: "demo-forced-00000000-0000-0000-0000-000000000003",
+  headline: "[PromptProfit Demo] Sponsored Headline Placeholder",
+  body: "Internal dry-run placeholder. Not a real advertisement.",
+  displayUrl: "demo.promptprofit.internal",
+  expiresAt: 0, // overwritten at render time
+};
+
+/**
+ * Resolves once document.body exists, or after timeoutMs elapses. With
+ * `run_at: "document_idle"` this should resolve immediately in practice;
+ * this exists only as a defensive guard against the rare case where the
+ * content script executes before body is attached. Never reads page content.
+ */
+function waitForDocumentBody(timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (document.body) {
+      resolve(true);
+      return;
+    }
+    const start = Date.now();
+    const poll = () => {
+      if (document.body) {
+        resolve(true);
+      } else if (Date.now() - start > timeoutMs) {
+        resolve(false);
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  });
+}
+
 void (async () => {
+  const bodyReady = await waitForDocumentBody(5_000);
   const adapter = new ChatGPTAdapter();
 
   // --------------------------------------------------------------------
@@ -52,6 +108,14 @@ void (async () => {
   // --------------------------------------------------------------------
   const diagnostics: DryRunDiagnosticsPanel | null =
     PROMPTPROFIT_BUILD_MODE === "internal-beta" ? new DryRunDiagnosticsPanel() : null;
+
+  if (!bodyReady) {
+    // No document.body ever appeared -- there is nothing to mount a panel or
+    // banner into. Fail closed silently, matching this file's existing
+    // fail-closed convention for unreachable/unavailable dependencies.
+    return;
+  }
+
   if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
     diagnostics?.update({ extension_loaded: true, content_script_loaded: true, build_mode: "internal-beta" });
     const [demoActive, diagnosticsEnabled] = await Promise.all([
@@ -105,6 +169,59 @@ void (async () => {
     diagnostics?.update({ adapter_active: true, kill_switch_active: false });
   }
 
+  // --------------------------------------------------------------------
+  // Forced internal-beta demo fallback (DRYRUN-001).
+  //
+  // Deliberately independent of wait-state detection: renders immediately
+  // once demo mode is confirmed on, with no dependency on the ad-decision
+  // API, apiBaseUrl, or ChatGPT's live DOM selectors. `forcedFallbackActive`
+  // both (a) protects this banner's minimum display window from being torn
+  // down by a real (possibly fleeting) wait-state-end event, and (b)
+  // prevents the normal wait-state path from rendering a duplicate banner
+  // while this one is still showing.
+  // --------------------------------------------------------------------
+  let forcedFallbackActive = false;
+  if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+    const demoActive = await isDryRunDemoModeActive();
+    diagnostics?.update({ dry_run_demo_mode: demoActive });
+    if (demoActive) {
+      diagnostics?.update({ demo_fallback_active: true, banner_render_attempted: true });
+      const moment: SponsoredMoment = {
+        ...FORCED_DEMO_MOMENT,
+        expiresAt: Date.now() + FORCED_FALLBACK_MIN_DISPLAY_MS + 60_000,
+      };
+      await adapter.renderSponsoredMoment(moment, () => {
+        // User explicitly dismissed the fallback banner — stop protecting it
+        // so the normal wait-state path can render again on a future cycle.
+        forcedFallbackActive = false;
+        diagnostics?.update({ banner_closed: true, banner_visible: false });
+      });
+      const fallbackEl = document.getElementById("promptprofit-sponsored-banner");
+      const rendered = fallbackEl !== null;
+      const visible = isElementVisible(fallbackEl);
+      forcedFallbackActive = rendered;
+      diagnostics?.update({
+        demo_fallback_rendered: rendered,
+        ad_decision_requested: true,
+        ad_decision_received: rendered,
+        banner_rendered: rendered,
+        banner_visible: visible,
+        last_error_code: !rendered ? "banner_render_failed" : !visible ? "banner_not_visible" : "none",
+      });
+      if (rendered) {
+        setTimeout(() => {
+          // Only auto-hide if still the same fallback banner and not already
+          // closed by the user (forcedFallbackActive would be false then).
+          if (forcedFallbackActive && document.getElementById("promptprofit-sponsored-banner")) {
+            forcedFallbackActive = false;
+            void adapter.removeSponsoredMoment();
+            diagnostics?.update({ banner_visible: false });
+          }
+        }, FORCED_FALLBACK_MIN_DISPLAY_MS);
+      }
+    }
+  }
+
   const viewabilityObserver = new ViewabilityObserver();
   let waitStateStartedAtMs: number | null = null;
 
@@ -117,6 +234,11 @@ void (async () => {
         wait_state_started_at: event.startedAt.toISOString(),
       });
     }
+
+    // The forced fallback banner is already showing this exact demo content —
+    // skip re-fetching/re-rendering to avoid a duplicate banner or duplicate
+    // telemetry. wait_state_detected above is still recorded correctly.
+    if (forcedFallbackActive) return;
 
     // Request an ad decision from the service-worker (which calls the API)
     debugPanel.update({ adDecisionRequested: true });
@@ -214,6 +336,11 @@ void (async () => {
     if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
       diagnostics?.update({ wait_state_detected: false });
     }
+    // Protect the forced fallback banner from being torn down by a real
+    // (possibly very short) wait-state ending before its minimum display
+    // window elapses — this is the exact "banner flashes then vanishes"
+    // failure mode this fallback exists to eliminate.
+    if (forcedFallbackActive) return;
     await adapter.removeSponsoredMoment();
   });
 

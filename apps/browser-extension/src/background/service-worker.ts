@@ -206,33 +206,81 @@ async function getAdDecision(adapterId: string): Promise<Record<string, unknown>
   }
 }
 
-// On first install, write safe default flags so the kill-switch starts OFF.
-// Without this, cachedFlags defaults to FALLBACK_FLAGS_DISABLED (kill-switch ON),
-// which silently blocks the banner on fresh installs with no prior storage.
-chrome.runtime.onInstalled.addListener(({ reason }: { reason: string }) => {
-  if (reason === "install") {
-    chrome.storage.local.get("featureFlags").then((stored: Record<string, unknown>) => {
-      if (!isValidFeatureFlags(stored["featureFlags"])) {
-        const defaultFlags: FeatureFlags = { killSwitchEnabled: false, disabledAdapters: [], flags: {} };
-        const items: Record<string, unknown> = { featureFlags: defaultFlags };
-        // Internal-beta: enable demo mode and live dry-run diagnostics so the
-        // banner (and the diagnostic panel) show without any manual setup.
-        // This branch is unreachable at runtime in production builds (the
-        // build-time constant is always "production" there); the production
-        // build pipeline additionally minifies to strip this source text, and
-        // scripts/audit-browser-extension-zip.js fails a public-release ZIP
-        // if these strings are found in the shipped service worker.
-        if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
-          items["dryRunDemoMode"] = true;
-          items["dryRunDiagnosticsEnabled"] = true;
-        }
-        chrome.storage.local.set(items).catch(() => {});
-        cachedFlags = defaultFlags;
-        flagsFetchedAt = Date.now();
+/**
+ * Ensures safe defaults exist in storage: kill-switch OFF (always), and for
+ * internal-beta builds only, dryRunDemoMode/dryRunDiagnosticsEnabled ON.
+ *
+ * "Ensures", not "forces": each key is written ONLY when genuinely absent
+ * (`typeof stored[key] !== expected type`), never when a tester has
+ * deliberately set it to a different value (e.g. turned demo mode off to
+ * test the no-demo path). This is what makes it safe to call on every
+ * `onInstalled` reason (not just "install") and on service-worker startup,
+ * repairing state that an "update" reason would otherwise skip entirely.
+ *
+ * Internal-beta only: this whole function body is unreachable at runtime in
+ * a production build (the build-time constant is always "production"
+ * there); the production build pipeline additionally minifies to strip this
+ * source text, and scripts/audit-browser-extension-zip.js Check 3b fails a
+ * public-release ZIP if any of these strings are found in the shipped
+ * service worker.
+ */
+async function ensureDryRunDefaults(): Promise<void> {
+  try {
+    const stored = (await chrome.storage.local.get(["featureFlags"])) as Record<string, unknown>;
+
+    const items: Record<string, unknown> = {};
+
+    if (!isValidFeatureFlags(stored["featureFlags"])) {
+      const defaultFlags: FeatureFlags = { killSwitchEnabled: false, disabledAdapters: [], flags: {} };
+      items["featureFlags"] = defaultFlags;
+      cachedFlags = defaultFlags;
+      flagsFetchedAt = Date.now();
+    }
+
+    // The "dryRunDemoMode"/"dryRunDiagnosticsEnabled" key names are only ever
+    // read (or written) inside this branch, specifically so esbuild's
+    // minifier can dead-code-eliminate this whole block — including these
+    // string literals — from a production build. Reading them unconditionally
+    // above (even just to decide whether to write a default) would keep the
+    // literal key names in the production bundle regardless of whether the
+    // write itself was gated, which defeats Check 3b's guarantee.
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+      const dryRunStored = (await chrome.storage.local.get([
+        "dryRunDemoMode",
+        "dryRunDiagnosticsEnabled",
+      ])) as Record<string, unknown>;
+      if (typeof dryRunStored["dryRunDemoMode"] !== "boolean") {
+        items["dryRunDemoMode"] = true;
       }
-    }).catch(() => {});
+      if (typeof dryRunStored["dryRunDiagnosticsEnabled"] !== "boolean") {
+        items["dryRunDiagnosticsEnabled"] = true;
+      }
+    }
+
+    if (Object.keys(items).length > 0) {
+      await chrome.storage.local.set(items);
+    }
+  } catch {
+    // Storage unavailable — leave existing state as-is; other call sites
+    // already fail closed (e.g. FALLBACK_FLAGS_DISABLED) when storage is empty.
+  }
+}
+
+// Repair on install AND update — an "install"-only listener misses the case
+// where a tester loads a new ZIP into the same unpacked-extension ID Chrome
+// previously assigned (common when iterating on a dry-run), which fires
+// "update" rather than "install" and would otherwise silently skip writing
+// dryRunDemoMode/dryRunDiagnosticsEnabled.
+chrome.runtime.onInstalled.addListener(({ reason }: { reason: string }) => {
+  if (reason === "install" || reason === "update") {
+    void ensureDryRunDefaults();
   }
 });
+
+// Repair on every service-worker startup too (MV3 service workers restart
+// frequently). Cheap: one storage read, and a write only when something is
+// genuinely missing — never overrides a deliberately-set value.
+void ensureDryRunDefaults();
 
 chrome.runtime.onMessage.addListener(
   (message: Record<string, unknown>, _sender: unknown, sendResponse: (r: unknown) => void) => {

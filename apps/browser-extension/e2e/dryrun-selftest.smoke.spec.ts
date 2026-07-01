@@ -1,11 +1,18 @@
 /**
- * Dry-run selftest: verifies the sponsored banner renders without any API
- * configuration by relying on internal demo mode (dryRunDemoMode: true).
+ * Dry-run selftest: verifies the sponsored banner renders DETERMINISTICALLY
+ * via the internal-beta forced demo fallback (dryRunDemoMode: true), with NO
+ * dependency on wait-state detection, ChatGPT selector matching, generation
+ * timing, or apiBaseUrl/the ad-decision API.
  *
  * This spec is the automated gate for DRYRUN-001 scheduling. It must pass
  * before a human tester is asked to run the dry-run. If it fails, the wrapper
  * script (scripts/dryrun-001-selftest.js) prints "BLOCKED BEFORE HUMAN TEST"
  * and exits non-zero.
+ *
+ * Critically, the primary test below never calls window.fixtureStartWait().
+ * If it required that call to pass, it would only be proving the OLD
+ * wait-state-dependent path all over again -- exactly the thing that kept
+ * failing on real ChatGPT. See DRYRUN-001_DEFINITIVE_BANNER_FIX.md.
  *
  * PRIVACY: No real ChatGPT content, user data, screenshots, or API responses
  * are captured here. The fixture page is entirely synthetic.
@@ -74,27 +81,25 @@ test.afterAll(async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Gate test: banner must render with demo mode and NO apiBaseUrl
+// PRIMARY GATE: forced demo fallback renders with NO wait-state trigger at all
 // ---------------------------------------------------------------------------
 
-test('dryrun-selftest: banner renders in demo mode without API config', async () => {
+test('dryrun-selftest: forced internal-beta demo fallback banner rendered (no wait-state, no apiBaseUrl)', async () => {
   // Configure storage: demo mode ON, kill-switch OFF, no apiBaseUrl.
   // This mirrors a fresh internal-beta install where onInstalled writes these defaults.
   await configureExtensionStorage(extensionContext, {
     dryRunDemoMode: true,
     killSwitchEnabled: false,
     disabledAdapters: [],
-    // apiBaseUrl intentionally omitted — this is the key constraint being tested.
+    // apiBaseUrl intentionally omitted — the forced fallback must not need it.
   });
 
   const page = await openFixturePage(extensionContext, fileServerPort);
 
-  // Trigger the ChatGPT wait-state signal in the fixture page.
-  // This adds [data-testid="stop-button"] to the DOM, which the MutationObserver picks up.
-  await page.evaluate(() => (window as unknown as { fixtureStartWait: () => void }).fixtureStartWait());
-
-  // Wait for the sponsored banner to appear.
-  // Timeout of 5 s gives the service worker round-trip and MutationObserver throttle time.
+  // Deliberately do NOT call window.fixtureStartWait(). The forced fallback
+  // must render on its own, driven only by extension load + demo mode +
+  // supported host + kill-switch off -- proving the banner no longer depends
+  // on wait-state selector matching or generation timing.
   await expect(page.locator('#promptprofit-sponsored-banner')).toBeVisible({ timeout: 5_000 });
 
   // Verify the banner contains the expected demo content.
@@ -105,15 +110,46 @@ test('dryrun-selftest: banner renders in demo mode without API config', async ()
   const closeBtn = page.locator('button[aria-label="Dismiss sponsored moment"]');
   await expect(closeBtn).toBeVisible();
 
+  // Confirm no stop-button / wait-state signal was ever present on this page
+  // (this fixture never had fixtureStartWait() called) -- the banner appeared
+  // despite that, which is exactly the property being verified.
+  const stopButton = await page.$('[data-testid="stop-button"]');
+  expect(stopButton).toBeNull();
+
   // Click close — banner must be removed from DOM.
   await closeBtn.click();
   await expect(page.locator('#promptprofit-sponsored-banner')).toBeHidden({ timeout: 2_000 });
 
   await page.close();
+
+  // eslint-disable-next-line no-console
+  console.log('PASS: forced internal-beta demo fallback banner rendered');
 });
 
 // ---------------------------------------------------------------------------
-// Sanity check: kill-switch still blocks the banner even in demo mode
+// Backward-compatibility check: the normal wait-state path still works too
+// (demo mode content is identical either way; this just proves the older
+// path was not broken by adding the fallback).
+// ---------------------------------------------------------------------------
+
+test('dryrun-selftest: banner also renders via the normal wait-state path in demo mode', async () => {
+  await configureExtensionStorage(extensionContext, {
+    dryRunDemoMode: true,
+    killSwitchEnabled: false,
+    disabledAdapters: [],
+  });
+
+  const page = await openFixturePage(extensionContext, fileServerPort);
+  await page.evaluate(() => (window as unknown as { fixtureStartWait: () => void }).fixtureStartWait());
+
+  await expect(page.locator('#promptprofit-sponsored-banner')).toBeVisible({ timeout: 5_000 });
+
+  await page.close();
+});
+
+// ---------------------------------------------------------------------------
+// Sanity check: kill-switch still blocks the banner even in demo mode,
+// including the forced fallback path (no wait-state trigger needed here either).
 // ---------------------------------------------------------------------------
 
 test('dryrun-selftest: kill-switch blocks banner even with demo mode', async () => {
@@ -124,11 +160,11 @@ test('dryrun-selftest: kill-switch blocks banner even with demo mode', async () 
   });
 
   const page = await openFixturePage(extensionContext, fileServerPort);
-  await page.evaluate(() => (window as unknown as { fixtureStartWait: () => void }).fixtureStartWait());
 
   await page.waitForTimeout(SETTLE_MS);
 
-  // Kill-switch must suppress the banner regardless of demo mode.
+  // Kill-switch must suppress the banner regardless of demo mode, even
+  // without ever triggering a wait-state.
   await expect(page.locator('#promptprofit-sponsored-banner')).toBeHidden();
 
   await page.close();

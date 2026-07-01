@@ -44,6 +44,16 @@ describe("DryRunDiagnosticsState -- defaults", () => {
     expect(s.getState().last_error_code).toBe("none");
   });
 
+  it("starts with demo_fallback_active false", () => {
+    const s = new DryRunDiagnosticsState();
+    expect(s.getState().demo_fallback_active).toBe(false);
+  });
+
+  it("starts with demo_fallback_rendered false", () => {
+    const s = new DryRunDiagnosticsState();
+    expect(s.getState().demo_fallback_rendered).toBe(false);
+  });
+
   it("default state matches DEFAULT_DRYRUN_DIAGNOSTIC_STATE", () => {
     const s = new DryRunDiagnosticsState();
     expect(s.getState()).toEqual(DEFAULT_DRYRUN_DIAGNOSTIC_STATE);
@@ -141,6 +151,8 @@ describe("DryRunDiagnosticsState -- privacy safety", () => {
       content_script_loaded: true,
       platform_detected: "chatgpt",
       adapter_active: true,
+      demo_fallback_active: true,
+      demo_fallback_rendered: true,
       wait_state_detected: true,
       wait_state_started_at: new Date(0).toISOString(),
       wait_state_duration_ms: 500,
@@ -282,6 +294,52 @@ describe("computeStatusLabel", () => {
     state.banner_rendered = true;
     state.banner_visible = true;
     expect(computeStatusLabel(state)).toBe("Banner visible");
+  });
+
+  it("reports banner visible via the forced demo fallback with no wait-state and no adapter_active", () => {
+    // This is the deterministic DRYRUN-001 fallback path: adapter_active and
+    // wait_state_detected are both still false (no real generation ever
+    // occurred), yet the banner is up because demo_fallback_active/rendered
+    // bypass those preconditions.
+    const state = base();
+    state.extension_loaded = true;
+    state.content_script_loaded = true;
+    state.platform_detected = "chatgpt";
+    state.demo_fallback_active = true;
+    state.demo_fallback_rendered = true;
+    state.banner_render_attempted = true;
+    state.banner_rendered = true;
+    state.banner_visible = true;
+    expect(computeStatusLabel(state)).toBe("Banner visible");
+  });
+
+  it("reports a distinct pending state while the forced fallback is active but not yet rendered", () => {
+    const state = base();
+    state.extension_loaded = true;
+    state.content_script_loaded = true;
+    state.platform_detected = "chatgpt";
+    state.demo_fallback_active = true;
+    // demo_fallback_rendered still false, banner_render_attempted still false
+    expect(computeStatusLabel(state)).not.toBe("Waiting for generation state");
+    expect(computeStatusLabel(state)).not.toBe("Adapter inactive");
+  });
+
+  it("reports 'closed by user' instead of 'not visible' after the banner is closed", () => {
+    // Regression test: banner_closed must be checked before banner_visible,
+    // since closing the banner correctly resets banner_visible to false —
+    // without this ordering, a deliberate close would misreport as a failure.
+    const state = base();
+    state.extension_loaded = true;
+    state.content_script_loaded = true;
+    state.platform_detected = "chatgpt";
+    state.adapter_active = true;
+    state.wait_state_detected = true;
+    state.ad_decision_received = true;
+    state.banner_render_attempted = true;
+    state.banner_rendered = true;
+    state.banner_visible = false;
+    state.banner_closed = true;
+    expect(computeStatusLabel(state)).toBe("Banner visible; closed by user");
   });
 });
 

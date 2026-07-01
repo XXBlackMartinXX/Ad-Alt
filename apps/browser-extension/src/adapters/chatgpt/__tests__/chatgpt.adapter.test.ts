@@ -81,6 +81,11 @@ describe("ChatGPTAdapter — canActivate", () => {
     expect(await adapter.canActivate()).toBe(true);
   });
 
+  it("resolves true on www.chatgpt.com", async () => {
+    const { adapter } = makeAdapter("www.chatgpt.com");
+    expect(await adapter.canActivate()).toBe(true);
+  });
+
   it("resolves false on gemini.google.com", async () => {
     const { adapter } = makeAdapter("gemini.google.com");
     expect(await adapter.canActivate()).toBe(false);

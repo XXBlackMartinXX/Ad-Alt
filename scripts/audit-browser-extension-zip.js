@@ -273,6 +273,11 @@ const FORBIDDEN_INTERNAL_BETA_STRINGS = [
   'DEMO_AD_DECISION',
   'promptprofit-dryrun-diagnostics',
   'DryRunDiagnostics',
+  'demo_fallback_active',
+  'demo_fallback_rendered',
+  'FORCED_DEMO_MOMENT',
+  'demo-forced-',
+  'ensureDryRunDefaults',
 ];
 
 const jsEntries = entries.filter(e => e.name.replace(/\\/g, '/').endsWith('.js'));

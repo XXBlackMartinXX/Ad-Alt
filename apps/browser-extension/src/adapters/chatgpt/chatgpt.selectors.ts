@@ -25,9 +25,15 @@ export const CHATGPT_PROCESSING_SELECTORS = [
 /**
  * Hostnames where the ChatGPT adapter should activate.
  * Only exact hostname matches are accepted — no subdomain wildcards.
+ *
+ * "www.chatgpt.com" is included defensively: OpenAI does not currently serve
+ * ChatGPT there (chatgpt.com is canonical), but matching it costs nothing if
+ * it's never visited, and protects against it being used in the future or by
+ * some intermediate redirect/proxy a tester's network applies.
  */
 export const CHATGPT_HOSTNAMES = [
   "chatgpt.com",
+  "www.chatgpt.com",
   "chat.openai.com",
 ] as const;
 

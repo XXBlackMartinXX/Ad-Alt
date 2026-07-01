@@ -288,3 +288,78 @@ test('diagnostic panel attributes contain no forbidden data', async () => {
 
   await page.close();
 });
+
+// ---------------------------------------------------------------------------
+// 9. Forced demo fallback renders even when wait-state selectors never match
+//    (no window.fixtureStartWait() call anywhere in this test)
+// ---------------------------------------------------------------------------
+
+test('forced demo fallback renders banner and diagnostics without any wait-state trigger', async () => {
+  const page = await openConfiguredPage({ dryRunDemoMode: true, apiBaseUrl: '' });
+
+  // Deliberately never call fixtureStartWait() — the stop-button selector
+  // never appears, so the normal wait-state path could never fire.
+  await expect(page.locator('#promptprofit-sponsored-banner')).toBeVisible({ timeout: 5_000 });
+
+  const panel = page.locator(PANEL_SELECTOR);
+  await expect(panel).toHaveAttribute('data-demo-fallback-active', 'true');
+  await expect(panel).toHaveAttribute('data-demo-fallback-rendered', 'true');
+  await expect(panel).toHaveAttribute('data-banner-visible', 'true');
+  expect(await panel.getAttribute('data-status-label')).toBe('Banner visible');
+
+  // Confirm no stop-button was ever present (proves this isn't the wait-state path).
+  const stopButton = await page.$('[data-testid="stop-button"]');
+  expect(stopButton).toBeNull();
+
+  await page.close();
+});
+
+// ---------------------------------------------------------------------------
+// 10. Forced demo fallback sends NO billing/event telemetry
+// ---------------------------------------------------------------------------
+
+test('forced demo fallback does not send billing/event telemetry', async () => {
+  // apiBaseUrl points at the real mock server this time — if the fallback
+  // path called any of the ad-event-sender functions, POST /v1/events would
+  // be captured here. It must not be, for any reason (this is a synthetic
+  // placeholder banner, not a billable impression).
+  const page = await openConfiguredPage({ dryRunDemoMode: true });
+
+  await expect(page.locator('#promptprofit-sponsored-banner')).toBeVisible({ timeout: 5_000 });
+
+  // Give any (incorrect) async telemetry call time to land before asserting.
+  await page.waitForTimeout(CONTENT_SCRIPT_SETTLE_MS);
+
+  expect(mockApi.getCapturedEvents()).toHaveLength(0);
+
+  await page.close();
+});
+
+// ---------------------------------------------------------------------------
+// 11. No duplicate banners when a real wait-state fires after the forced
+//     fallback is already showing (SPA-like: content script stays loaded,
+//     a later generation cycle must not create a second banner element)
+// ---------------------------------------------------------------------------
+
+test('no duplicate banners when wait-state fires after the forced fallback is already visible', async () => {
+  const page = await openConfiguredPage({ dryRunDemoMode: true, apiBaseUrl: '' });
+
+  await expect(page.locator('#promptprofit-sponsored-banner')).toBeVisible({ timeout: 5_000 });
+
+  // Now trigger a real wait-state cycle while the forced fallback banner is
+  // still up. This must not create a second banner element or re-attempt a
+  // render — the existing banner (and only it) must remain.
+  await page.evaluate('window.fixtureStartWait()');
+  await page.waitForTimeout(CONTENT_SCRIPT_SETTLE_MS);
+  await page.evaluate('window.fixtureEndWait()');
+  await page.waitForTimeout(CONTENT_SCRIPT_SETTLE_MS);
+
+  const banners = await page.$$('#promptprofit-sponsored-banner');
+  expect(banners).toHaveLength(1);
+
+  // The forced fallback banner must still be visible — a real (fleeting)
+  // wait-state ending must not tear it down before its protected window.
+  await expect(page.locator('#promptprofit-sponsored-banner')).toBeVisible();
+
+  await page.close();
+});

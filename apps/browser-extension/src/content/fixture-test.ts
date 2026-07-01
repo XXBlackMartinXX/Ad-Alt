@@ -41,6 +41,21 @@ declare const chrome: any;
 // to "internal-beta" so the diagnostics panel can be exercised in E2E tests.
 declare const PROMPTPROFIT_BUILD_MODE: string;
 
+// Mirrors the forced internal-beta demo fallback in chatgpt.ts exactly, so
+// e2e/dryrun-selftest.smoke.spec.ts and e2e/dryrun-diagnostics.smoke.spec.ts
+// exercise the identical deterministic behavior shipped to testers.
+const FORCED_FALLBACK_MIN_DISPLAY_MS = 12_000;
+
+const FORCED_DEMO_MOMENT: SponsoredMoment = {
+  adDecisionId: "demo-forced-00000000-0000-0000-0000-000000000001",
+  campaignId: "demo-forced-00000000-0000-0000-0000-000000000002",
+  creativeId: "demo-forced-00000000-0000-0000-0000-000000000003",
+  headline: "[PromptProfit Demo] Sponsored Headline Placeholder",
+  body: "Internal dry-run placeholder. Not a real advertisement.",
+  displayUrl: "demo.promptprofit.internal",
+  expiresAt: 0,
+};
+
 void (async () => {
   // Override getHostname so canActivate() passes on the local fixture origin.
   const adapter = new ChatGPTAdapter({
@@ -111,6 +126,45 @@ void (async () => {
     diagnostics?.update({ adapter_active: true, kill_switch_active: false });
   }
 
+  // Forced internal-beta demo fallback — see chatgpt.ts for full rationale.
+  let forcedFallbackActive = false;
+  if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+    const demoActive = await isDryRunDemoModeActive();
+    diagnostics?.update({ dry_run_demo_mode: demoActive });
+    if (demoActive) {
+      diagnostics?.update({ demo_fallback_active: true, banner_render_attempted: true });
+      const moment: SponsoredMoment = {
+        ...FORCED_DEMO_MOMENT,
+        expiresAt: Date.now() + FORCED_FALLBACK_MIN_DISPLAY_MS + 60_000,
+      };
+      await adapter.renderSponsoredMoment(moment, () => {
+        forcedFallbackActive = false;
+        diagnostics?.update({ banner_closed: true, banner_visible: false });
+      });
+      const fallbackEl = document.getElementById("promptprofit-sponsored-banner");
+      const rendered = fallbackEl !== null;
+      const visible = isElementVisible(fallbackEl);
+      forcedFallbackActive = rendered;
+      diagnostics?.update({
+        demo_fallback_rendered: rendered,
+        ad_decision_requested: true,
+        ad_decision_received: rendered,
+        banner_rendered: rendered,
+        banner_visible: visible,
+        last_error_code: !rendered ? "banner_render_failed" : !visible ? "banner_not_visible" : "none",
+      });
+      if (rendered) {
+        setTimeout(() => {
+          if (forcedFallbackActive && document.getElementById("promptprofit-sponsored-banner")) {
+            forcedFallbackActive = false;
+            void adapter.removeSponsoredMoment();
+            diagnostics?.update({ banner_visible: false });
+          }
+        }, FORCED_FALLBACK_MIN_DISPLAY_MS);
+      }
+    }
+  }
+
   const viewabilityObserver = new ViewabilityObserver();
   // Test-only: timer handle used when IntersectionObserver is bypassed.
   let testViewabilityTimer: ReturnType<typeof setTimeout> | null = null;
@@ -125,6 +179,8 @@ void (async () => {
         wait_state_started_at: event.startedAt.toISOString(),
       });
     }
+
+    if (forcedFallbackActive) return;
 
     // Request an ad decision from the service-worker (which calls the mock API).
     debugPanel.update({ adDecisionRequested: true });
@@ -242,6 +298,7 @@ void (async () => {
     if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
       diagnostics?.update({ wait_state_detected: false });
     }
+    if (forcedFallbackActive) return;
     await adapter.removeSponsoredMoment();
   });
 
