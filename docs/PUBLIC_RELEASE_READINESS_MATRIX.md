@@ -210,3 +210,23 @@ The following must ALL be PASS before billing goes to production:
 These are documented blockers. The core adapter, event pipeline, billing
 invariant, privacy model, and packaging scripts are all functioning correctly
 for internal beta distribution.
+
+---
+
+## Internal Beta Release Packet
+
+The internal beta release packet (`docs/internal-beta/`) contains:
+
+- `README.md` — Go/No-Go table and overall beta status
+- `BETA_TESTER_INSTALLATION_GUIDE.md` — Installation steps and privacy warnings
+- `BETA_TEST_PLAN.md` — Test plan with pass/fail criteria and commands
+- `RISK_REGISTER.md` — Risk table with mitigation status
+- `STAKEHOLDER_DECISION_CHECKLIST.md` — Decisions required before public release
+- `PRIVACY_SECURITY_ONE_PAGER.md` — What data is and is not collected
+- `BILLING_VERIFICATION_SUMMARY.md` — Local billing results and production blockers
+- `RELEASE_MANAGER_CHECKLIST.md` — Step-by-step pre-release checklist
+- `PR_DESCRIPTION_TEMPLATE.md` — PR description template
+- `INTERNAL_BETA_RELEASE_NOTES.md` — Product-facing release notes
+- `INDEX.md` — Navigation index
+
+Verify completeness: `pnpm check:internal-beta-packet`

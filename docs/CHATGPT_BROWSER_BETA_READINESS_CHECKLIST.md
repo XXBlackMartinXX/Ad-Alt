@@ -314,3 +314,16 @@ Three outstanding blockers (LICENSE decision, final brand icons, and staging bil
 reconciliation) do not affect core adapter correctness or internal beta testing.
 These are hard gates for CWS submission, Marketplace submission, and production
 billing respectively. See docs/PUBLIC_RELEASE_READINESS_MATRIX.md for the full matrix.
+
+---
+
+## Internal Beta Release Packet
+
+A complete internal beta handoff packet is available in `docs/internal-beta/`.
+It contains tester installation guides, a test plan, risk register, stakeholder
+decision checklist, privacy one-pager, billing summary, release manager checklist,
+PR template, and release notes.
+
+Verify packet completeness: `pnpm check:internal-beta-packet`
+
+See `docs/internal-beta/INDEX.md` for navigation.

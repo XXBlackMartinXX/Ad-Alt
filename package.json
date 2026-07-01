@@ -51,7 +51,8 @@
     "check:report-ascii": "node scripts/check-report-templates-ascii.js",
     "check:license": "node scripts/check-license-decision.js",
     "check:billing:reconciliation": "node scripts/check-billing-reconciliation-readiness.js",
-    "icons:create": "node scripts/create-placeholder-icons.mjs"
+    "icons:create": "node scripts/create-placeholder-icons.mjs",
+    "check:internal-beta-packet": "node scripts/check-internal-beta-packet.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
