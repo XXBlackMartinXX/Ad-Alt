@@ -37,8 +37,10 @@ The `dry-runs/` subdirectory contains detailed execution documents for DRYRUN-00
 | [dry-runs/PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md](./dry-runs/PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md) | Privacy-safe issue capture form with evidence safety checklist |
 | [dry-runs/GO_NO_GO_DECISION_RECORD.md](./dry-runs/GO_NO_GO_DECISION_RECORD.md) | Decision record for DRYRUN-001 (PENDING until execution) |
 | [dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md](./dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md) | Post-session triage agenda, severity assignment, escalation paths |
-| [dry-runs/DRY_RUN_STATUS_TRACKER.md](./dry-runs/DRY_RUN_STATUS_TRACKER.md) | All dry-run sessions and their current status |
+| [dry-runs/DRY_RUN_STATUS_TRACKER.md](./dry-runs/DRY_RUN_STATUS_TRACKER.md) | All dry-run sessions and their current status (INCONCLUSIVE) |
 | [dry-runs/DRYRUN-001_OWNER_READY_NOTE.md](./dry-runs/DRYRUN-001_OWNER_READY_NOTE.md) | DRYRUN-001 owner-ready note: current state, commands, checklist, criteria |
+| [dry-runs/TROUBLESHOOTING_BANNER_NOT_OBSERVED.md](./dry-runs/TROUBLESHOOTING_BANNER_NOT_OBSERVED.md) | Checklist for diagnosing banner not appearing; logged-in requirement; quick fix commands |
+| [dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md](./dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md) | Record of inconclusive first attempt; root cause hypotheses; rerun prerequisites |
 
 ---
 
@@ -105,6 +107,7 @@ The `dry-runs/` subdirectory contains detailed execution documents for DRYRUN-00
 pnpm -w run dryrun:001:prepare    # Before session: all checks + package + create draft + print human steps
 pnpm -w run dryrun:001:finalize   # After session: interactive CLI to record results and update docs
 pnpm -w run check:dryrun:001      # Validate DRYRUN-001 state at any time
+pnpm -w run dryrun:001:diagnose   # Diagnose setup issues (branch, dist/, ZIP, Chrome load path)
 
 # Verify internal beta packet
 pnpm -w run check:internal-beta-packet

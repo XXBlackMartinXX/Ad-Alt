@@ -15,7 +15,7 @@
 
 | ID | Date | Tester | Track | Status | Decision | Result Log | Notes |
 |----|------|--------|-------|--------|----------|------------|-------|
-| DRYRUN-001 | [DATE TBD] | [TESTER TBD] | [A / B] | READY TO RUN | PENDING | [FILE TBD] | Packet verified; all pre-run checks pass; awaiting tester scheduling |
+| DRYRUN-001 | 2026-07-01 | [non-engineer] | A | INCONCLUSIVE | HOLD | DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md | Attempted; banner not observed; tester logged out; rerun required |
 
 ---
 
@@ -28,6 +28,8 @@
 | SCHEDULED | Session scheduled; tester confirmed; date set |
 | IN PROGRESS | Session actively running |
 | COMPLETED | Session finished; result log filed; triage done |
+| INCONCLUSIVE | Session attempted but key observations could not be confirmed; rerun required |
+| READY TO RERUN | Setup issues identified and resolved; rerun scheduled |
 | BLOCKED | Session could not complete; blocking issue found |
 | CANCELLED | Session cancelled before running |
 
@@ -60,18 +62,19 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 | Field | Value |
 |-------|-------|
-| Status | READY TO RUN |
-| Decision | PENDING |
+| Status | INCONCLUSIVE |
+| Decision | HOLD |
 | Worksheet | docs/internal-beta/dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md |
 | Owner-Ready Note | docs/internal-beta/dry-runs/DRYRUN-001_OWNER_READY_NOTE.md |
-| Result Log | [To be filed after session: DRY_RUN_RESULT_LOG_DRYRUN-001.md] |
-| Issues Found | NOT OBSERVED YET |
-| Open S0 | NOT OBSERVED YET |
-| Open S1 | NOT OBSERVED YET |
-| Privacy Result | NOT OBSERVED YET |
+| Inconclusive Note | docs/internal-beta/dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md |
+| Result Log | [No result log -- session inconclusive; rerun required] |
+| Issues Found | NOT OBSERVED (session inconclusive) |
+| Open S0 | NONE OBSERVED |
+| Open S1 | NONE OBSERVED (banner not observed is inconclusive, not confirmed S1) |
+| Privacy Result | CLEAN -- no privacy/security issue observed |
 | Billing Result | NOT OBSERVED IN REAL TESTER RUN |
-| Rollback Result | NOT OBSERVED YET |
-| Notes | Packet fully verified (35802c9). All pre-run checks pass. Awaiting tester scheduling. |
+| Rollback Result | NOT CONFIRMED -- session did not reach uninstall step |
+| Notes | Attempted 2026-07-01. Banner not observed; tester appeared logged out. Rerun required. See DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md and TROUBLESHOOTING_BANNER_NOT_OBSERVED.md. |
 
 ---
 
@@ -89,10 +92,12 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 ## Summary
 
-**Total dry-run sessions:** 1 prepared, 0 completed
+**Total dry-run sessions:** 1 attempted (inconclusive), 0 completed
 
 **Current beta phase status:**
-- Dry-run packet: READY (all checks pass at 35802c9)
-- DRYRUN-001: READY TO RUN (not executed; awaiting tester scheduling)
+- Dry-run packet: READY (all checks pass)
+- DRYRUN-001: INCONCLUSIVE / HOLD (attempted 2026-07-01; banner not observed; rerun required)
 - Wider beta (Day 2-3): BLOCKED on DRYRUN-001 GO decision
 - Public release: BLOCKED (LICENSE, icons, VSIX, staging reconciliation pending)
+
+**Next action:** Owner runs `pnpm -w run dryrun:001:diagnose`, confirms tester is logged into chatgpt.com, then schedules DRYRUN-001 rerun.

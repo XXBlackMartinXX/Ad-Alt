@@ -74,6 +74,8 @@ Verify all automated checks pass before distributing the package:
 - [ ] Tester has read privacy rules (PRIVACY_SECURITY_ONE_PAGER.md or summary provided)
 - [ ] Beta ZIP delivered to tester via secure internal channel (NOT unencrypted email or public link)
 - [ ] FIRST_TESTER_DRY_RUN_WORKSHEET.md is available to owner during session
+- [ ] Tester confirmed they have a chatgpt.com account and CAN log in before starting
+- [ ] Owner has shared TROUBLESHOOTING_BANNER_NOT_OBSERVED.md (or summary) with tester
 
 **Pre-Run Checklist Completed By:** [OWNER TBD] -- [DATE TBD]
 
@@ -113,10 +115,25 @@ Track B additions (Engineer):
 
 **Forbidden prompts:** any prompt containing personal data, work content, or sensitive information.
 
-- [ ] Tester navigated to https://chatgpt.com and logged in
-- [ ] Tester opened a new chat (not an existing conversation)
+**LOGGED-IN PREREQUISITE (MUST confirm before proceeding):**
+- [ ] Tester confirmed they are logged into chatgpt.com (no "Log in" / "Sign up" visible)
+  If NOT logged in: STOP. Have tester log in first. Banner will not appear without authentication.
+
+**What you should see (banner description for the owner's reference):**
+While ChatGPT is generating (the streaming phase), watch the BOTTOM-RIGHT corner.
+A small rectangular overlay banner should appear with:
+  - Placeholder headline text
+  - Placeholder body line
+  - Placeholder display URL
+  - An X (close) button
+The banner is NOT a real advertisement. It is placeholder content for internal testing only.
+If no banner appears within 5 seconds of the response starting: record "banner not observed."
+
+- [ ] Tester navigated to https://chatgpt.com and confirmed they are logged in
+- [ ] Tester opened a NEW chat (click "New chat" in sidebar -- NOT an existing conversation)
 - [ ] Tester typed exactly: Count slowly from 1 to 10.
 - [ ] Tester pressed Enter / sent the prompt
+- [ ] Owner/tester both watched the BOTTOM-RIGHT corner during ChatGPT generation
 - [ ] While ChatGPT was generating, an overlay banner appeared in the bottom-right viewport area
 - [ ] Banner showed: placeholder headline text
 - [ ] Banner showed: placeholder body text

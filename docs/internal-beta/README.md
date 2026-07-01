@@ -158,6 +158,7 @@ Verify rollout packet: `pnpm -w run check:internal-beta-rollout`
 | `pnpm -w run dryrun:001:prepare` | Before the tester session: checks, package, draft, human steps |
 | `pnpm -w run dryrun:001:finalize` | After the session: interactive results recording |
 | `pnpm -w run check:dryrun:001` | Anytime: validate DRYRUN-001 state |
+| `pnpm -w run dryrun:001:diagnose` | When banner not observed: check dist/, ZIP, manifest, Chrome load path |
 
 These commands automate all safe owner-side steps. ChatGPT interaction, login, and tester
 observation remain human-only and cannot be automated.

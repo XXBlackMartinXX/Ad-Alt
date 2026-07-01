@@ -17,6 +17,8 @@ const TRACKER = path.join(DRY_RUNS_DIR, 'DRY_RUN_STATUS_TRACKER.md');
 const GO_NO_GO = path.join(DRY_RUNS_DIR, 'GO_NO_GO_DECISION_RECORD.md');
 const WORKSHEET = path.join(DRY_RUNS_DIR, 'FIRST_TESTER_DRY_RUN_WORKSHEET.md');
 const DRAFT = path.join(DRY_RUNS_DIR, 'DRYRUN-001_RESULT_DRAFT.md');
+const TROUBLESHOOTING = path.join(DRY_RUNS_DIR, 'TROUBLESHOOTING_BANNER_NOT_OBSERVED.md');
+const INCONCLUSIVE_NOTE = path.join(DRY_RUNS_DIR, 'DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md');
 
 let passed = 0;
 let warned = 0;
@@ -41,6 +43,8 @@ const goNoGoContent = read(GO_NO_GO);
 const worksheetContent = read(WORKSHEET);
 const resultLogExists = resultLogContent !== null;
 const draftExists = fs.existsSync(DRAFT);
+const troubleshootingExists = fs.existsSync(TROUBLESHOOTING);
+const inconclusiveNoteExists = fs.existsSync(INCONCLUSIVE_NOTE);
 
 // -----------------------------------------------------------------------
 // Section 1: Existence check
@@ -61,6 +65,16 @@ if (draftExists) {
   warn('No draft (DRYRUN-001_RESULT_DRAFT.md) -- run dryrun:001:prepare before the session');
 }
 
+if (troubleshootingExists) {
+  pass('Troubleshooting guide present: TROUBLESHOOTING_BANNER_NOT_OBSERVED.md');
+} else {
+  warn('TROUBLESHOOTING_BANNER_NOT_OBSERVED.md missing -- helpful if banner is not observed');
+}
+
+if (inconclusiveNoteExists) {
+  pass('Inconclusive note present: DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md');
+}
+
 console.log('');
 
 // -----------------------------------------------------------------------
@@ -72,44 +86,67 @@ if (!resultLogExists) {
   if (!trackerContent) {
     fail('DRY_RUN_STATUS_TRACKER.md is missing');
   } else {
-    // Tracker must say READY TO RUN or NOT RUN YET, NOT COMPLETED
+    // Tracker must say READY TO RUN, NOT RUN YET, INCONCLUSIVE, or READY TO RERUN -- NOT COMPLETED
     if (/DRYRUN-001.*COMPLETED/i.test(trackerContent)) {
       fail('Tracker claims DRYRUN-001 COMPLETED but no result log exists -- overclaiming (CANARY 13)');
     } else if (/DRYRUN-001.*(READY TO RUN|NOT RUN YET)/i.test(trackerContent)) {
       pass('Tracker: DRYRUN-001 is READY TO RUN / NOT RUN YET (correct for pre-execution)');
+    } else if (/DRYRUN-001.*INCONCLUSIVE/i.test(trackerContent)) {
+      pass('Tracker: DRYRUN-001 is INCONCLUSIVE (session attempted but inconclusive; rerun required)');
+    } else if (/DRYRUN-001.*READY TO RERUN/i.test(trackerContent)) {
+      pass('Tracker: DRYRUN-001 is READY TO RERUN (setup confirmed; rerun scheduled)');
     } else {
       warn('Tracker: DRYRUN-001 status unclear -- verify it does not claim completion');
     }
 
-    // Decision must be PENDING
-    if (/DRYRUN-001.*GO\b(?!.*PENDING)|DRYRUN-001.*\bHOLD\b|DRYRUN-001.*\bSTOP\b/i.test(trackerContent) &&
-        !/PENDING/i.test(trackerContent.match(/DRYRUN-001[^\n]*/)?.[0] || '')) {
-      fail('Tracker shows non-PENDING decision without a result log -- overclaiming');
-    } else if (/Decision.*PENDING/i.test(trackerContent) || /\| PENDING \|/.test(trackerContent)) {
+    // Decision must be PENDING -- EXCEPT: HOLD is allowed when status is INCONCLUSIVE
+    // Check only the DRYRUN-001 table row (pipe-delimited), not free text in the doc
+    const trackerRow = trackerContent.match(/\| DRYRUN-001 \|[^\n]*/)?.[0] || '';
+    const rowHasHold = /\| HOLD \|/.test(trackerRow);
+    const rowHasGo = /\| GO \|/.test(trackerRow);
+    const rowHasStop = /\| STOP \|/.test(trackerRow);
+    const rowHasInconclusive = /INCONCLUSIVE/.test(trackerRow);
+    const rowHasReadyToRerun = /READY TO RERUN/.test(trackerRow);
+    if (rowHasGo || rowHasStop) {
+      fail('Tracker row shows GO/STOP decision without a result log -- overclaiming');
+    } else if (rowHasHold && (rowHasInconclusive || rowHasReadyToRerun)) {
+      pass('Tracker decision: HOLD with INCONCLUSIVE/READY TO RERUN status (correct for inconclusive attempt)');
+    } else if (/\| PENDING \|/.test(trackerRow)) {
       pass('Tracker decision: PENDING (correct before execution)');
+    } else if (rowHasHold) {
+      fail('Tracker shows HOLD decision without INCONCLUSIVE status or result log -- overclaiming');
     } else {
       warn('Tracker decision status unclear');
     }
   }
 
-  // Go/no-go must say PENDING
+  // Go/no-go must say PENDING or HOLD (HOLD is valid for inconclusive attempts)
   if (!goNoGoContent) {
     warn('GO_NO_GO_DECISION_RECORD.md missing');
-  } else if (/PENDING/i.test(goNoGoContent) && !/Decision Status: GO\b|Decision Status: HOLD\b|Decision Status: STOP\b/i.test(goNoGoContent)) {
+  } else if (/PENDING/i.test(goNoGoContent) && !/Decision Status: GO\b|Decision Status: STOP\b/i.test(goNoGoContent)) {
     pass('Go/No-Go decision record: PENDING (correct before execution)');
-  } else if (/Decision Status: GO\b|Decision Status: HOLD\b|Decision Status: STOP\b/i.test(goNoGoContent)) {
+  } else if (/Decision Status: HOLD\b/i.test(goNoGoContent) && !resultLogExists) {
+    // HOLD is valid when tracker is INCONCLUSIVE (inconclusive attempt recorded)
+    if (/DRYRUN-001.*INCONCLUSIVE/i.test(trackerContent || '')) {
+      pass('Go/No-Go decision record: HOLD with INCONCLUSIVE tracker (consistent with inconclusive attempt)');
+    } else {
+      fail('Go/No-Go decision was set to HOLD without a result log or inconclusive note -- overclaiming (CANARY 13)');
+    }
+  } else if (/Decision Status: GO\b|Decision Status: STOP\b/i.test(goNoGoContent)) {
     fail('Go/No-Go decision was set without a result log -- overclaiming (CANARY 13)');
   } else {
     warn('Go/No-Go decision status unclear');
   }
 
-  // Worksheet must say NOT RUN YET
+  // Worksheet must say NOT RUN YET or INCONCLUSIVE (INCONCLUSIVE is valid after an inconclusive attempt)
   if (!worksheetContent) {
     warn('FIRST_TESTER_DRY_RUN_WORKSHEET.md missing');
-  } else if (/Status.*COMPLETED|dry-run completed/i.test(worksheetContent)) {
+  } else if (/Status.*COMPLETED|dry-run completed/i.test(worksheetContent) && !/INCONCLUSIVE/i.test(worksheetContent)) {
     fail('Worksheet claims COMPLETED without a result log -- overclaiming (CANARY 13)');
   } else if (/NOT RUN YET/i.test(worksheetContent)) {
     pass('Worksheet status: NOT RUN YET (correct)');
+  } else if (/INCONCLUSIVE/i.test(worksheetContent)) {
+    pass('Worksheet status: INCONCLUSIVE (correct after inconclusive attempt)');
   } else {
     warn('Worksheet status unclear');
   }
@@ -117,7 +154,7 @@ if (!resultLogExists) {
   console.log('');
   console.log('-- Section 3: Overclaiming detection (pre-execution docs) --');
 
-  const allDocs = [TRACKER, GO_NO_GO, WORKSHEET, DRAFT].filter(p => fs.existsSync(p))
+  const allDocs = [TRACKER, GO_NO_GO, WORKSHEET, DRAFT, INCONCLUSIVE_NOTE, TROUBLESHOOTING].filter(p => p && fs.existsSync(p))
     .map(p => ({ file: path.basename(p), content: read(p) || '' }));
 
   const overclaiming = [
@@ -158,9 +195,10 @@ if (!resultLogExists) {
   // -----------------------------------------------------------------------
   console.log('-- Section 2: Result log validation --');
 
-  // Status must be a valid value
+  // Status must be a valid value (BLOCKED is valid for inconclusive sessions)
   if (/\*\*Status: PASS\b|\*\*Status: PASS WITH ISSUES|\*\*Status: BLOCKED|\*\*Status: FAILED/i.test(resultLogContent)) {
-    pass('Result log status is a valid value (PASS / PASS WITH ISSUES / BLOCKED / FAILED)');
+    const blocked = /\*\*Status: BLOCKED/i.test(resultLogContent);
+    pass(`Result log status is a valid value${blocked ? ' (BLOCKED = inconclusive session recorded)' : ''}`);
   } else if (/\*\*Status: READY FOR HUMAN EXECUTION/i.test(resultLogContent)) {
     fail('Result log still says READY FOR HUMAN EXECUTION -- finalize script was not run');
   } else {
@@ -288,7 +326,9 @@ console.log('-- Section 5: Tracker consistency --');
 if (resultLogExists && trackerContent) {
   if (/DRYRUN-001.*COMPLETED/i.test(trackerContent)) {
     pass('Tracker shows COMPLETED -- consistent with result log existing');
-  } else if (/DRYRUN-001.*(READY TO RUN|NOT RUN YET)/i.test(trackerContent)) {
+  } else if (/DRYRUN-001.*INCONCLUSIVE/i.test(trackerContent)) {
+    pass('Tracker shows INCONCLUSIVE -- consistent with result log from inconclusive session');
+  } else if (/DRYRUN-001.*(READY TO RUN|NOT RUN YET|READY TO RERUN)/i.test(trackerContent)) {
     warn('Result log exists but tracker still shows pre-execution status -- consider running finalize again or updating tracker manually');
   } else {
     warn('Tracker status ambiguous');
@@ -296,8 +336,10 @@ if (resultLogExists && trackerContent) {
 } else if (!resultLogExists && trackerContent) {
   if (/DRYRUN-001.*COMPLETED/i.test(trackerContent)) {
     fail('Tracker says COMPLETED but no result log exists -- inconsistent state');
+  } else if (/DRYRUN-001.*INCONCLUSIVE/i.test(trackerContent)) {
+    pass('Tracker shows INCONCLUSIVE and no result log -- consistent (inconclusive attempt recorded via note)');
   } else {
-    pass('Tracker and result log state are consistent (both pre-execution)');
+    pass('Tracker and result log state are consistent (both pre-execution or inconclusive)');
   }
 }
 

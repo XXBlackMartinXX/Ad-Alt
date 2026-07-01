@@ -17,6 +17,9 @@ Estimated time: 30-45 minutes. No terminal required.
 - [ ] Google Chrome (latest version). Download from https://www.google.com/chrome/ if needed.
 - [ ] The beta ZIP file (received from your beta contact -- do NOT download from any store).
 - [ ] A chatgpt.com account (your own existing account).
+- [ ] **You MUST be logged into chatgpt.com before starting the test.**
+  The PromptProfit overlay only appears when you are authenticated.
+  If chatgpt.com shows "Log in" or "Sign up for free": log in first, then proceed.
 
 ### Step 1 -- Get the package
 Obtain the beta ZIP file from your beta contact via the secure internal channel.
@@ -39,27 +42,42 @@ Unzip the file to a folder you can find easily (e.g., Desktop/promptprofit-beta/
 - "PromptProfit" should now appear in the extension list at chrome://extensions.
 - The extension icon may appear in your Chrome toolbar (puzzle-piece icon area).
 
-### Step 6 -- Sanity check
-1. Go to https://chatgpt.com and log in if prompted.
-2. Type this exact safe test prompt in a new chat:
+### Step 6 -- Log in and open a new chat
+1. Go to https://chatgpt.com.
+2. **REQUIRED: Confirm you are logged in.** If you see "Log in" or "Sign up for free": log in first.
+   The PromptProfit banner ONLY appears when you are logged in and ChatGPT is generating.
+3. Click "New chat" in the ChatGPT sidebar to start a fresh conversation.
+4. Type this exact safe test prompt in the message box (not the URL bar):
 
    Count slowly from 1 to 10.
 
-3. Press Enter and wait for ChatGPT to respond.
+5. Press Enter and **watch the bottom-right corner** while ChatGPT responds.
 
 ### Step 7 -- What success looks like
-While ChatGPT is generating its response, look for:
-- A small banner/overlay in the bottom-right corner of the browser window.
-- The banner shows placeholder sponsored text (headline, short description, display URL).
-- A close button (X) appears on the banner.
+WHILE ChatGPT is generating its response (the streaming/typing phase), look for:
+
+- A small rectangular banner/overlay in the **bottom-right corner** of the browser window.
+- The banner shows placeholder text: a headline, a short body line, and a display URL.
+- These are placeholders, NOT real advertisements.
+- A close button (X) appears in the corner of the banner.
+
+Important: Watch the bottom-right corner FROM THE MOMENT you press Enter. The banner appears
+during generation. If you look away and back after ChatGPT finishes, you may have missed it.
 
 ### Step 8 -- Test the close button
 Click the X button on the banner. It should disappear immediately.
 
-### Step 9 -- What failure looks like
-- No banner appears at all during the response.
-- An error badge (red exclamation icon) appears on the extension icon.
-- Chrome shows an "Aw, Snap" or extension error in chrome://extensions.
+### Step 9 -- What to do if no banner appears
+- Check: Is the extension toggle ON (blue) in chrome://extensions?
+- Check: Are you logged into chatgpt.com? (No "Log in" or "Sign up" visible?)
+- Check: Did you open a NEW chat (not an existing one)?
+- Check: Were you watching the bottom-right corner DURING generation?
+- If all yes and still no banner: file a bug report using the template in FEEDBACK_INTAKE.md.
+  Do NOT share ChatGPT content in the bug report -- only describe extension behavior.
+
+Other failure signs:
+- An error badge (red exclamation icon) on the extension icon in chrome://extensions.
+- Chrome shows an extension error under Details -> Errors in chrome://extensions.
 
 ### Step 10 -- Disable (safe pause)
 To pause the extension without uninstalling:
@@ -188,9 +206,11 @@ personal or private data, API keys, .env files, cookies, tokens, or raw logs wit
 
 | Situation | Action |
 |-----------|--------|
-| Banner does not appear | Check chrome://extensions -- is the extension enabled? |
-| Extension shows error badge | Click "Details" -> "Errors" for the error message |
+| Banner does not appear | Check: logged in? Extension ON? New chat? Watched during generation? |
+| Not logged into chatgpt.com | Log in first, reload tab, try again from Step 6 |
+| Extension shows error badge | Click "Details" -> "Errors" -- record error text (no personal data) |
 | Banner text looks wrong | File a bug report with severity S2 |
 | Chrome crashes | File a bug report with severity S1 |
 | You see a ppft_ key anywhere | Stop immediately -- notify beta coordinator |
 | You want to stop testing | Disable: chrome://extensions -> toggle off |
+| Still no banner after all checks | See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md |

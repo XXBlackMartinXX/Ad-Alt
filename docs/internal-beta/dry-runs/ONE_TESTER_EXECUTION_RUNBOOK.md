@@ -153,7 +153,18 @@ Have FIRST_TESTER_DRY_RUN_WORKSHEET.md open and track each step.
 2. Tester opens `chrome://extensions`
 3. Tester enables Developer Mode toggle (top right)
 4. Tester clicks "Load unpacked" and selects the `dist/` folder from the unzipped package
+   **Important:** The tester must select the `dist/` subfolder INSIDE the unzipped directory,
+   NOT the outer folder. The correct folder contains `manifest.json` directly.
 5. Extension "PromptProfit" appears in the list with no error badge
+
+**LOGGED-IN REQUIREMENT (verify before proceeding to safe test):**
+
+Before proceeding to the safe test, confirm the tester is logged into chatgpt.com:
+
+- Ask the tester to navigate to `https://chatgpt.com`
+- If they see "Log in" or "Sign up for free": STOP. The tester must log in before the test.
+- The PromptProfit banner ONLY appears when the user is authenticated and ChatGPT is generating.
+- An unauthenticated user will see no banner even if the extension is correctly installed.
 
 **If the tester hits an error at any step:**
 
@@ -188,9 +199,23 @@ Count slowly from 1 to 10.
 4. Tester presses Enter
 5. While ChatGPT generates the response, an overlay banner appears in the bottom-right area
 
+**What you and the tester should see (banner description):**
+
+While ChatGPT is streaming its response (generating phase, not after):
+- A small rectangular overlay banner appears in the BOTTOM-RIGHT corner of the browser window.
+- The banner contains:
+  - A short placeholder headline (e.g. "Sponsored" or placeholder text — not a real ad)
+  - A short placeholder description line
+  - A placeholder display URL
+  - An X (close) button in the top corner of the banner
+- The banner remains visible until the X is clicked.
+
+If no banner appears within 3-5 seconds of the response starting: record "banner not observed."
+See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md for diagnosis steps.
+
 **While the banner is visible, verify:**
 
-- [ ] Banner appeared (if NO: S1 blocker -- record immediately)
+- [ ] Banner appeared (if NO: inconclusive/S1 -- record immediately; see TROUBLESHOOTING_BANNER_NOT_OBSERVED.md)
 - [ ] Banner shows placeholder headline text (if real ad content: S0/S1 -- escalate)
 - [ ] Banner shows placeholder body text
 - [ ] Banner shows a placeholder display URL
