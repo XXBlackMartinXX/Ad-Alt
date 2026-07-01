@@ -4,18 +4,26 @@
 **Status: BLOCKED**
 **Date:** 2026-07-01
 **Branch:** claude/ecstatic-maxwell-h0d8d8
-**Commit:** 800cdc8
+**Commit:** 682276f
 **Decision:** HOLD
 
 ---
 
-> Result recorded by dryrun-001-finalize.js on 2026-07-01.
+> Result recorded by dryrun-001-finalize.js on 2026-07-01 (DRYRUN-001 rerun after commit 682276f).
 > Real human tester participated in this session.
 > Privacy rules enforced: no personal data, no API keys, no ChatGPT content recorded.
 
-> **NOTE:** This result is INCONCLUSIVE. Some key observations were answered as UNKNOWN.
-> Rerun required after confirming tester setup. See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md.
-> Run: pnpm -w run dryrun:001:diagnose
+> **NOTE:** `pnpm -w run dryrun:001:selftest` PASSED before this session (packaged artifact confirmed
+> to render the banner in demo mode with no API configuration). The real ChatGPT session still did
+> NOT show the banner. This is a CONFIRMED real-runtime failure, not an inconclusive/unknown-setup
+> result -- see DRYRUN-001-ISSUE-001.md (S1/P1, GO blocked). Runtime diagnosis on real chatgpt.com is
+> required before any rerun or wider distribution.
+>
+> **Triage correction:** This issue was previously misclassified at a lower severity (S4/P3) in an
+> earlier pass. That classification was incorrect and has been corrected to S1/P1 -- see
+> DRYRUN-001-ISSUE-001.md "Triage Correction" section and the enforcement rule added to
+> `scripts/dryrun-001-finalize.js` that prevents this class of confirmed banner failure from being
+> filed or downgraded below S1/P1.
 
 ---
 
@@ -28,9 +36,10 @@
 | Tester Role | [not provided] |
 | Tester Track | [A / B -- record separately] |
 | Owner | [OWNER TBD] |
-| Release Commit | 800cdc8 |
-| Package Artifact | promptprofit-browser-beta-2026-07-01T15-35-56.zip |
+| Release Commit | 682276f |
+| Package Artifact | promptprofit-browser-beta-2026-07-01T17-01-42.zip |
 | Package Audit | PASS (internal-beta) |
+| Packaged Selftest (dryrun:001:selftest) | PASS (ran before this session) |
 | Overall Status | BLOCKED |
 | Decision | HOLD |
 
@@ -40,7 +49,9 @@
 
 **Current Status: BLOCKED**
 
-**Reason:** Some critical observations were UNKNOWN. Session is inconclusive. Rerun required.
+**Reason:** Packaged selftest passed, but the banner was confirmed NOT to appear on real ChatGPT.
+This is a real-runtime defect (S1/P1, GO blocked), not an inconclusive/setup-related result. Runtime
+diagnosis on real chatgpt.com is required before the next rerun. See DRYRUN-001-ISSUE-001.md.
 
 ---
 
@@ -71,10 +82,11 @@
 | Observation | Result |
 |-------------|--------|
 | Extension loaded in Chrome | YES |
-| Overlay banner appeared during response | NO |
-| Banner content: placeholder only | [record separately] |
-| Banner close button worked | NO |
-| Disable turned off banner | NO |
+| Packaged selftest (dryrun:001:selftest) | PASS -- banner rendered in demo mode, no API config needed |
+| Overlay banner appeared during response (real ChatGPT) | NO (confirmed) |
+| Banner content: placeholder only | N/A -- banner never appeared |
+| Banner close button worked | NO -- banner never appeared |
+| Disable turned off banner | NO -- banner never appeared |
 | Remove uninstalled cleanly | UNKNOWN |
 
 ---
@@ -83,18 +95,19 @@
 
 | # | Title | Severity | Area | Status | GitHub Issue # |
 |---|-------|----------|------|--------|----------------|
-| -- | No issues recorded during this dry-run session. | -- | -- | -- | -- |
+| 1 | Banner not observed on real ChatGPT despite packaged selftest passing | S1 | area:browser-extension, area:chatgpt-adapter, area:dry-run | accepted / needs diagnosis | [Internal tracking only] |
+
+See: docs/internal-beta/dry-runs/issues/DRYRUN-001-ISSUE-001.md
 
 ---
 
 ## 9. Privacy and Security Observations
 
-- Privacy/security issue observed: UNKNOWN -- TREAT AS S0/P0 UNTIL CONFIRMED CLEAN
+- Privacy/security issue observed: NOT REPORTED this session (not independently re-verified; not
+  the subject of this triage correction -- do not treat as a confirmed clean bill of health)
 - ppft_ key visible in shared output: NOT OBSERVED
 - ChatGPT content shared by tester: NOT RECORDED
-- S0 event triggered: POSSIBLE -- SEE ESCALATION NOTE
-
-**ACTION REQUIRED:** Contact Privacy Owner via private channel. Do NOT file publicly.
+- S0 event triggered: NOT OBSERVED (no report this session)
 
 ---
 
@@ -114,20 +127,23 @@
 - Full rollback triggered: NO
 
 **Blockers preventing GO:**
-- Privacy/security status unknown (S0/P0 assumed) -- decision cannot be GO
-- Billing/ledger status unknown (concern assumed) -- decision cannot be GO
+- Banner confirmed NOT to appear on real ChatGPT despite packaged selftest passing -- S1 blocker -- decision cannot be GO (see Issue 001)
+- Billing/ledger status not re-verified this session -- decision cannot be GO
 - Uninstall/rollback status unknown -- decision cannot be GO
-- Banner did not appear -- S1 blocker -- decision cannot be GO
 
 ---
 
 ## 13. Triage Outcome
 
-Triage completed: NO ISSUES -- N/A
+Triage completed: NEEDS TRIAGE
 
 | Issue # | Severity | Priority | Assigned To | Target Fix |
 |---------|----------|----------|-------------|-----------|
-| -- | -- | -- | No issues | -- |
+| 1 | S1 | P1 | [OWNER TBD -- Engineering + QA] | [DATE TBD -- before next beta dry-run] |
+
+**Note:** Issue 1 was corrected from an earlier, incorrect S4/P3 classification. A confirmed banner
+failure on real ChatGPT after the packaged selftest passed is a beta blocker by definition and
+cannot be recorded or left at S2-S4/P2-P3. See DRYRUN-001-ISSUE-001.md "Triage Correction".
 
 ---
 
@@ -135,7 +151,8 @@ Triage completed: NO ISSUES -- N/A
 
 | Next Action | Details | Owner | Target Date |
 |-------------|---------|-------|------------|
-| Diagnose setup issues; schedule rerun | Run dryrun:001:diagnose; see TROUBLESHOOTING_BANNER_NOT_OBSERVED.md | [OWNER TBD] | [DATE TBD] |
+| Diagnose real-ChatGPT banner failure (Issue 001, S1/P1) | Add privacy-safe runtime diagnostics; verify wait-state selectors against live chatgpt.com DOM; verify dryRunDemoMode persists across install/update; see DRYRUN-001-ISSUE-001.md | [OWNER TBD] | [DATE TBD -- before next beta dry-run] |
+| Do NOT schedule wider beta distribution | GO blocked while Issue 001 (S1/P1) is open | [OWNER TBD] | N/A |
 
 ---
 
@@ -145,8 +162,8 @@ Triage completed: NO ISSUES -- N/A
 |------|---------|------|
 | Dry-Run Owner | [YES / NO / TBD] | 2026-07-01 |
 | QA Owner | [YES / NO / TBD] | [DATE TBD] |
-| Privacy Owner | REQUIRED -- S0 PENDING | [DATE TBD] |
-| Release Owner | [YES / NO / TBD] | [DATE TBD] |
+| Privacy Owner | [YES / NO / TBD] | [DATE TBD] |
+| Release Owner | NO -- S1/P1 blocker open (Issue 001) | [DATE TBD] |
 
 ---
 

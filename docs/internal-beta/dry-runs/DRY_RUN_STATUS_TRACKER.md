@@ -15,7 +15,7 @@
 
 | ID | Date | Tester | Track | Status | Decision | Result Log | Notes |
 |----|------|--------|-------|--------|----------|------------|-------|
-| DRYRUN-001 | 2026-07-01 | [TBD] | [A/B] | INCONCLUSIVE | HOLD | DRYRUN-001_RESULT_LOG.md | Session inconclusive; some answers unknown; rerun required |
+| DRYRUN-001 | 2026-07-01 | [TBD] | [A/B] | BLOCKED | HOLD | DRYRUN-001_RESULT_LOG.md | Rerun after 682276f: packaged selftest PASSED, real ChatGPT banner still did NOT appear -- confirmed S1/P1 blocker (Issue 001), not inconclusive setup |
 
 ---
 
@@ -50,7 +50,7 @@
 
 | Issue # | Title | Severity | Blocking Which Session |
 |---------|-------|----------|----------------------|
-| [TBD] | [TBD] | [S0 / S1] | [DRYRUN-NNN] |
+| DRYRUN-001-ISSUE-001 | Banner not observed on real ChatGPT despite packaged selftest passing | S1 | DRYRUN-001 (and any future session until resolved) |
 
 If no open S0/S1 issues: "None -- no blocking issues."
 
@@ -62,19 +62,19 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 | Field | Value |
 |-------|-------|
-| Status | INCONCLUSIVE |
+| Status | BLOCKED |
 | Decision | HOLD |
 | Worksheet | docs/internal-beta/dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md |
 | Owner-Ready Note | docs/internal-beta/dry-runs/DRYRUN-001_OWNER_READY_NOTE.md |
-| Inconclusive Note | docs/internal-beta/dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md |
-| Result Log | [No result log -- session inconclusive; rerun required] |
-| Issues Found | NOT OBSERVED (session inconclusive) |
+| Inconclusive Note (attempt 1) | docs/internal-beta/dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md |
+| Result Log (rerun after 682276f) | docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md |
+| Issues Found | 1 (DRYRUN-001-ISSUE-001, S1/P1) |
 | Open S0 | NONE OBSERVED |
-| Open S1 | NONE OBSERVED (banner not observed is inconclusive, not confirmed S1) |
-| Privacy Result | CLEAN -- no privacy/security issue observed |
+| Open S1 | DRYRUN-001-ISSUE-001 -- banner confirmed not observed on real ChatGPT despite packaged selftest passing; GO blocked |
+| Privacy Result | NOT RE-VERIFIED THIS SESSION -- not the subject of this triage; do not assume clean |
 | Billing Result | UNKNOWN -- TREAT AS CONCERN |
 | Rollback Result | NOT CONFIRMED -- session did not reach uninstall step |
-| Notes | Attempted 2026-07-01. Banner not observed; tester appeared logged out. Rerun required. See DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md and TROUBLESHOOTING_BANNER_NOT_OBSERVED.md. |
+| Notes | Rerun after commit 682276f (demo mode + dryrun:001:selftest). Selftest PASSED (banner renders in packaged artifact with no API config). Real ChatGPT session still showed NO banner -- this is a CONFIRMED S1/P1 blocker, not an inconclusive/setup result. An earlier pass had mis-classified this at S4/P3; corrected to S1/P1. Runtime diagnosis on real chatgpt.com required. See DRYRUN-001-ISSUE-001.md and TROUBLESHOOTING_BANNER_NOT_OBSERVED.md. |
 
 ---
 
@@ -92,12 +92,15 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 ## Summary
 
-**Total dry-run sessions:** 1 attempted (inconclusive), 0 completed
+**Total dry-run sessions:** 2 attempted (1 inconclusive/setup, 1 blocked/confirmed defect), 0 completed with GO
 
 **Current beta phase status:**
-- Dry-run packet: READY (all checks pass)
-- DRYRUN-001: INCONCLUSIVE / HOLD (attempted 2026-07-01; banner not observed; rerun required)
+- Dry-run packet: READY (all checks pass, including `dryrun:001:selftest`)
+- DRYRUN-001: BLOCKED / HOLD (rerun after 682276f; packaged selftest PASSED; real ChatGPT banner
+  confirmed NOT to appear; S1/P1 blocker DRYRUN-001-ISSUE-001 open; GO blocked)
 - Wider beta (Day 2-3): BLOCKED on DRYRUN-001 GO decision
 - Public release: BLOCKED (LICENSE, icons, VSIX, staging reconciliation pending)
 
-**Next action:** Owner runs `pnpm -w run dryrun:001:diagnose`, confirms tester is logged into chatgpt.com, then schedules DRYRUN-001 rerun.
+**Next action:** Owner adds privacy-safe real-runtime diagnostics and verifies wait-state selectors
+against the live chatgpt.com DOM (see DRYRUN-001-ISSUE-001.md). Do NOT schedule another rerun or
+wider distribution until the real-ChatGPT root cause is diagnosed and fixed.

@@ -1,8 +1,14 @@
 # PromptProfit -- First Tester Dry-Run Worksheet
 
 **Dry-Run ID:** DRYRUN-001
-**Status: INCONCLUSIVE -- see DRYRUN-001_RESULT_LOG.md (decision: HOLD)**
+**Status: BLOCKED -- see DRYRUN-001_RESULT_LOG.md (decision: HOLD)**
 **Branch:** claude/ecstatic-maxwell-h0d8d8
+
+> Rerun after commit 682276f: `pnpm -w run dryrun:001:selftest` PASSED before this session
+> (banner confirmed to render in the packaged artifact via demo mode, no API config needed).
+> The real ChatGPT session still did NOT show the banner -- this is a CONFIRMED S1/P1 blocker
+> (DRYRUN-001-ISSUE-001), not an inconclusive/setup result. See "Triage Correction" in that issue
+> file: an earlier pass had misclassified this at S4/P3, which is incorrect.
 
 ---
 
@@ -224,24 +230,29 @@ Only needed if an S0 or S1 issue was found:
 
 | Exit Criterion | Result | Notes |
 |----------------|--------|-------|
-| Install succeeded (no repo access required) | [TBD] | |
-| Banner appeared during safe test | [TBD] | |
-| Banner content was placeholder only | [TBD] | |
-| Close button worked | [TBD] | |
-| Privacy rules followed (no leakage) | [TBD] | |
-| No S0 issue | [TBD] | |
-| No S1 issue | [TBD] | |
-| Install guide understandable | [TBD] | |
-| Disable/remove worked | [TBD] | |
+| Install succeeded (no repo access required) | YES | Loaded from extracted ZIP root folder |
+| Packaged selftest passed pre-session | YES | `pnpm -w run dryrun:001:selftest` PASS |
+| Banner appeared during safe test (real ChatGPT) | **NO** | Confirmed -- see DRYRUN-001-ISSUE-001.md (S1/P1) |
+| Banner content was placeholder only | N/A | Banner never appeared |
+| Close button worked | N/A | Banner never appeared |
+| Privacy rules followed (no leakage) | NOT RE-VERIFIED | |
+| No S0 issue | YES | |
+| No S1 issue | **NO** | DRYRUN-001-ISSUE-001 open (S1/P1) |
+| Install guide understandable | YES | |
+| Disable/remove worked | NOT REACHED | |
 | Feedback filed | [TBD] | |
 
-**Decision:** HOLD -- DRYRUN-001 inconclusive 2026-07-01
+**Decision:** HOLD -- DRYRUN-001 blocked 2026-07-01 (rerun after 682276f; S1/P1 issue open)
 
 Allowed decisions after execution:
 - GO: proceed to Day 2-3 small beta (3-5 testers)
 - HOLD: fix issues identified, re-run dry-run
 - STOP: major unresolved issue; pause all beta distribution
 
+**Note:** A confirmed banner failure on real ChatGPT, occurring even after the packaged selftest
+passed, is a beta blocker (S1/P1) and must not be recorded or downgraded to S2-S4/P2-P3. See
+`scripts/dryrun-001-finalize.js` enforcement rule and DRYRUN-001-ISSUE-001.md "Triage Correction".
+
 **Decision recorded in:** GO_NO_GO_DECISION_RECORD.md (DRYRUN-001)
 **Decision Owner:** [OWNER TBD]
-**Decision Date:** [DATE TBD]
+**Decision Date:** 2026-07-01

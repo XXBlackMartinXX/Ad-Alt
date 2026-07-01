@@ -1,14 +1,19 @@
 # PromptProfit -- Go / No-Go Decision Record
 
 **Dry-Run ID:** DRYRUN-001
-**Decision Status: HOLD -- DRYRUN-001 inconclusive 2026-07-01**
+**Decision Status: HOLD -- DRYRUN-001 blocked 2026-07-01 (rerun after 682276f; S1/P1 issue open)**
 **Branch:** claude/ecstatic-maxwell-h0d8d8
 
 ---
 
-> This record is PENDING. No decision can be recorded until DRYRUN-001 is executed.
 > Do not change the decision status to GO, HOLD, or STOP without real tester execution evidence.
-> Reference: FIRST_TESTER_DRY_RUN_WORKSHEET.md and DRY_RUN_RESULT_LOG_TEMPLATE.md
+> Reference: FIRST_TESTER_DRY_RUN_WORKSHEET.md and DRYRUN-001_RESULT_LOG.md
+>
+> The packaged selftest (`dryrun:001:selftest`) PASSED before this rerun, confirming the banner
+> renders correctly in the shipped artifact with demo mode and no API configuration. The real
+> ChatGPT session still did not show the banner. This is a CONFIRMED S1/P1 blocker
+> (DRYRUN-001-ISSUE-001), not an inconclusive/setup result -- GO remains blocked until the
+> real-runtime root cause is diagnosed and fixed.
 
 ---
 
@@ -30,10 +35,10 @@
 |-------|-------|
 | Dry-Run ID | DRYRUN-001 |
 | Worksheet | docs/internal-beta/dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md |
-| Result Log | docs/internal-beta/dry-runs/DRY_RUN_RESULT_LOG_TEMPLATE.md (fill in) |
-| Date Executed | [DATE TBD] |
-| Tester | [TESTER TBD] |
-| Release Commit | [COMMIT TBD] |
+| Result Log | docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md |
+| Date Executed | 2026-07-01 (rerun after commit 682276f) |
+| Tester | [TESTER TBD -- non-engineer, Track A] |
+| Release Commit | 682276f |
 
 ---
 
@@ -44,18 +49,19 @@ Mark each as MET, NOT MET, or N/A.
 
 | Criterion | Result | Notes |
 |-----------|--------|-------|
-| Install succeeded without repo access | [PENDING] | |
-| Overlay banner appeared during safe test prompt | [PENDING] | |
-| Banner contained placeholder content only (no real data) | [PENDING] | |
-| Close button dismissed banner | [PENDING] | |
-| Privacy rules followed by tester (no leakage) | [PENDING] | |
-| No raw ppft_ key visible in any shared output | [PENDING] | |
-| No S0 privacy/security issue opened | [PENDING] | |
-| No S1 blocker issue opened | [PENDING] | |
-| Billing invariant held (if smoke run) | [PENDING] | |
-| Install guide was understandable | [PENDING] | |
-| Disable procedure worked | [PENDING] | |
-| Remove/uninstall procedure worked | [PENDING] | |
+| Install succeeded without repo access | MET | Extension loaded correctly from ZIP root |
+| Packaged selftest passed pre-session (dryrun:001:selftest) | MET | Demo mode banner render confirmed, no API config needed |
+| Overlay banner appeared during safe test prompt (real ChatGPT) | **NOT MET** | Confirmed NOT observed -- see DRYRUN-001-ISSUE-001.md (S1/P1) |
+| Banner contained placeholder content only (no real data) | N/A | Banner never appeared |
+| Close button dismissed banner | N/A | Banner never appeared |
+| Privacy rules followed by tester (no leakage) | NOT RE-VERIFIED THIS SESSION | Not the subject of this triage |
+| No raw ppft_ key visible in any shared output | MET (not observed) | |
+| No S0 privacy/security issue opened | MET | |
+| No S1 blocker issue opened | **NOT MET** | DRYRUN-001-ISSUE-001 (S1/P1) open |
+| Billing invariant held (if smoke run) | NOT RUN | |
+| Install guide was understandable | MET | Correct ZIP-root instruction followed |
+| Disable procedure worked | NOT REACHED | Session did not proceed to uninstall step |
+| Remove/uninstall procedure worked | NOT REACHED | |
 | Tester submitted feedback | [PENDING] | |
 
 ---
@@ -64,11 +70,11 @@ Mark each as MET, NOT MET, or N/A.
 
 | Issue # | Title | Severity | Priority | Status |
 |---------|-------|----------|----------|--------|
-| [TBD] | [TBD] | [TBD] | [TBD] | [TBD] |
+| DRYRUN-001-ISSUE-001 | Banner not observed on real ChatGPT despite packaged selftest passing | S1 | P1 | accepted / needs diagnosis |
 
-Open S0 count: [TBD]
-Open S1 count: [TBD]
-Open S2 count: [TBD]
+Open S0 count: 0
+Open S1 count: 1 (DRYRUN-001-ISSUE-001)
+Open S2 count: 0
 
 ---
 
@@ -84,7 +90,8 @@ Open S2 count: [TBD]
 
 ## CURRENT DECISION: HOLD
 
-**Reason:** DRYRUN-001 inconclusive 2026-07-01. Decision recorded by finalize script.
+**Reason:** DRYRUN-001 blocked 2026-07-01 (rerun after commit 682276f). Decision recorded by
+finalize script; severity/priority of the blocking issue corrected per triage review below.
 
 ---
 
@@ -93,29 +100,43 @@ Open S2 count: [TBD]
 **Decision:** HOLD
 
 **Rationale:**
-[Required if HOLD or STOP: describe which criteria were NOT MET]
-[Required if GO: confirm all criteria were MET]
+The packaged selftest (`dryrun:001:selftest`) PASSED before this session, confirming the shipped
+artifact correctly renders the sponsored banner in demo mode with no API configuration required.
+Despite this, the real ChatGPT session with a real tester did NOT show the banner. Setup/config
+causes (wrong load folder, kill-switch defaulting on, missing API config) are ruled out by the
+prior fixes and the passing selftest. This is accepted as a confirmed real-runtime defect, not an
+inconclusive/setup result, and is filed as DRYRUN-001-ISSUE-001 at S1 (Beta blocker) / P1 (Fix
+before next beta dry-run).
+
+**Triage correction:** An earlier pass had recorded this issue at S4/P3. That classification was
+incorrect -- a confirmed banner failure that blocks the core feature under test, surviving an
+automated pre-check specifically designed to catch this class of failure, is a beta blocker by
+definition. `scripts/dryrun-001-finalize.js` now enforces a floor of S1/P1 for this issue and
+auto-files it if a tester session confirms "banner appeared: no."
 
 **Blockers (if HOLD or STOP):**
-1. [BLOCKER TBD]
-2. [BLOCKER TBD]
+1. Banner confirmed NOT to appear on real ChatGPT despite packaged selftest passing (DRYRUN-001-ISSUE-001, S1/P1).
+2. Billing/ledger status not re-verified this session.
+3. Uninstall/rollback status not reached this session.
 
 **Required Fixes Before Re-Run (if HOLD):**
-1. [FIX TBD]
-2. [FIX TBD]
+1. Add privacy-safe real-runtime diagnostics (content-script-loaded, wait-state-detected,
+   ad-decision-requested/received, banner-render-attempted) without capturing page content.
+2. Verify `CHATGPT_PROCESSING_SELECTORS` still match the live chatgpt.com DOM; fix if drifted.
+3. Verify `dryRunDemoMode` persists correctly across real install/update flows, not just fresh
+   `chrome.runtime.onInstalled` "install" events exercised by the selftest.
+4. Extend `dryrun:001:selftest` to cover whichever gap is identified so this cannot recur silently.
 
 ---
 
 ## Sign-Off Table
 
-All sign-offs are PENDING until decision is made.
-
 | Role | Decision Approved | Signed Date |
 |------|-----------------|------------|
-| Decision Owner | [PENDING] | [DATE TBD] |
+| Decision Owner | HOLD (blocked) | 2026-07-01 |
 | QA Owner | [PENDING] | [DATE TBD] |
-| Privacy Owner | [PENDING] | [DATE TBD] |
-| Release Owner | [PENDING] | [DATE TBD] |
+| Privacy Owner | [PENDING -- not re-verified this session] | [DATE TBD] |
+| Release Owner | NO -- S1/P1 blocker open | [DATE TBD] |
 
 ---
 

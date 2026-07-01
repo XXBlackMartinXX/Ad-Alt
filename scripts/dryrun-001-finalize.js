@@ -171,7 +171,7 @@ async function main() {
   const uninstallOk = await askYNU('Q9.  Did the uninstall/remove procedure work?');
   const privacyIssue = await askYNU('Q10. Was any privacy or security issue observed?');
   const billingConcern = await askYNU('Q11. Was any billing or ledger concern observed?');
-  const hasIssues = await askYNU('Q12. Were any issues found during the session?');
+  let hasIssues = await askYNU('Q12. Were any issues found during the session?');
 
   const issueSummaries = [];
   if (hasIssues === 'yes') {
@@ -181,15 +181,60 @@ async function main() {
     while (true) {
       const s = await ask(`  Issue ${n} title (short, or press Enter to stop): `);
       if (!s) break;
-      const sev = await askChoice(`  Issue ${n} severity`, ['S0', 'S1', 'S2', 'S3', 'S4']);
+      let sev = await askChoice(`  Issue ${n} severity`, ['S0', 'S1', 'S2', 'S3', 'S4']);
       const area = await ask(`  Issue ${n} area (e.g. area:browser-extension, area:docs): `);
       const desc = await ask(`  Issue ${n} sanitized description (no private data): `);
+
+      // RULE: A confirmed "no" on banner appearance is a beta blocker. It cannot
+      // be filed at S2-S4 for an issue that is clearly the banner failure itself --
+      // that would misrepresent a GO-blocking defect as low priority. Enforce a
+      // floor of S1/P1 (S0 is still permitted if the tester escalated it further,
+      // e.g. because it also involves a privacy/security concern).
+      const bannerRelated = bannerAppeared === 'no' && /banner/i.test(s);
+      if (bannerRelated && sev !== 'S0' && sev !== 'S1') {
+        console.log(`  RULE  Banner confirmed NOT observed on real ChatGPT -- this blocks the dry-run GO decision.`);
+        console.log(`        Severity floor is S1/P1; refusing to record "${sev}" for "${s}". Forcing S1.`);
+        sev = 'S1';
+      }
+
       issueSummaries.push({ title: s, severity: sev, area: area || 'area:unknown', description: desc });
       n++;
       if (n > 10) {
         console.log('  Maximum 10 issues per session. File remaining issues manually.');
         break;
       }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // RULE: If the banner was confirmed NOT to appear on real ChatGPT, an S1/P1
+  // issue MUST exist in this session's record. Do not rely on the tester
+  // remembering to file it, and do not allow the failure to go unrecorded or
+  // be represented only by a low-severity issue.
+  // -----------------------------------------------------------------------
+  if (bannerAppeared === 'no') {
+    const hasBannerS1Issue = issueSummaries.some(
+      (iss) => /banner/i.test(iss.title) && (iss.severity === 'S0' || iss.severity === 'S1'),
+    );
+    if (!hasBannerS1Issue) {
+      console.log('');
+      console.log('  RULE  Banner confirmed NOT observed on real ChatGPT with no S0/S1 issue on record.');
+      console.log('        Auto-filing a mandatory S1/P1 blocker issue -- this cannot be skipped or downgraded.');
+      hasIssues = 'yes';
+      issueSummaries.push({
+        title: 'Banner not observed on real ChatGPT despite packaged selftest passing',
+        severity: 'S1',
+        area: 'area:browser-extension, area:chatgpt-adapter, area:dry-run',
+        description:
+          'The automated packaged selftest (dryrun:001:selftest) passed using internal demo mode ' +
+          '(no API configuration required), confirming the banner rendering code path works in the ' +
+          'shipped artifact. Despite this, a real human tester on real chatgpt.com with the same ' +
+          'packaged artifact did not see the banner. This rules out missing API configuration as the ' +
+          'cause and points to a discrepancy between the synthetic fixture/selftest environment and ' +
+          'real chatgpt.com (e.g. wait-state selector drift, content-script injection timing on the ' +
+          'live SPA, or demo-mode flag not persisting across install/update). Runtime diagnosis on the ' +
+          'real ChatGPT page is required before this can be downgraded.',
+      });
     }
   }
 
@@ -705,6 +750,11 @@ personal or private data, API keys, .env files, cookies, tokens, or raw logs wit
       : 'First internal beta dry-run completed and triaged.';
   } else if (decision === 'HOLD' && hasUnknownAnswers) {
     finalLabel = 'DRYRUN-001 inconclusive; rerun required after setup clarification.';
+  } else if (decision === 'HOLD' && bannerAppeared === 'no') {
+    // Confirmed (not unknown) banner failure on real ChatGPT, even though the
+    // packaged selftest passed -- setup/config causes are ruled out, but the
+    // exact real-runtime failure point is not yet diagnosed.
+    finalLabel = 'DRYRUN-001 inconclusive; real ChatGPT banner runtime diagnosis required.';
   } else if (decision === 'HOLD') {
     finalLabel = 'DRYRUN-001 blocked; fixes required before next tester.';
   } else if (decision === 'STOP') {
@@ -725,7 +775,7 @@ personal or private data, API keys, .env files, cookies, tokens, or raw logs wit
   } else if (decision === 'HOLD' && hasUnknownAnswers) {
     console.log('Next steps (INCONCLUSIVE -- setup must be confirmed):');
     console.log('  1. Run: pnpm -w run dryrun:001:diagnose');
-    console.log('     Verify extension loads correctly from the extracted dist/ folder.');
+    console.log('     Verify extension loads correctly from the extracted ZIP root folder containing manifest.json.');
     console.log('  2. See: docs/internal-beta/dry-runs/TROUBLESHOOTING_BANNER_NOT_OBSERVED.md');
     console.log('     Confirm tester is LOGGED INTO chatgpt.com before running the test.');
     console.log('  3. Confirm tester selects "New chat" (not an existing conversation).');
@@ -733,6 +783,16 @@ personal or private data, API keys, .env files, cookies, tokens, or raw logs wit
     console.log('  5. Commit the result log and updated docs (status: INCONCLUSIVE / HOLD).');
     console.log('  6. Reschedule rerun after confirming setup is correct.');
     console.log('  7. Do NOT invite more testers until the overlay is confirmed working.');
+  } else if (decision === 'HOLD' && bannerAppeared === 'no') {
+    console.log('Next steps (CONFIRMED banner failure -- packaged selftest passed, real ChatGPT did not):');
+    console.log('  1. Do NOT reclassify this as a setup/environment issue (S2-S4) -- selftest already');
+    console.log('     ruled out missing API config, wrong load folder, and kill-switch defaults.');
+    console.log('  2. Add real-runtime diagnostics (content-script-loaded, wait-state-detected,');
+    console.log('     ad-decision-requested/received, banner-render-attempted) without capturing page content.');
+    console.log('  3. Verify CHATGPT_PROCESSING_SELECTORS still match the live chatgpt.com DOM.');
+    console.log('  4. Verify dryRunDemoMode persists across install/update on a real Chrome profile.');
+    console.log('  5. Commit the result log and updated docs (status: BLOCKED / HOLD, Issue S1/P1).');
+    console.log('  6. Do NOT invite more testers until the real-ChatGPT root cause is diagnosed and fixed.');
   } else if (decision === 'HOLD') {
     console.log('Next steps:');
     console.log('  1. Commit the result log and updated docs.');
