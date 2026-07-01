@@ -101,6 +101,11 @@ The `dry-runs/` subdirectory contains detailed execution documents for DRYRUN-00
 ## Quick Commands
 
 ```bash
+# DRYRUN-001 semi-automated conductor
+pnpm -w run dryrun:001:prepare    # Before session: all checks + package + create draft + print human steps
+pnpm -w run dryrun:001:finalize   # After session: interactive CLI to record results and update docs
+pnpm -w run check:dryrun:001      # Validate DRYRUN-001 state at any time
+
 # Verify internal beta packet
 pnpm -w run check:internal-beta-packet
 

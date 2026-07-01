@@ -11,6 +11,25 @@
 
 ---
 
+## Semi-Automated Conductor Commands
+
+Three commands cover the automated portions of the dry-run. Human session steps remain manual.
+
+```bash
+# Before the session: runs all checks, packages, creates result draft, prints human steps
+pnpm -w run dryrun:001:prepare
+
+# After the session: interactive CLI to record results, enforce rules, update all docs
+pnpm -w run dryrun:001:finalize
+
+# Anytime: validate DRYRUN-001 state and result log
+pnpm -w run check:dryrun:001
+```
+
+These commands do NOT automate ChatGPT interaction, login, prompt entry, or tester observation.
+
+---
+
 ## 1. Before the Tester Session
 
 Complete ALL of the following before inviting the tester.
@@ -22,12 +41,21 @@ git branch --show-current
 # Expected: claude/ecstatic-maxwell-h0d8d8
 
 git log --oneline -1
-# Expected: 9adb441 or later
+# Expected: 4963877 or later
 ```
 
 ### 1b. Run Full Automated Check Suite
 
-Run these commands in order. All must exit 0.
+**Recommended: use the conductor:**
+
+```bash
+pnpm -w run dryrun:001:prepare
+```
+
+This runs all checks, packages the extension, audits the ZIP, confirms public-release gates,
+creates `DRYRUN-001_RESULT_DRAFT.md`, and prints the human-only tester steps.
+
+**Or run manually:**
 
 ```bash
 pnpm -w run check:ps1
@@ -225,13 +253,23 @@ After the safe test completes:
 
 Within 24 hours of the session, run triage using DRY_RUN_TRIAGE_CHECKLIST.md.
 
-**Immediately after the session:**
+**Recommended: use the finalize conductor:**
+
+```bash
+pnpm -w run dryrun:001:finalize
+```
+
+This interactive CLI collects sanitized session results, enforces privacy/billing rules,
+creates `DRYRUN-001_RESULT_LOG.md`, updates the tracker and go/no-go record, creates issue
+files, runs a privacy scan, and prints the final honest label.
+
+**Or record manually:**
 
 1. Open FIRST_TESTER_DRY_RUN_WORKSHEET.md and confirm all sections are filled in
 2. Copy DRY_RUN_RESULT_LOG_TEMPLATE.md to:
-   `docs/internal-beta/dry-runs/DRY_RUN_RESULT_LOG_DRYRUN-001.md`
+   `docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md`
 3. Fill in ALL sections of the result log (sections 1-14)
-4. Update DRY_RUN_STATUS_TRACKER.md: set DRYRUN-001 row to IN PROGRESS or COMPLETED
+4. Update DRY_RUN_STATUS_TRACKER.md: set DRYRUN-001 row to COMPLETED
 
 **For each issue found:**
 
@@ -281,7 +319,12 @@ After triage, record the decision in GO_NO_GO_DECISION_RECORD.md.
 ## Quick Command Reference
 
 ```bash
-# Pre-run verification (run ALL before each session)
+# Semi-automated conductor (recommended)
+pnpm -w run dryrun:001:prepare    # Before session: checks + package + draft + human steps
+pnpm -w run dryrun:001:finalize   # After session:  record results + update docs + final label
+pnpm -w run check:dryrun:001      # Anytime: validate DRYRUN-001 state
+
+# Full pre-run verification (individual checks)
 pnpm -w run check:ps1
 pnpm -w run check:secrets:local
 pnpm -w run check:internal-beta-packet

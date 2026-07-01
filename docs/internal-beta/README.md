@@ -151,6 +151,17 @@ The following documents are ready for use in the active beta rollout:
 
 Verify rollout packet: `pnpm -w run check:internal-beta-rollout`
 
+### DRYRUN-001 Semi-Automated Conductor
+
+| Command | When to Run |
+|---------|------------|
+| `pnpm -w run dryrun:001:prepare` | Before the tester session: checks, package, draft, human steps |
+| `pnpm -w run dryrun:001:finalize` | After the session: interactive results recording |
+| `pnpm -w run check:dryrun:001` | Anytime: validate DRYRUN-001 state |
+
+These commands automate all safe owner-side steps. ChatGPT interaction, login, and tester
+observation remain human-only and cannot be automated.
+
 ---
 
 ## Go/No-Go Table

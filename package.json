@@ -54,7 +54,10 @@
     "icons:create": "node scripts/create-placeholder-icons.mjs",
     "check:internal-beta-packet": "node scripts/check-internal-beta-packet.js",
     "check:internal-beta-rollout": "node scripts/check-internal-beta-rollout.js",
-    "check:first-dry-run-packet": "node scripts/check-first-dry-run-packet.js"
+    "check:first-dry-run-packet": "node scripts/check-first-dry-run-packet.js",
+    "check:dryrun:001": "node scripts/check-dryrun-001-result.js",
+    "dryrun:001:prepare": "node scripts/dryrun-001-prepare.js",
+    "dryrun:001:finalize": "node scripts/dryrun-001-finalize.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
