@@ -24,6 +24,14 @@
 > DRYRUN-001-ISSUE-001.md "Triage Correction" section and the enforcement rule added to
 > `scripts/dryrun-001-finalize.js` that prevents this class of confirmed banner failure from being
 > filed or downgraded below S1/P1.
+>
+> **Since this session:** a privacy-safe, internal-beta-only live dry-run diagnostics panel
+> (`src/diagnostics/dryrun-diagnostics.ts`) and a longer recommended safe prompt ("Count slowly
+> from 1 to 100, one number per line.") have been added specifically so the NEXT rerun can show
+> exactly where the real-ChatGPT runtime path stops, instead of a single undifferentiated "no
+> banner" report. See DRYRUN-001_REAL_CHATGPT_RUNTIME_INVESTIGATION.md for the full source-level
+> review and `pnpm -w run dryrun:001:live-checklist` for rerun guidance. DRYRUN-001 status remains
+> BLOCKED/HOLD; this is NOT a claim that the underlying real-runtime issue is fixed.
 
 ---
 
@@ -151,7 +159,7 @@ cannot be recorded or left at S2-S4/P2-P3. See DRYRUN-001-ISSUE-001.md "Triage C
 
 | Next Action | Details | Owner | Target Date |
 |-------------|---------|-------|------------|
-| Diagnose real-ChatGPT banner failure (Issue 001, S1/P1) | Add privacy-safe runtime diagnostics; verify wait-state selectors against live chatgpt.com DOM; verify dryRunDemoMode persists across install/update; see DRYRUN-001-ISSUE-001.md | [OWNER TBD] | [DATE TBD -- before next beta dry-run] |
+| Rerun with live diagnostics (Issue 001, S1/P1) | Live dry-run diagnostics panel and longer recommended prompt now added; run `pnpm -w run dryrun:001:live-checklist` and rerun with a real tester; record the exact diagnostic panel status line if the banner still does not appear; see DRYRUN-001-ISSUE-001.md and DRYRUN-001_REAL_CHATGPT_RUNTIME_INVESTIGATION.md | [OWNER TBD] | [DATE TBD -- before next beta dry-run] |
 | Do NOT schedule wider beta distribution | GO blocked while Issue 001 (S1/P1) is open | [OWNER TBD] | N/A |
 
 ---

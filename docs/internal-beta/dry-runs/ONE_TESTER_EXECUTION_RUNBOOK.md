@@ -83,7 +83,7 @@ pnpm -r build
 # Expected: exit 0
 
 pnpm --filter @ad-alt/browser-extension test:unit
-# Expected: 105/105
+# Expected: all unit tests pass
 
 pnpm -w run package:browser:beta
 # Expected: exit 0
@@ -91,6 +91,10 @@ pnpm -w run package:browser:beta
 
 pnpm -w run package:browser:zip:audit -- --mode internal-beta
 # Expected: PASS (warnings acceptable, no FAIL)
+
+pnpm -w run dryrun:001:selftest
+# Expected: PASS -- proves the packaged artifact renders the banner without API config.
+# If this fails: BLOCKED BEFORE HUMAN TEST. Do not schedule the tester session.
 ```
 
 Record the artifact filename. You will need it for the result log.
@@ -185,21 +189,34 @@ Before proceeding to the safe test, confirm the tester is logged into chatgpt.co
 
 ## 3. During Safe Test
 
-**Only one prompt is approved for this dry-run:**
+**Two prompts are approved for this dry-run. Use the RECOMMENDED one for this rerun:**
 
 ```
-Count slowly from 1 to 10.
+RECOMMENDED: Count slowly from 1 to 100, one number per line.
+
+Also approved (shorter, original DRYRUN-001 prompt): Count slowly from 1 to 10.
 ```
 
-**Do NOT allow** any other prompt. If the tester starts typing something else, politely redirect them to the approved prompt.
+The longer prompt is recommended because it gives more time to observe the banner --
+a very short generation can complete before the ad-decision round-trip finishes, causing
+the banner to render and be removed almost instantly.
+
+**Do NOT allow** any other prompt. If the tester starts typing something else, politely redirect them to an approved prompt.
 
 **Observe and record (do NOT record ChatGPT content):**
 
-1. Tester navigates to `https://chatgpt.com` and logs in
+1. Tester navigates to `https://chatgpt.com` (in a NEW tab, opened AFTER the extension was loaded) and logs in
 2. Tester opens a NEW chat (not an existing conversation)
-3. Tester types exactly: `Count slowly from 1 to 10.`
+3. Tester types exactly: `Count slowly from 1 to 100, one number per line.`
 4. Tester presses Enter
 5. While ChatGPT generates the response, an overlay banner appears in the bottom-right area
+
+**Read the live dry-run diagnostics panel (internal-beta only):**
+
+A small panel labeled "PromptProfit Dry-Run Diagnostics" may be visible in the TOP-LEFT
+corner. It never shows ChatGPT content -- only extension-owned state. If the banner does
+not appear, READ AND RECORD its status line and last-error value exactly instead of
+guessing. See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md for the full status-line legend.
 
 **What you and the tester should see (banner description):**
 
@@ -212,12 +229,14 @@ While ChatGPT is streaming its response (generating phase, not after):
   - An X (close) button in the top corner of the banner
 - The banner remains visible until the X is clicked.
 
-If no banner appears within 3-5 seconds of the response starting: record "banner not observed."
-See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md for diagnosis steps.
+If no banner appears within 3-5 seconds of the response starting: record "banner not observed"
+AND the exact diagnostics panel status line. See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md for diagnosis steps.
 
 **While the banner is visible, verify:**
 
-- [ ] Banner appeared (if NO: inconclusive/S1 -- record immediately; see TROUBLESHOOTING_BANNER_NOT_OBSERVED.md)
+- [ ] Banner appeared (if NO and `dryrun:001:selftest` passed pre-session: this is a confirmed
+      S1/P1 blocker, not inconclusive -- record the diagnostics panel status line immediately;
+      see TROUBLESHOOTING_BANNER_NOT_OBSERVED.md)
 - [ ] Banner shows placeholder headline text (if real ad content: S0/S1 -- escalate)
 - [ ] Banner shows placeholder body text
 - [ ] Banner shows a placeholder display URL
@@ -347,9 +366,10 @@ After triage, record the decision in GO_NO_GO_DECISION_RECORD.md.
 
 ```bash
 # Semi-automated conductor (recommended)
-pnpm -w run dryrun:001:prepare    # Before session: checks + package + draft + human steps
-pnpm -w run dryrun:001:finalize   # After session:  record results + update docs + final label
-pnpm -w run check:dryrun:001      # Anytime: validate DRYRUN-001 state
+pnpm -w run dryrun:001:prepare        # Before session: checks + package + selftest + draft + human steps
+pnpm -w run dryrun:001:live-checklist # Before/during session: folder, prompt, diagnostics legend
+pnpm -w run dryrun:001:finalize       # After session:  record results + update docs + final label
+pnpm -w run check:dryrun:001          # Anytime: validate DRYRUN-001 state
 
 # Full pre-run verification (individual checks)
 pnpm -w run check:ps1
@@ -357,6 +377,7 @@ pnpm -w run check:secrets:local
 pnpm -w run check:internal-beta-packet
 pnpm -w run check:internal-beta-rollout
 pnpm -w run check:first-dry-run-packet
+pnpm -w run dryrun:001:selftest  # Banner-render gate against the packaged artifact
 
 # Build and package
 pnpm -r build
@@ -370,11 +391,15 @@ pnpm -w run smoke:billing:local
 pnpm -w run smoke:billing:click:local
 ```
 
-**Approved human test prompt (ONLY this exact text):**
+**Approved human test prompts:**
 
 ```
-Count slowly from 1 to 10.
+RECOMMENDED for this rerun: Count slowly from 1 to 100, one number per line.
+
+Also approved (shorter, original DRYRUN-001 prompt): Count slowly from 1 to 10.
 ```
+
+No other prompt is allowed.
 
 ---
 

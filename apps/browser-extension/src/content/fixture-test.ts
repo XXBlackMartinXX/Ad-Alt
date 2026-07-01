@@ -21,6 +21,13 @@ import { ChatGPTAdapter } from "../adapters/chatgpt/chatgpt.adapter.js";
 import { ViewabilityObserver } from "./viewability-observer.js";
 import { DebugPanel, isDebugModeEnabled, isApiConfigured } from "./debug-panel.js";
 import {
+  DryRunDiagnosticsPanel,
+  isDryRunDemoModeActive,
+  isDryRunDiagnosticsEnabled,
+  hasApiBaseUrlConfigured,
+  isElementVisible,
+} from "../diagnostics/dryrun-diagnostics.js";
+import {
   sendImpressionRequested,
   sendImpressionRendered,
   sendViewabilityThresholdMet,
@@ -30,6 +37,9 @@ import type { SponsoredMoment } from "@ad-alt/platform-core";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const chrome: any;
+// Injected at build time by esbuild define. bundle-test.mjs always sets this
+// to "internal-beta" so the diagnostics panel can be exercised in E2E tests.
+declare const PROMPTPROFIT_BUILD_MODE: string;
 
 void (async () => {
   // Override getHostname so canActivate() passes on the local fixture origin.
@@ -60,6 +70,20 @@ void (async () => {
     });
   }
 
+  // Dry-run diagnostics panel (exercised by e2e/dryrun-diagnostics.smoke.spec.ts).
+  // bundle-test.mjs always sets PROMPTPROFIT_BUILD_MODE to "internal-beta".
+  const diagnostics: DryRunDiagnosticsPanel | null =
+    PROMPTPROFIT_BUILD_MODE === "internal-beta" ? new DryRunDiagnosticsPanel() : null;
+  if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+    diagnostics?.update({ extension_loaded: true, content_script_loaded: true, build_mode: "internal-beta" });
+    const [demoActive, diagnosticsEnabled] = await Promise.all([
+      isDryRunDemoModeActive(),
+      isDryRunDiagnosticsEnabled(),
+    ]);
+    diagnostics?.update({ dry_run_demo_mode: demoActive, platform_detected: "chatgpt" });
+    if (diagnosticsEnabled) diagnostics?.mount();
+  }
+
   // Kill-switch check — fail closed if service worker is unreachable.
   let killSwitchEnabled = false;
   try {
@@ -70,25 +94,41 @@ void (async () => {
     killSwitchEnabled = resp?.disabled ?? true;
     if (killSwitchEnabled) {
       debugPanel.update({ killSwitchEnabled: true, lastErrorCode: "kill_switch_active" });
+      if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+        diagnostics?.update({ kill_switch_active: true, last_error_code: "kill_switch_active" });
+      }
       return;
     }
   } catch {
     debugPanel.update({ lastErrorCode: "service_worker_unreachable" });
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") diagnostics?.update({ last_error_code: "unknown_error" });
     return;
   }
 
   await adapter.start();
   debugPanel.update({ adapterActive: true, killSwitchEnabled });
+  if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+    diagnostics?.update({ adapter_active: true, kill_switch_active: false });
+  }
 
   const viewabilityObserver = new ViewabilityObserver();
   // Test-only: timer handle used when IntersectionObserver is bypassed.
   let testViewabilityTimer: ReturnType<typeof setTimeout> | null = null;
+  let waitStateStartedAtMs: number | null = null;
 
-  adapter.onWaitStateStart(async (_event) => {
+  adapter.onWaitStateStart(async (event) => {
     debugPanel.update({ waitStateDetected: true });
+    waitStateStartedAtMs = event.startedAt.getTime();
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+      diagnostics?.update({
+        wait_state_detected: true,
+        wait_state_started_at: event.startedAt.toISOString(),
+      });
+    }
 
     // Request an ad decision from the service-worker (which calls the mock API).
     debugPanel.update({ adDecisionRequested: true });
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") diagnostics?.update({ ad_decision_requested: true });
     let decision: SponsoredMoment | null = null;
     try {
       const resp = (await chrome.runtime.sendMessage({
@@ -99,22 +139,56 @@ void (async () => {
     } catch {
       // Service worker unreachable — show no ad, fail closed.
       debugPanel.update({ lastErrorCode: "service_worker_unreachable" });
+      if (PROMPTPROFIT_BUILD_MODE === "internal-beta") diagnostics?.update({ last_error_code: "unknown_error" });
       return;
     }
 
     if (!decision) {
       debugPanel.update({ lastErrorCode: "no_decision" });
+      if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+        const [demoActive, apiConfigured] = await Promise.all([
+          isDryRunDemoModeActive(),
+          hasApiBaseUrlConfigured(),
+        ]);
+        if (!demoActive && !apiConfigured) {
+          diagnostics?.update({ missing_api_config: true, last_error_code: "missing_api_config" });
+        } else {
+          diagnostics?.update({ ad_decision_failed: true, last_error_code: "ad_decision_failed" });
+        }
+      }
       return;
     }
 
     debugPanel.update({ adDecisionReceived: true, lastErrorCode: null });
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+      diagnostics?.update({
+        ad_decision_received: true,
+        last_error_code: "none",
+        wait_state_duration_ms:
+          waitStateStartedAtMs !== null ? Date.now() - waitStateStartedAtMs : null,
+      });
+    }
 
     // Fire impression_requested before rendering (campaignId required by schema).
     void sendImpressionRequested(decision, adapter.adapterId);
     debugPanel.update({ lastEventType: "impression_requested" });
 
-    await adapter.renderSponsoredMoment(decision);
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") diagnostics?.update({ banner_render_attempted: true });
+    await adapter.renderSponsoredMoment(decision, () => {
+      if (PROMPTPROFIT_BUILD_MODE === "internal-beta") diagnostics?.update({ banner_closed: true });
+    });
     debugPanel.update({ sponsoredMomentRendered: true });
+
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+      const bannerElForDiag = document.getElementById("promptprofit-sponsored-banner");
+      const rendered = bannerElForDiag !== null;
+      const visible = isElementVisible(bannerElForDiag);
+      diagnostics?.update({
+        banner_rendered: rendered,
+        banner_visible: visible,
+        last_error_code: !rendered ? "banner_render_failed" : !visible ? "banner_not_visible" : "none",
+      });
+    }
 
     // Fire impression_rendered immediately after the banner enters the DOM.
     void sendImpressionRendered(decision, adapter.adapterId);
@@ -165,12 +239,16 @@ void (async () => {
     }
     viewabilityObserver.stop();
     debugPanel.update({ waitStateDetected: false, sponsoredMomentRendered: false });
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
+      diagnostics?.update({ wait_state_detected: false });
+    }
     await adapter.removeSponsoredMoment();
   });
 
   window.addEventListener("beforeunload", () => {
     viewabilityObserver.stop();
     debugPanel.unmount();
+    if (PROMPTPROFIT_BUILD_MODE === "internal-beta") diagnostics?.unmount();
     void adapter.stop();
   });
 })();

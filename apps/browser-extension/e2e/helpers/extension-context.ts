@@ -44,6 +44,13 @@ export interface ExtensionConfig {
    * Defaults to false — always explicitly written to storage for test isolation.
    */
   dryRunDemoMode?: boolean;
+  /**
+   * When true, the internal-beta-only live dry-run diagnostics panel is
+   * mounted on the fixture page (requires an internal-beta build; bundle-test.mjs
+   * always builds internal-beta). Defaults to false — always explicitly
+   * written to storage for test isolation.
+   */
+  dryRunDiagnosticsEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,12 +155,13 @@ export async function configureExtensionStorage(
     config.apiKey ?? null,
     config.deviceId ?? null,
     config.dryRunDemoMode ?? false,
-  ] as [string, boolean, string[], boolean, number | null, string | null, string | null, boolean];
+    config.dryRunDiagnosticsEnabled ?? false,
+  ] as [string, boolean, string[], boolean, number | null, string | null, string | null, boolean, boolean];
 
   const doEvaluate = async () => {
     const sw = await getOrWaitForServiceWorker(context);
     await sw.evaluate(
-      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey, deviceId, dryRunDemoMode]: [
+      ([apiBaseUrl, killSwitchEnabled, disabledAdapters, debugMode, testViewabilityThresholdMs, apiKey, deviceId, dryRunDemoMode, dryRunDiagnosticsEnabled]: [
         string,
         boolean,
         string[],
@@ -161,6 +169,7 @@ export async function configureExtensionStorage(
         number | null,
         string | null,
         string | null,
+        boolean,
         boolean,
       ]) => {
         return new Promise<void>((resolve, reject) => {
@@ -190,6 +199,8 @@ export async function configureExtensionStorage(
           // Always write dryRunDemoMode so each test starts with an explicit value
           // (prevents onInstalled's write from bleeding into tests that don't set it).
           items["dryRunDemoMode"] = dryRunDemoMode;
+          // Same reasoning for the live diagnostics panel toggle.
+          items["dryRunDiagnosticsEnabled"] = dryRunDiagnosticsEnabled;
           // @ts-ignore — running inside Chrome extension service worker context
           chrome.storage.local.set(items, () => {
             // @ts-ignore

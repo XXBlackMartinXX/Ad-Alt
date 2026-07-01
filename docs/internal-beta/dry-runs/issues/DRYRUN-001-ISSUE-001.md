@@ -118,17 +118,27 @@ exactly as demonstrated by the passing packaged selftest.
 
 ## Reproduction Steps (for real-runtime diagnosis)
 
+**Updated for this rerun -- a live dry-run diagnostics panel now replaces steps 7-8 below.**
+Run `pnpm -w run dryrun:001:live-checklist` first; it prints the exact folder to load, the
+recommended prompt, and the full diagnostics-panel status-line legend.
+
 1. Owner runs: `pnpm -w run dryrun:001:selftest` -- confirm it still PASSES (packaged artifact is sound).
 2. Tester confirms logged into chatgpt.com (chat interface visible, not "Log in" / "Sign up").
 3. Tester loads the extension: chrome://extensions -> Developer Mode ON -> Load unpacked -> select the
    **extracted ZIP root folder** (the folder containing `manifest.json` directly, NOT the `dist/` subfolder).
+   Use a NEW extraction folder, not one reused from a previous attempt (see hypothesis 3 below).
 4. Confirm in `chrome://extensions` that this is a fresh install (not a reload of a previously-loaded ID),
    so `onInstalled` fires with `reason === "install"`.
 5. Open a NEW chat.
-6. Submit: `Count slowly from 1 to 10.`
-7. Watch the bottom-right corner during ChatGPT generation.
-8. If no banner: inspect the service worker console (chrome://extensions -> service worker "Inspect")
-   for `GET_AD_DECISION` handling and confirm `dryRunDemoMode` is `true` in `chrome.storage.local`.
+6. Submit the recommended prompt: `Count slowly from 1 to 100, one number per line.`
+   (the shorter `Count slowly from 1 to 10.` remains approved but is more likely to trigger
+   hypothesis 4 below).
+7. Watch the bottom-right corner during ChatGPT generation, AND the live dry-run diagnostics
+   panel (top-left corner, internal-beta only). Record the panel's exact status line.
+8. If no banner: the diagnostics panel's status line and `last_error_code` directly indicate
+   which of the hypotheses below is occurring -- record it verbatim instead of guessing.
+   (The service-worker-console inspection previously suggested here is superseded by the panel,
+   which reads the same signals without requiring DevTools.)
 
 ---
 
@@ -167,10 +177,16 @@ exactly as demonstrated by the passing packaged selftest.
 
 ## Resolution Criteria
 
-**Resolved (downgrade permitted):** Real-runtime diagnostics are added (privacy-safe, no page content),
-the exact failure point on real chatgpt.com is identified and fixed, `dryrun:001:selftest` is extended to
-cover the identified gap (e.g. real-DOM selector check, install-vs-update path), and a subsequent real
-tester session confirms the banner appears on real chatgpt.com.
+**Partially addressed:** The privacy-safe live dry-run diagnostics panel
+(`src/diagnostics/dryrun-diagnostics.ts`, `DryRunDiagnosticsPanel`) and a longer
+recommended safe prompt have been added. This is NOT resolution -- it is the
+instrumentation needed to identify the real-runtime failure point on the next rerun.
+
+**Resolved (downgrade permitted):** The exact failure point on real chatgpt.com is
+identified via the live diagnostics panel and fixed, `dryrun:001:selftest` (or a new
+targeted test) is extended to cover the identified gap (e.g. real-DOM selector check,
+install-vs-update path), and a subsequent real tester session confirms the banner appears
+on real chatgpt.com with the diagnostics panel reading "Banner visible."
 
 **Remains S1/P1 until then.** Do not schedule DRYRUN-002 wider distribution while this is open.
 

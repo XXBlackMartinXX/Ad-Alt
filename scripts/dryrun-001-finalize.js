@@ -165,7 +165,7 @@ async function main() {
   const artifact = artifactRaw || defaultZip;
 
   const installOk = await askYNU('Q5.  Did the install succeed without assistance?');
-  const safePromptUsed = await askYNU('Q6.  Was the safe test prompt used exactly? ("Count slowly from 1 to 10.")');
+  const safePromptUsed = await askYNU('Q6.  Was one of the two approved safe prompts used exactly? ("Count slowly from 1 to 10." OR the recommended "Count slowly from 1 to 100, one number per line.")');
   const bannerAppeared = await askYNU('Q7.  Did the banner appear correctly during the safe test?');
   const closeWorked = await askYNU('Q8.  Did the close/disable procedure work?');
   const uninstallOk = await askYNU('Q9.  Did the uninstall/remove procedure work?');
@@ -432,8 +432,9 @@ ${hasUnknownAnswers ? '\n**Reason:** Some critical observations were UNKNOWN. Se
 1. Received beta ZIP via secure internal channel.
 2. Loaded extension via chrome://extensions -> Load unpacked.
 3. Navigated to chatgpt.com.
-4. Used safe prompt: "Count slowly from 1 to 10." (approved)
-5. Observed banner behavior.
+4. Used an approved safe prompt (either "Count slowly from 1 to 10." or the
+   recommended longer prompt "Count slowly from 1 to 100, one number per line.")
+5. Observed banner behavior (and, if enabled, the live dry-run diagnostics panel).
 6. Tested close/disable/uninstall procedures.
 
 ---

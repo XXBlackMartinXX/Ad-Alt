@@ -204,7 +204,14 @@ describe("ChatGPTAdapter — rendering", () => {
   it("renderSponsoredMoment calls renderer when active", async () => {
     await adapter.start();
     await adapter.renderSponsoredMoment(MOMENT);
-    expect(renderer.render).toHaveBeenCalledWith(MOMENT);
+    expect(renderer.render).toHaveBeenCalledWith(MOMENT, undefined);
+  });
+
+  it("renderSponsoredMoment forwards an onClose callback to the renderer", async () => {
+    await adapter.start();
+    const onClose = () => {};
+    await adapter.renderSponsoredMoment(MOMENT, onClose);
+    expect(renderer.render).toHaveBeenCalledWith(MOMENT, onClose);
   });
 
   it("renderSponsoredMoment is a no-op when adapter is not active", async () => {

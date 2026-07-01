@@ -121,6 +121,15 @@ console.log('-- Banner selftest (automated gate -- must pass before human test) 
 
 const selftestCheck = check('dryrun:001:selftest', 'pnpm -w run dryrun:001:selftest');
 
+if (selftestCheck.ok) {
+  console.log('  PASS  Packaged selftest confirms the banner renders without API config.');
+  console.log('        This does NOT prove the real ChatGPT runtime path works --');
+  console.log('        it only proves the packaged artifact CAN render the banner.');
+  console.log('        Next: run `pnpm -w run dryrun:001:live-checklist` before the human session.');
+} else {
+  console.log('  FAIL  Selftest failed -- BLOCKED BEFORE HUMAN TEST. Do not schedule a rerun.');
+}
+
 console.log('');
 console.log('-- Public-release gate confirmation (expected: FAIL/blocking) --');
 
@@ -297,11 +306,20 @@ console.log('   Tester: Click "Load unpacked" and select the EXTRACTED ZIP ROOT 
 console.log('           (the folder that contains manifest.json directly -- NOT the dist/ subfolder)');
 console.log('   Tester: Confirm "PromptProfit" appears in the list with no error badge');
 console.log('');
+console.log('   RECOMMENDED: run `pnpm -w run dryrun:001:live-checklist` first -- it prints');
+console.log('   the exact folder to load, the recommended prompt, and what each diagnostic');
+console.log('   panel state means, so the tester does not have to guess.');
+console.log('');
 console.log('3. Tester: Navigate to https://chatgpt.com (manual login -- do not automate)');
 console.log('   Tester: Open a NEW chat (not an existing conversation)');
-console.log('   Tester: Type EXACTLY the following prompt:');
+console.log('   Tester: Type EXACTLY the following prompt (RECOMMENDED -- gives more observation time):');
 console.log('');
-console.log('     Count slowly from 1 to 10.');
+console.log('     Count slowly from 1 to 100, one number per line.');
+console.log('');
+console.log('   (The original short prompt "Count slowly from 1 to 10." remains approved,');
+console.log('   but the longer prompt is recommended because a very short generation may');
+console.log('   complete before the ad-decision round-trip finishes, causing the banner to');
+console.log('   flash briefly or seem to never appear.)');
 console.log('');
 console.log('   Tester: Send the prompt and watch the bottom-right viewport area');
 console.log('');
@@ -311,6 +329,10 @@ console.log('   [ ] Banner shows placeholder headline text only');
 console.log('   [ ] Banner shows placeholder body text and display URL');
 console.log('   [ ] No ChatGPT content or personal data visible in the banner');
 console.log('   [ ] No ppft_ key visible anywhere in the browser UI');
+console.log('');
+console.log('   If the internal-beta live dry-run diagnostics panel is visible (top-left');
+console.log('   corner), READ ITS STATUS LINE instead of guessing why the banner did not');
+console.log('   appear -- record the exact status line and last-error value in the worksheet.');
 console.log('');
 console.log('5. Tester: Click the X button on the banner');
 console.log('   [ ] Banner disappears immediately');
@@ -329,11 +351,15 @@ console.log('   - Do NOT share screenshots containing personal or private data')
 console.log('   - Do NOT share API keys, .env files, ppft_ patterns, or tokens');
 console.log('   - Do NOT share full browser URLs containing session IDs');
 console.log('   - Do NOT share cookies or raw logs containing secrets');
-console.log('   - Only use the approved safe prompt: "Count slowly from 1 to 10."');
+console.log('   - Only use an approved safe prompt:');
+console.log('       Recommended: "Count slowly from 1 to 100, one number per line."');
+console.log('       Also approved: "Count slowly from 1 to 10."');
 console.log('');
 console.log('8. After the session:');
 console.log('   Run: pnpm -w run dryrun:001:finalize');
 console.log('   This records the results and creates the official result log.');
+console.log('   If the banner did not appear, record the diagnostic panel status line');
+console.log('   and last-error value verbatim -- do not guess at a cause.');
 console.log('');
 
 // -----------------------------------------------------------------------

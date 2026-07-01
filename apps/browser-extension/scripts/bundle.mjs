@@ -28,6 +28,11 @@ const sharedOpts = {
   define: {
     PROMPTPROFIT_BUILD_MODE: JSON.stringify(buildMode),
   },
+  // Production builds are minified so that build-mode-gated dead branches
+  // (internal-beta demo mode, dry-run diagnostics) are actually stripped from
+  // the shipped source text, not just made unreachable at runtime. Internal-beta
+  // builds stay unminified for tester/engineer debuggability.
+  minify: buildMode === "production",
 };
 
 await esbuild.build({

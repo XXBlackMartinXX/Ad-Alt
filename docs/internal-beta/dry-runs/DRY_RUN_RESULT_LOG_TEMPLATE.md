@@ -95,7 +95,8 @@ except the approved safe prompt.
 
 1. [ACTION]
 2. [ACTION]
-3. Used safe prompt: "Count slowly from 1 to 10." (approved)
+3. Used an approved safe prompt: "Count slowly from 1 to 100, one number per line."
+   (recommended) or "Count slowly from 1 to 10." (also approved)
 4. [ACTION]
 ...
 
@@ -115,6 +116,8 @@ Describe what was observed. No personal data. No ppft_ keys. No ChatGPT content.
 | No personal data in banner | [YES / NO / TBD] |
 | Disable turned off banner | [YES / NO / TBD] |
 | Remove uninstalled cleanly | [YES / NO / TBD] |
+| Live dry-run diagnostics panel status line (internal beta only, if visible) | [RECORD EXACTLY, or N/A] |
+| Live dry-run diagnostics last-error value (if banner did not appear) | [RECORD EXACTLY, or N/A] |
 
 Additional notes (no personal data, no ppft_ keys, no ChatGPT content):
 [FREE TEXT]

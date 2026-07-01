@@ -21,6 +21,45 @@ pnpm -w run dryrun:001:diagnose
 This checks: branch, commit, dist/ contents, manifest, expected JS files, ZIP artifact.
 Fix any FAIL items before proceeding with the checklist below.
 
+Then run the live checklist, which prints the exact folder to load, the recommended
+prompt, and what each diagnostic panel state means:
+
+```bash
+pnpm -w run dryrun:001:live-checklist
+```
+
+---
+
+## Read the Live Diagnostics Panel First -- Do Not Guess
+
+The packaged selftest (`pnpm -w run dryrun:001:selftest`) already proves the banner CAN
+render in the shipped artifact using internal-beta demo mode with no API configuration.
+If the banner still does not appear on real ChatGPT, that means something in the REAL
+runtime path is failing -- not a packaging problem. Guessing at which of the checklist
+items below applies wastes the tester's time and produces vague reports.
+
+Instead: look for the small panel labeled "PromptProfit Dry-Run Diagnostics" in the
+**top-left** corner of the page (internal-beta builds only). It never shows any ChatGPT
+content -- only extension-owned state. Read its status line and record it EXACTLY:
+
+| Status line | Meaning | What to check next |
+|---|---|---|
+| "Extension not loaded on this page" | Content script never ran here | Reload the ChatGPT tab; confirm you opened it AFTER loading the extension |
+| "Platform not detected" | Hostname mismatch | Confirm you are on chatgpt.com or chat.openai.com |
+| "Kill-switch active -- banner suppressed" | A stored flag is blocking the banner | See section B below |
+| "Adapter inactive" | Extension loaded but did not start | Check for an error badge; see section B |
+| "Waiting for generation state" (never changes after sending a prompt) | Wait-state selector may not match this ChatGPT build | File an issue referencing this exact status; see RF-2 in DRYRUN-001_BANNER_NOT_OBSERVED_ROOT_CAUSE.md |
+| "Generation detected; API not configured" | Demo mode/API never got configured -- likely a reused extraction folder (see section B5) | Reload into a fresh folder; re-verify install was a genuine "install" not "update" |
+| "Generation detected; ad decision failed" | Demo mode or API IS configured but still failed | This is a genuine runtime bug -- report it, do not treat as setup |
+| "Banner attempted; not visible" | Banner is in the page but has zero visible size | Report this exactly -- likely a CSS/host-page conflict |
+| "Banner visible" | Everything worked | No issue |
+
+If the panel itself is not visible at all: this only happens if
+`dryRunDiagnosticsEnabled` was never written to storage, which (like the demo-mode issue
+in section B5) usually means Chrome treated the extension load as an "update" rather than
+a fresh "install." Remove all copies of the extension and reload from a NEW extraction
+folder.
+
 ---
 
 ## Checklist: Common Causes of Banner Not Appearing
@@ -79,7 +118,8 @@ Work through each item in order. Check each box when confirmed.
 
 - [ ] **C4. Confirm the safe test prompt is typed in the chat input, not the URL bar.**
   The prompt must be typed into the ChatGPT message box, not the browser address bar.
-  Prompt: `Count slowly from 1 to 10.` (exactly as written)
+  Recommended (gives more observation time): `Count slowly from 1 to 100, one number per line.`
+  Also approved (original, shorter): `Count slowly from 1 to 10.`
 
 ### D. Extension Files
 
@@ -132,7 +172,7 @@ STOP and follow the S0 escalation procedure in DRY_RUN_TRIAGE_CHECKLIST.md.
 
 | What You See | Action |
 |-------------|--------|
-| No banner after all checklist items confirmed | File S2 issue via PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md |
+| No banner after all checklist items confirmed AND `dryrun:001:selftest` passed | File S1/P1 (beta blocker) via PRIVACY_SAFE_ISSUE_CAPTURE_FORM.md -- record the diagnostic panel status line verbatim. A confirmed failure surviving a passing packaged selftest is NOT a setup issue and cannot be downgraded to S2-S4 (see `scripts/dryrun-001-finalize.js` enforcement). |
 | Error badge on extension icon | Record exact error text; file S1/S2 issue |
 | Real ad content in banner (not placeholder) | STOP -- S0/S1 -- escalate to Privacy Owner |
 | API key pattern (ppft_...) visible anywhere | STOP -- S0 -- escalate to Privacy Owner |
@@ -147,6 +187,12 @@ STOP and follow the S0 escalation procedure in DRY_RUN_TRIAGE_CHECKLIST.md.
 ```bash
 # Re-run repo diagnostics
 pnpm -w run dryrun:001:diagnose
+
+# Confirm the packaged artifact can render the banner without API config
+pnpm -w run dryrun:001:selftest
+
+# Print the live checklist (folder to load, recommended prompt, diagnostic panel legend)
+pnpm -w run dryrun:001:live-checklist
 
 # Rebuild and repackage
 pnpm -r build

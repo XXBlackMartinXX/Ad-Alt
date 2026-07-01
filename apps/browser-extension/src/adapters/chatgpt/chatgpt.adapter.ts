@@ -118,9 +118,9 @@ export class ChatGPTAdapter implements IAdapter {
     };
   }
 
-  async renderSponsoredMoment(moment: SponsoredMoment): Promise<void> {
+  async renderSponsoredMoment(moment: SponsoredMoment, onClose?: () => void): Promise<void> {
     if (!this.active) return;
-    this.renderer.render(moment);
+    this.renderer.render(moment, onClose);
   }
 
   async removeSponsoredMoment(): Promise<void> {

@@ -68,16 +68,19 @@ Verify all automated checks pass before distributing the package:
 - [ ] git branch --show-current -> claude/ecstatic-maxwell-h0d8d8
 - [ ] git log --oneline -1 -> 9adb441 or later
 - [ ] pnpm -r build -> exit 0
-- [ ] pnpm --filter @ad-alt/browser-extension test:unit -> 105/105
+- [ ] pnpm --filter @ad-alt/browser-extension test:unit -> all pass
 - [ ] pnpm -w run check:secrets:local -> 0 leaks
 - [ ] pnpm -w run package:browser:beta -> exit 0
 - [ ] pnpm -w run package:browser:zip:audit -- --mode internal-beta -> PASS
 - [ ] pnpm -w run check:internal-beta-packet -> PASS
 - [ ] pnpm -w run check:internal-beta-rollout -> PASS
+- [ ] pnpm -w run dryrun:001:selftest -> PASS (packaged artifact renders banner without API config)
+- [ ] pnpm -w run dryrun:001:live-checklist -> read and shared with the tester
 - [ ] Beta ZIP confirmed: does NOT contain dist-test/, .js.map, .env, node_modules
 - [ ] Beta ZIP confirmed: DOES contain manifest.json, background/service-worker.js, content/chatgpt.js, icons/
 - [ ] Tester has agreed to NDA or internal beta terms
 - [ ] Tester has read privacy rules (PRIVACY_SECURITY_ONE_PAGER.md or summary provided)
+- [ ] Tester instructed to unzip into a NEW folder (not a folder reused from a previous attempt)
 - [ ] Beta ZIP delivered to tester via secure internal channel (NOT unencrypted email or public link)
 - [ ] FIRST_TESTER_DRY_RUN_WORKSHEET.md is available to owner during session
 - [ ] Tester confirmed they have a chatgpt.com account and CAN log in before starting
@@ -105,8 +108,8 @@ Track B additions (Engineer):
 - [ ] git checkout claude/ecstatic-maxwell-h0d8d8 succeeded
 - [ ] pnpm install --frozen-lockfile succeeded
 - [ ] pnpm -r build succeeded
-- [ ] pnpm --filter @ad-alt/browser-extension test:unit -> 105/105
-- [ ] pnpm --filter @ad-alt/browser-extension test:e2e -> 13/13
+- [ ] pnpm --filter @ad-alt/browser-extension test:unit -> all pass
+- [ ] pnpm --filter @ad-alt/browser-extension test:e2e -> all pass
 
 **Install Notes:**
 [Record any confusion, errors, or steps that needed explanation]
@@ -115,11 +118,16 @@ Track B additions (Engineer):
 
 ## SAFE TEST CHECKLIST
 
-**Approved test prompt (use ONLY this exact prompt):**
+**Approved test prompts -- use the RECOMMENDED one for this rerun:**
 
-  Count slowly from 1 to 10.
+  RECOMMENDED: Count slowly from 1 to 100, one number per line.
+  Also approved (shorter, original DRYRUN-001 prompt): Count slowly from 1 to 10.
+
+The longer prompt is recommended because it gives more time to observe the banner --
+a very short generation can complete before the ad-decision round-trip finishes.
 
 **Forbidden prompts:** any prompt containing personal data, work content, or sensitive information.
+No prompt other than the two above is allowed.
 
 **LOGGED-IN PREREQUISITE (MUST confirm before proceeding):**
 - [ ] Tester confirmed they are logged into chatgpt.com (no "Log in" / "Sign up" visible)
@@ -135,9 +143,17 @@ A small rectangular overlay banner should appear with:
 The banner is NOT a real advertisement. It is placeholder content for internal testing only.
 If no banner appears within 5 seconds of the response starting: record "banner not observed."
 
-- [ ] Tester navigated to https://chatgpt.com and confirmed they are logged in
+**Live dry-run diagnostics panel (internal-beta only, top-left corner):**
+If visible, read its status line and `last_error_code` and record them EXACTLY here instead
+of guessing at a cause. It never shows ChatGPT content. See TROUBLESHOOTING_BANNER_NOT_OBSERVED.md
+for the full status-line legend.
+
+Diagnostics panel status line observed: ______________________________________
+Diagnostics panel last-error value observed: __________________________________
+
+- [ ] Tester navigated to https://chatgpt.com (new tab, opened AFTER loading the extension) and confirmed they are logged in
 - [ ] Tester opened a NEW chat (click "New chat" in sidebar -- NOT an existing conversation)
-- [ ] Tester typed exactly: Count slowly from 1 to 10.
+- [ ] Tester typed exactly: Count slowly from 1 to 100, one number per line.
 - [ ] Tester pressed Enter / sent the prompt
 - [ ] Owner/tester both watched the BOTTOM-RIGHT corner during ChatGPT generation
 - [ ] While ChatGPT was generating, an overlay banner appeared in the bottom-right viewport area

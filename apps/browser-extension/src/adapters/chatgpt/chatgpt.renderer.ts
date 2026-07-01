@@ -19,7 +19,14 @@
 import type { SponsoredMoment } from "@ad-alt/platform-core";
 
 export interface IChatGPTRenderer {
-  render(moment: SponsoredMoment): void;
+  /**
+   * @param onClose Optional callback fired ONLY when the user clicks the
+   *   close (X) button — distinct from remove(), which is also called when
+   *   the wait-state ends. Used by internal-beta dry-run diagnostics to
+   *   distinguish "the tester dismissed it" from "it was auto-removed."
+   *   Never receives any moment/page data — a no-argument signal only.
+   */
+  render(moment: SponsoredMoment, onClose?: () => void): void;
   remove(): void;
   getElement(): Element | null;
 }
@@ -29,7 +36,7 @@ const CONTAINER_ID = "promptprofit-sponsored-banner";
 export class ChatGPTRenderer implements IChatGPTRenderer {
   private container: HTMLElement | null = null;
 
-  render(moment: SponsoredMoment): void {
+  render(moment: SponsoredMoment, onClose?: () => void): void {
     this.remove();
 
     if (typeof document === "undefined") return;
@@ -80,7 +87,10 @@ export class ChatGPTRenderer implements IChatGPTRenderer {
       "align-items:center",
       "justify-content:center",
     ].join(";");
-    closeBtn.addEventListener("click", () => this.remove());
+    closeBtn.addEventListener("click", () => {
+      this.remove();
+      onClose?.();
+    });
 
     const sponsorLabel = document.createElement("div");
     sponsorLabel.textContent = "PromptProfit · Sponsored"; // ·

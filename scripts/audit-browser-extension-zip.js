@@ -20,6 +20,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const EXT_DIR   = path.join(REPO_ROOT, 'apps', 'browser-extension');
@@ -75,20 +76,42 @@ function readZipEntries(buf) {
     const sig = buf.readUInt32LE(pos);
     if (sig !== 0x02014B50) break; // Central directory header signature
 
-    const compMethod     = buf.readUInt16LE(pos + 10);
-    const compressedSize = buf.readUInt32LE(pos + 20);
-    const uncompSize     = buf.readUInt32LE(pos + 24);
-    const fnLen          = buf.readUInt16LE(pos + 28);
-    const extraLen       = buf.readUInt16LE(pos + 30);
-    const commentLen     = buf.readUInt16LE(pos + 32);
+    const compMethod       = buf.readUInt16LE(pos + 10);
+    const compressedSize   = buf.readUInt32LE(pos + 20);
+    const uncompSize       = buf.readUInt32LE(pos + 24);
+    const fnLen            = buf.readUInt16LE(pos + 28);
+    const extraLen         = buf.readUInt16LE(pos + 30);
+    const commentLen       = buf.readUInt16LE(pos + 32);
+    const localHeaderOffset = buf.readUInt32LE(pos + 42);
 
     const name = buf.subarray(pos + 46, pos + 46 + fnLen).toString('utf8');
-    entries.push({ name, compressedSize, uncompSize, compMethod });
+    entries.push({ name, compressedSize, uncompSize, compMethod, localHeaderOffset });
 
     pos += 46 + fnLen + extraLen + commentLen;
   }
 
   return entries;
+}
+
+/**
+ * Decompresses a single ZIP entry's file content, given the whole-ZIP buffer
+ * and the entry descriptor returned by readZipEntries(). Supports method 0
+ * (stored) and method 8 (deflate) -- the only methods the packaging scripts
+ * ever produce. Returns a Buffer of the uncompressed content.
+ */
+function readZipEntryContent(buf, entry) {
+  const local = entry.localHeaderOffset;
+  if (buf.readUInt32LE(local) !== 0x04034B50) {
+    throw new Error('Invalid local file header for ' + entry.name);
+  }
+  const fnLen    = buf.readUInt16LE(local + 26);
+  const extraLen = buf.readUInt16LE(local + 28);
+  const dataStart = local + 30 + fnLen + extraLen;
+  const compressed = buf.subarray(dataStart, dataStart + entry.compressedSize);
+
+  if (entry.compMethod === 0) return compressed;
+  if (entry.compMethod === 8) return zlib.inflateRawSync(compressed);
+  throw new Error('Unsupported compression method ' + entry.compMethod + ' for ' + entry.name);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,9 +165,10 @@ pass('ZIP size: ' + zipStat.size + ' bytes');
 section('2. ZIP Contents');
 
 let entries;
+let zipBuf;
 try {
-  const buf = fs.readFileSync(zipPath);
-  entries = readZipEntries(buf);
+  zipBuf = fs.readFileSync(zipPath);
+  entries = readZipEntries(zipBuf);
 } catch (e) {
   fail('Failed to read ZIP: ' + e.message);
   process.exit(1);
@@ -226,6 +250,60 @@ if (reportFiles.length === 0) {
   pass('No local report files in ZIP');
 } else {
   fail('Local report file(s) in ZIP: ' + reportFiles.join(', '));
+}
+
+// ---------------------------------------------------------------------------
+// Check 3b: Internal-beta-only source text must not ship in public-release
+// ---------------------------------------------------------------------------
+// dryRunDemoMode / dry-run diagnostics only exist so an internal-beta tester
+// can see the sponsored banner and a live diagnostics panel without any API
+// configuration. That source text (and the "internal-beta" build-mode string
+// itself) must never reach a public-release artifact -- CANARY 10 requires
+// the diagnostics panel be "impossible" in production, not merely inert.
+// This is checked by decompressing the actual shipped JS and scanning for
+// the literal strings, not just trusting that the build-mode branch is
+// unreachable at runtime.
+
+section('3b. Internal-Beta-Only Source Text (public-release gate)');
+
+const FORBIDDEN_INTERNAL_BETA_STRINGS = [
+  'internal-beta',
+  'dryRunDemoMode',
+  'dryRunDiagnosticsEnabled',
+  'DEMO_AD_DECISION',
+  'promptprofit-dryrun-diagnostics',
+  'DryRunDiagnostics',
+];
+
+const jsEntries = entries.filter(e => e.name.replace(/\\/g, '/').endsWith('.js'));
+const foundInternalBetaText = [];
+
+for (const entry of jsEntries) {
+  let content;
+  try {
+    content = readZipEntryContent(zipBuf, entry).toString('utf8');
+  } catch (e) {
+    warn('Could not decompress ' + entry.name + ' for content scan: ' + e.message);
+    continue;
+  }
+  for (const needle of FORBIDDEN_INTERNAL_BETA_STRINGS) {
+    if (content.includes(needle)) {
+      foundInternalBetaText.push({ file: entry.name.replace(/\\/g, '/'), needle });
+    }
+  }
+}
+
+if (foundInternalBetaText.length === 0) {
+  pass('No internal-beta-only source text (demo mode, diagnostics) found in shipped JS');
+} else {
+  for (const hit of foundInternalBetaText) {
+    modeGatedFail('Internal-beta-only string "' + hit.needle + '" found in ' + hit.file);
+  }
+  if (isPublicRelease) {
+    info('  Fix: rebuild with the production build mode before packaging');
+    info('  (pnpm -w run package:browser:public rebuilds with --build-mode production');
+    info('  and minifies, which strips this source text).');
+  }
 }
 
 // ---------------------------------------------------------------------------

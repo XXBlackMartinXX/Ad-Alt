@@ -237,8 +237,11 @@ if (!resultLogExists) {
     warn('Result log decision field unclear');
   }
 
-  // Safe prompt check -- must not contain unauthorized prompts
-  if (/Count slowly from 1 to 10/i.test(resultLogContent)) {
+  // Safe prompt check -- must reference one of the two approved prompts exactly.
+  // Anchored with a trailing period/comma so "...to 10." never incidentally
+  // matches as a substring of "...to 100, one number per line."
+  const APPROVED_PROMPT_PATTERN = /Count slowly from 1 to 10\.|Count slowly from 1 to 100, one number per line\./i;
+  if (APPROVED_PROMPT_PATTERN.test(resultLogContent)) {
     pass('Approved safe test prompt present in result log');
   }
 

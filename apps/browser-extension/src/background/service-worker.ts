@@ -154,7 +154,10 @@ async function postEvent(event: unknown): Promise<boolean> {
  */
 async function getAdDecision(adapterId: string): Promise<Record<string, unknown> | null> {
   // Internal-beta only: return a local placeholder when dryRunDemoMode is active.
-  // esbuild dead-code eliminates this entire block in production builds.
+  // This branch is unreachable at runtime in production builds (build-time
+  // constant is always "production" there); the minified production bundle
+  // and the audit-browser-extension-zip.js public-release gate both ensure
+  // this source text does not ship in a public-release artifact.
   if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
     try {
       const demoStored = await chrome.storage.local.get("dryRunDemoMode") as Record<string, unknown>;
@@ -212,10 +215,16 @@ chrome.runtime.onInstalled.addListener(({ reason }: { reason: string }) => {
       if (!isValidFeatureFlags(stored["featureFlags"])) {
         const defaultFlags: FeatureFlags = { killSwitchEnabled: false, disabledAdapters: [], flags: {} };
         const items: Record<string, unknown> = { featureFlags: defaultFlags };
-        // Internal-beta: enable demo mode so the banner shows without API config.
-        // esbuild dead-code eliminates this branch in production builds.
+        // Internal-beta: enable demo mode and live dry-run diagnostics so the
+        // banner (and the diagnostic panel) show without any manual setup.
+        // This branch is unreachable at runtime in production builds (the
+        // build-time constant is always "production" there); the production
+        // build pipeline additionally minifies to strip this source text, and
+        // scripts/audit-browser-extension-zip.js fails a public-release ZIP
+        // if these strings are found in the shipped service worker.
         if (PROMPTPROFIT_BUILD_MODE === "internal-beta") {
           items["dryRunDemoMode"] = true;
+          items["dryRunDiagnosticsEnabled"] = true;
         }
         chrome.storage.local.set(items).catch(() => {});
         cachedFlags = defaultFlags;

@@ -222,10 +222,12 @@ if (/check:secrets:local|check:internal-beta-packet|check:internal-beta-rollout/
   fail('Execution runbook missing required pre-run check commands');
 }
 
-if (/Count slowly from 1 to 10/i.test(runbookContent)) {
-  pass('Execution runbook contains approved safe test prompt');
+// Anchored with a trailing period/comma so "...to 10." never incidentally
+// matches as a substring of "...to 100, one number per line."
+if (/Count slowly from 1 to 10\.|Count slowly from 1 to 100, one number per line\./i.test(runbookContent)) {
+  pass('Execution runbook contains an approved safe test prompt');
 } else {
-  fail('Execution runbook missing approved safe test prompt');
+  fail('Execution runbook missing an approved safe test prompt');
 }
 
 if (/smoke:billing:local|smoke:billing:click:local/i.test(runbookContent)) {
