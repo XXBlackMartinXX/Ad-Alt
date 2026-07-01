@@ -15,7 +15,7 @@
 
 | ID | Date | Tester | Track | Status | Decision | Result Log | Notes |
 |----|------|--------|-------|--------|----------|------------|-------|
-| DRYRUN-001 | 2026-07-01 | [non-engineer] | A | INCONCLUSIVE | HOLD | DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md | Attempted; banner not observed; tester logged out; rerun required |
+| DRYRUN-001 | 2026-07-01 | [TBD] | [A/B] | INCONCLUSIVE | HOLD | DRYRUN-001_RESULT_LOG.md | Session inconclusive; some answers unknown; rerun required |
 
 ---
 
@@ -72,7 +72,7 @@ If no open S0/S1 issues: "None -- no blocking issues."
 | Open S0 | NONE OBSERVED |
 | Open S1 | NONE OBSERVED (banner not observed is inconclusive, not confirmed S1) |
 | Privacy Result | CLEAN -- no privacy/security issue observed |
-| Billing Result | NOT OBSERVED IN REAL TESTER RUN |
+| Billing Result | UNKNOWN -- TREAT AS CONCERN |
 | Rollback Result | NOT CONFIRMED -- session did not reach uninstall step |
 | Notes | Attempted 2026-07-01. Banner not observed; tester appeared logged out. Rerun required. See DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md and TROUBLESHOOTING_BANNER_NOT_OBSERVED.md. |
 

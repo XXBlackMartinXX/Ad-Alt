@@ -1,7 +1,7 @@
 # PromptProfit -- First Tester Dry-Run Worksheet
 
 **Dry-Run ID:** DRYRUN-001
-**Status: NOT RUN YET**
+**Status: INCONCLUSIVE -- see DRYRUN-001_RESULT_LOG.md (decision: HOLD)**
 **Branch:** claude/ecstatic-maxwell-h0d8d8
 
 ---
@@ -235,7 +235,7 @@ Only needed if an S0 or S1 issue was found:
 | Disable/remove worked | [TBD] | |
 | Feedback filed | [TBD] | |
 
-**Decision:** PENDING -- dry-run not yet executed
+**Decision:** HOLD -- DRYRUN-001 inconclusive 2026-07-01
 
 Allowed decisions after execution:
 - GO: proceed to Day 2-3 small beta (3-5 testers)

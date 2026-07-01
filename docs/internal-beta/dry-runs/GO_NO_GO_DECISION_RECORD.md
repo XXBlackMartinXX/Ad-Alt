@@ -1,7 +1,7 @@
 # PromptProfit -- Go / No-Go Decision Record
 
 **Dry-Run ID:** DRYRUN-001
-**Decision Status: PENDING -- dry-run not yet executed**
+**Decision Status: HOLD -- DRYRUN-001 inconclusive 2026-07-01**
 **Branch:** claude/ecstatic-maxwell-h0d8d8
 
 ---
@@ -82,15 +82,15 @@ Open S2 count: [TBD]
 
 ---
 
-## CURRENT DECISION: PENDING
+## CURRENT DECISION: HOLD
 
-**Reason:** Dry-run DRYRUN-001 has not been executed yet.
+**Reason:** DRYRUN-001 inconclusive 2026-07-01. Decision recorded by finalize script.
 
 ---
 
 ## Decision Record (Fill In After Dry-Run)
 
-**Decision:** [GO / HOLD / STOP -- DO NOT FILL IN UNTIL DRY-RUN IS COMPLETE]
+**Decision:** HOLD
 
 **Rationale:**
 [Required if HOLD or STOP: describe which criteria were NOT MET]
