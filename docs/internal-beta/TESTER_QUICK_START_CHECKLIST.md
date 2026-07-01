@@ -35,7 +35,9 @@ Unzip the file to a folder you can find easily (e.g., Desktop/promptprofit-beta/
 
 ### Step 4 -- Load the extension
 1. Click "Load unpacked" (top-left button, visible after enabling Developer Mode).
-2. In the file browser, navigate to the unzipped folder and select the "dist" folder inside it.
+2. In the file browser, navigate to the unzipped folder and SELECT THAT FOLDER ITSELF.
+   The folder you select must contain `manifest.json` directly at its top level.
+   Do NOT navigate into `dist/` or any subfolder — Chrome needs the folder with `manifest.json`.
 3. Click "Select Folder" (or "Open").
 
 ### Step 5 -- Verify the extension loaded

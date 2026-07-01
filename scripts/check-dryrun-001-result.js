@@ -206,8 +206,9 @@ if (!resultLogExists) {
   }
 
   // Decision must exist
-  if (/\*\*Decision:\s*(GO|HOLD|STOP)\b/i.test(resultLogContent)) {
-    const m = resultLogContent.match(/\*\*Decision:\s*(GO|HOLD|STOP)\b/i);
+  // Format: **Decision:** HOLD  (bold label ends with **, then value follows)
+  if (/\*\*Decision:\*{0,2}\s*(GO|HOLD|STOP)\b/i.test(resultLogContent)) {
+    const m = resultLogContent.match(/\*\*Decision:\*{0,2}\s*(GO|HOLD|STOP)\b/i);
     pass(`Result log has go/no-go decision: ${m[1]}`);
 
     // GO decision with S0/P0 issue is forbidden

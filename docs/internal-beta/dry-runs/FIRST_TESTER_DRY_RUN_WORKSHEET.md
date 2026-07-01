@@ -89,7 +89,7 @@ Track A (Non-engineer) steps:
 - [ ] Tester unzipped to a local folder
 - [ ] Tester opened chrome://extensions
 - [ ] Tester enabled Developer Mode toggle
-- [ ] Tester clicked "Load unpacked" -> selected the dist/ folder
+- [ ] Tester clicked "Load unpacked" -> selected the extracted ZIP root folder (the folder containing manifest.json directly, NOT the dist/ subfolder)
 - [ ] Extension "PromptProfit" appeared in the extensions list
 - [ ] Extension toggle is ON (blue)
 - [ ] No error badge (red exclamation) on extension icon

@@ -45,11 +45,12 @@ Work through each item in order. Check each box when confirmed.
   Go to chrome://extensions. In the top-right: "Developer mode" toggle must be ON (blue/enabled).
   If it was off when the extension was loaded: disable and re-enable the toggle, then reload the extension.
 
-- [ ] **B2. Verify the tester loaded the `dist/` SUBFOLDER, not the outer ZIP folder.**
-  When clicking "Load unpacked", the tester must select the `dist/` folder INSIDE the unzipped package.
-  The outer folder (e.g. `promptprofit-browser-beta-1.0.0/`) will fail or load nothing.
-  The correct path ends in `.../dist/` (contains manifest.json directly).
-  Fix: Remove the extension, navigate into the unzipped folder, select `dist/`, load again.
+- [ ] **B2. Verify the tester loaded the EXTRACTED ZIP ROOT FOLDER (not a subfolder).**
+  When clicking "Load unpacked", the tester must select the EXTRACTED ZIP ROOT FOLDER — the folder
+  created when they unzipped the package (e.g. `promptprofit-browser-beta-2026-07-01T.../`).
+  That root folder contains `manifest.json` directly. Do NOT navigate into any subfolder.
+  The `dist/` subfolder only contains compiled JS files, NOT manifest.json — Chrome will reject it.
+  Fix: Remove the extension. Re-select the extracted root folder (the one with manifest.json), load again.
 
 - [ ] **B3. Confirm "PromptProfit" appears in the chrome://extensions list with NO error badge.**
   An error badge (red exclamation mark) means the extension failed to load.
@@ -97,8 +98,8 @@ Work through each item in order. Check each box when confirmed.
 ### E. Manifest and Permissions
 
 - [ ] **E1. Check the manifest.json content_scripts section.**
-  In dist/manifest.json, verify there is a content_scripts entry matching `*://chatgpt.com/*`.
-  If missing: the build may have been configured incorrectly.
+  In the extracted ZIP root folder, open `manifest.json` and verify there is a `content_scripts`
+  entry matching `https://chatgpt.com/*`. If missing: the build may have been configured incorrectly.
 
 - [ ] **F2. Confirm no Chrome Content Security Policy blocks the extension overlay.**
   In Chrome DevTools (F12) -> Console tab: look for errors mentioning "Content Security Policy",

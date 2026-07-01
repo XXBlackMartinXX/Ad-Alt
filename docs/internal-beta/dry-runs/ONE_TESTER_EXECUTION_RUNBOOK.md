@@ -152,9 +152,11 @@ Have FIRST_TESTER_DRY_RUN_WORKSHEET.md open and track each step.
 1. Tester unzips the package to a local folder
 2. Tester opens `chrome://extensions`
 3. Tester enables Developer Mode toggle (top right)
-4. Tester clicks "Load unpacked" and selects the `dist/` folder from the unzipped package
-   **Important:** The tester must select the `dist/` subfolder INSIDE the unzipped directory,
-   NOT the outer folder. The correct folder contains `manifest.json` directly.
+4. Tester clicks "Load unpacked" and selects the EXTRACTED ZIP ROOT FOLDER.
+   **Important:** The tester must select the EXTRACTED ZIP ROOT FOLDER — the folder created
+   when they unzipped the package (e.g. `promptprofit-browser-beta-.../`). This folder contains
+   `manifest.json` directly. Do NOT navigate into `dist/` or any subfolder inside it.
+   The `dist/` subfolder only has JS files — Chrome will reject it (no `manifest.json` there).
 5. Extension "PromptProfit" appears in the list with no error badge
 
 **LOGGED-IN REQUIREMENT (verify before proceeding to safe test):**

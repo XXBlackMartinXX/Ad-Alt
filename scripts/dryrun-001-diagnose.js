@@ -194,7 +194,9 @@ if (!fs.existsSync(DIST_PACKAGE_DIR)) {
     console.log(`  Re-extract command (if tester may have loaded the wrong folder):`);
     console.log(`    mkdir -p /tmp/promptprofit-reextract`);
     console.log(`    unzip -o "apps/browser-extension/dist-package/${latest.name}" -d /tmp/promptprofit-reextract/`);
-    console.log(`    Then load the "dist" subfolder from /tmp/promptprofit-reextract/ in Chrome.`);
+    console.log(`    Then in Chrome "Load unpacked": select the extracted ROOT folder`);
+    console.log(`    (/tmp/promptprofit-reextract/ -- the folder containing manifest.json directly).`);
+    console.log(`    Do NOT select the dist/ subfolder inside it.`);
   }
 }
 
@@ -229,13 +231,16 @@ console.log('');
 console.log('  CHROME LOAD INSTRUCTIONS (owner reads these to the tester):');
 console.log('');
 console.log('  1. Unzip the beta ZIP to a folder on their computer.');
-console.log('     The ZIP contains a "dist/" subfolder -- that is what Chrome loads.');
+console.log('     The unzipped folder IS the folder to load -- it contains manifest.json directly.');
 console.log('');
 console.log('  2. In Chrome: go to chrome://extensions');
 console.log('     Enable "Developer mode" (top-right toggle).');
 console.log('     Click "Load unpacked".');
-console.log('     Select the "dist/" folder INSIDE the unzipped directory.');
-console.log('     NOT the outer ZIP folder -- the dist/ folder inside it.');
+console.log('     Select the EXTRACTED ZIP ROOT FOLDER (e.g. promptprofit-browser-beta-.../).');
+console.log('     This folder contains manifest.json directly at its top level.');
+console.log('     Do NOT navigate into any subfolder -- Chrome needs manifest.json at the top.');
+console.log('     WRONG: selecting dist/ (no manifest.json there -- Chrome will reject it).');
+console.log('     RIGHT: selecting the root of the extracted ZIP (has manifest.json + dist/ + icons/).');
 console.log('');
 console.log('  3. Confirm PromptProfit appears in the extension list with no error badge.');
 console.log('     The extension toggle must be ON (blue).');

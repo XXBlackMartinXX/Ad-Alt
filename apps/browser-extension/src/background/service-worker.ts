@@ -176,6 +176,22 @@ async function getAdDecision(adapterId: string): Promise<Record<string, unknown>
   }
 }
 
+// On first install, write safe default flags so the kill-switch starts OFF.
+// Without this, cachedFlags defaults to FALLBACK_FLAGS_DISABLED (kill-switch ON),
+// which silently blocks the banner on fresh installs with no prior storage.
+chrome.runtime.onInstalled.addListener(({ reason }: { reason: string }) => {
+  if (reason === "install") {
+    chrome.storage.local.get("featureFlags").then((stored: Record<string, unknown>) => {
+      if (!isValidFeatureFlags(stored["featureFlags"])) {
+        const defaultFlags: FeatureFlags = { killSwitchEnabled: false, disabledAdapters: [], flags: {} };
+        chrome.storage.local.set({ featureFlags: defaultFlags }).catch(() => {});
+        cachedFlags = defaultFlags;
+        flagsFetchedAt = Date.now();
+      }
+    }).catch(() => {});
+  }
+});
+
 chrome.runtime.onMessage.addListener(
   (message: Record<string, unknown>, _sender: unknown, sendResponse: (r: unknown) => void) => {
     if (message?.["type"] === "CHECK_ADAPTER_STATUS") {
