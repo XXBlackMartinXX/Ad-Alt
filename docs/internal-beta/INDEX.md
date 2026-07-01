@@ -38,6 +38,7 @@ The `dry-runs/` subdirectory contains detailed execution documents for DRYRUN-00
 | [dry-runs/GO_NO_GO_DECISION_RECORD.md](./dry-runs/GO_NO_GO_DECISION_RECORD.md) | Decision record for DRYRUN-001 (PENDING until execution) |
 | [dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md](./dry-runs/DRY_RUN_TRIAGE_CHECKLIST.md) | Post-session triage agenda, severity assignment, escalation paths |
 | [dry-runs/DRY_RUN_STATUS_TRACKER.md](./dry-runs/DRY_RUN_STATUS_TRACKER.md) | All dry-run sessions and their current status |
+| [dry-runs/DRYRUN-001_OWNER_READY_NOTE.md](./dry-runs/DRYRUN-001_OWNER_READY_NOTE.md) | DRYRUN-001 owner-ready note: current state, commands, checklist, criteria |
 
 ---
 

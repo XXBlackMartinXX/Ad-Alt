@@ -15,7 +15,7 @@
 
 | ID | Date | Tester | Track | Status | Decision | Result Log | Notes |
 |----|------|--------|-------|--------|----------|------------|-------|
-| DRYRUN-001 | [DATE TBD] | [TESTER TBD] | [A / B] | NOT RUN YET | PENDING | [FILE TBD] | First tester session |
+| DRYRUN-001 | [DATE TBD] | [TESTER TBD] | [A / B] | READY TO RUN | PENDING | [FILE TBD] | Packet verified; all pre-run checks pass; awaiting tester scheduling |
 
 ---
 
@@ -24,6 +24,7 @@
 | Status | Meaning |
 |--------|---------|
 | NOT RUN YET | Session prepared but not yet scheduled or started |
+| READY TO RUN | Packet verified; all pre-run checks pass; awaiting tester scheduling |
 | SCHEDULED | Session scheduled; tester confirmed; date set |
 | IN PROGRESS | Session actively running |
 | COMPLETED | Session finished; result log filed; triage done |
@@ -59,14 +60,18 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 | Field | Value |
 |-------|-------|
-| Status | NOT RUN YET |
+| Status | READY TO RUN |
 | Decision | PENDING |
 | Worksheet | docs/internal-beta/dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md |
+| Owner-Ready Note | docs/internal-beta/dry-runs/DRYRUN-001_OWNER_READY_NOTE.md |
 | Result Log | [To be filed after session: DRY_RUN_RESULT_LOG_DRYRUN-001.md] |
-| Issues Found | [TBD] |
-| Open S0 | [TBD] |
-| Open S1 | [TBD] |
-| Notes | First tester dry-run. Packet prepared. Awaiting tester scheduling. |
+| Issues Found | NOT OBSERVED YET |
+| Open S0 | NOT OBSERVED YET |
+| Open S1 | NOT OBSERVED YET |
+| Privacy Result | NOT OBSERVED YET |
+| Billing Result | NOT OBSERVED IN REAL TESTER RUN |
+| Rollback Result | NOT OBSERVED YET |
+| Notes | Packet fully verified (35802c9). All pre-run checks pass. Awaiting tester scheduling. |
 
 ---
 
@@ -87,7 +92,7 @@ If no open S0/S1 issues: "None -- no blocking issues."
 **Total dry-run sessions:** 1 prepared, 0 completed
 
 **Current beta phase status:**
-- Dry-run packet: READY
-- DRYRUN-001: NOT RUN YET
+- Dry-run packet: READY (all checks pass at 35802c9)
+- DRYRUN-001: READY TO RUN (not executed; awaiting tester scheduling)
 - Wider beta (Day 2-3): BLOCKED on DRYRUN-001 GO decision
 - Public release: BLOCKED (LICENSE, icons, VSIX, staging reconciliation pending)

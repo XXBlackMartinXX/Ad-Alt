@@ -108,9 +108,9 @@ if (/PENDING|not yet executed/i.test(goNoGoContent)) {
   warn('Go/No-Go decision status unclear');
 }
 
-// Tracker must say NOT RUN YET for DRYRUN-001
-if (/DRYRUN-001.*NOT RUN YET|NOT RUN YET.*DRYRUN-001/i.test(trackerContent)) {
-  pass('Status tracker: DRYRUN-001 is NOT RUN YET (correct)');
+// Tracker must say NOT RUN YET or READY TO RUN for DRYRUN-001 (not COMPLETED)
+if (/DRYRUN-001.*NOT RUN YET|NOT RUN YET.*DRYRUN-001|DRYRUN-001.*READY TO RUN|READY TO RUN.*DRYRUN-001/i.test(trackerContent)) {
+  pass('Status tracker: DRYRUN-001 not yet executed (NOT RUN YET or READY TO RUN -- correct)');
 } else if (/DRYRUN-001.*COMPLETED/i.test(trackerContent)) {
   fail('Status tracker claims DRYRUN-001 COMPLETED without execution evidence (CANARY 13)');
 } else {
