@@ -81,16 +81,45 @@ const resultLogContent = docContents['DRY_RUN_RESULT_LOG_TEMPLATE.md'] || '';
 const goNoGoContent = docContents['GO_NO_GO_DECISION_RECORD.md'] || '';
 const trackerContent = docContents['DRY_RUN_STATUS_TRACKER.md'] || '';
 
-// Worksheet must say NOT RUN YET or similar
+// This section's original purpose: catch someone hand-editing these docs to
+// claim GO/HOLD/STOP/COMPLETED before any real dry-run session happened.
+// It must NOT keep demanding "NOT RUN YET" forever once a dry-run has
+// legitimately occurred -- that would make this check permanently FAIL
+// after the very first real, evidence-backed session, which is not
+// overclaiming. The evidence is docs/internal-beta/dry-runs/
+// DRYRUN-001_RESULT_LOG.md (the ACTUAL per-session result, distinct from
+// DRY_RUN_RESULT_LOG_TEMPLATE.md above): it is written ONLY by
+// dryrun-001-finalize.js after a real human tester session, and only that
+// script writes the "Result recorded by dryrun-001-finalize.js on <date>"
+// marker -- a marker that should never appear in a doc by any other means.
+const actualResultLogContent = readFile(path.join(DRY_RUNS_DIR, 'DRYRUN-001_RESULT_LOG.md')) || '';
+const hasRealResultLogEvidence = /Result recorded by dryrun-001-finalize\.js on/.test(actualResultLogContent);
+const resultLogDecisionMatch = /\*\*Decision:\*\*\s*(GO|HOLD|STOP)/.exec(actualResultLogContent);
+const resultLogDecision = resultLogDecisionMatch ? resultLogDecisionMatch[1] : null;
+
+if (hasRealResultLogEvidence) {
+  pass(`DRYRUN-001_RESULT_LOG.md carries real finalize-script evidence (recorded decision: ${resultLogDecision || 'unknown'})`);
+} else {
+  pass('No real DRYRUN-001_RESULT_LOG.md evidence yet -- completion claims below must not appear without it');
+}
+
+// Worksheet: NOT RUN YET is always fine. A completion-shaped status is only
+// fine when backed by real result-log evidence.
 if (/NOT RUN YET|NOT YET EXECUTED|not yet executed/i.test(worksheetContent)) {
   pass('Worksheet status: NOT RUN YET (correct for unprepared dry-run)');
-} else if (/Status.*PASS|Status.*COMPLETED|dry-run completed/i.test(worksheetContent)) {
-  fail('Worksheet incorrectly claims dry-run completed without execution evidence (CANARY 13)');
+} else if (/Status.*PASS|Status.*COMPLETED|Status.*INCONCLUSIVE|Status.*BLOCKED|dry-run completed/i.test(worksheetContent)) {
+  if (hasRealResultLogEvidence) {
+    pass('Worksheet claims a completed/blocked session, backed by real DRYRUN-001_RESULT_LOG.md evidence (CANARY 13 satisfied)');
+  } else {
+    fail('Worksheet incorrectly claims dry-run completed without execution evidence (CANARY 13)');
+  }
 } else {
   warn('Worksheet status unclear -- verify it does not claim completion');
 }
 
-// Result log template must say NOT RUN
+// Result log TEMPLATE must always say NOT RUN -- it is never a real
+// session's record (that's DRYRUN-001_RESULT_LOG.md, checked above), so
+// evidence never makes a completion claim here legitimate.
 if (/NOT RUN|Status.*NOT RUN/i.test(resultLogContent)) {
   pass('Result log template status: NOT RUN (correct for template)');
 } else if (/Status.*PASS|dry-run completed/i.test(resultLogContent)) {
@@ -99,20 +128,34 @@ if (/NOT RUN|Status.*NOT RUN/i.test(resultLogContent)) {
   warn('Result log template status unclear');
 }
 
-// Go/No-Go must say PENDING
+// Go/No-Go: PENDING is always fine. A GO/HOLD/STOP decision is only fine
+// when backed by real result-log evidence, AND (when evidence exists) it
+// must match the decision the result log itself recorded -- catches the
+// decision being changed here without updating the underlying evidence.
 if (/PENDING|not yet executed/i.test(goNoGoContent)) {
   pass('Go/No-Go decision: PENDING (correct before execution)');
 } else if (/Decision.*GO\b|Decision.*HOLD|Decision.*STOP/i.test(goNoGoContent)) {
-  fail('Go/No-Go decision was set without dry-run execution evidence (CANARY 13)');
+  if (!hasRealResultLogEvidence) {
+    fail('Go/No-Go decision was set without dry-run execution evidence (CANARY 13)');
+  } else if (resultLogDecision && !new RegExp(`Decision[^\\n]*${resultLogDecision}`, 'i').test(goNoGoContent) && !new RegExp(`CURRENT DECISION:\\s*${resultLogDecision}`, 'i').test(goNoGoContent)) {
+    fail(`Go/No-Go decision does not match the decision recorded in DRYRUN-001_RESULT_LOG.md (${resultLogDecision}) -- CANARY 13`);
+  } else {
+    pass(`Go/No-Go decision (${resultLogDecision || 'recorded'}) is backed by real DRYRUN-001_RESULT_LOG.md evidence`);
+  }
 } else {
   warn('Go/No-Go decision status unclear');
 }
 
-// Tracker must say NOT RUN YET or READY TO RUN for DRYRUN-001 (not COMPLETED)
+// Tracker: NOT RUN YET / READY TO RUN is always fine. COMPLETED or
+// INCONCLUSIVE is only fine when backed by real result-log evidence.
 if (/DRYRUN-001.*NOT RUN YET|NOT RUN YET.*DRYRUN-001|DRYRUN-001.*READY TO RUN|READY TO RUN.*DRYRUN-001/i.test(trackerContent)) {
   pass('Status tracker: DRYRUN-001 not yet executed (NOT RUN YET or READY TO RUN -- correct)');
-} else if (/DRYRUN-001.*COMPLETED/i.test(trackerContent)) {
-  fail('Status tracker claims DRYRUN-001 COMPLETED without execution evidence (CANARY 13)');
+} else if (/DRYRUN-001.*COMPLETED|DRYRUN-001.*INCONCLUSIVE/i.test(trackerContent)) {
+  if (hasRealResultLogEvidence) {
+    pass('Status tracker claims DRYRUN-001 completed/inconclusive, backed by real DRYRUN-001_RESULT_LOG.md evidence');
+  } else {
+    fail('Status tracker claims DRYRUN-001 COMPLETED without execution evidence (CANARY 13)');
+  }
 } else {
   warn('Status tracker DRYRUN-001 status unclear');
 }

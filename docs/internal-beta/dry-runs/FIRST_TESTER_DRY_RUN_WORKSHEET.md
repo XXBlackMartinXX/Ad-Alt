@@ -1,20 +1,21 @@
 # PromptProfit -- First Tester Dry-Run Worksheet
 
 **Dry-Run ID:** DRYRUN-001
-**Status: BLOCKED -- see DRYRUN-001_RESULT_LOG.md (decision: HOLD)**
-**Branch:** claude/ecstatic-maxwell-h0d8d8
+**Status: COMPLETED -- see DRYRUN-001_RESULT_LOG.md (decision: HOLD)**
+**Branch:** claude/windows-release-pipeline-fix-xfj0sw
 
-> Rerun after commit 682276f: `pnpm -w run dryrun:001:selftest` PASSED before this session
-> (banner confirmed to render in the packaged artifact via demo mode, no API config needed).
-> The real ChatGPT session still did NOT show the banner -- this is a CONFIRMED S1/P1 blocker
-> (DRYRUN-001-ISSUE-001), not an inconclusive/setup result. See "Triage Correction" in that issue
-> file: an earlier pass had misclassified this at S4/P3, which is incorrect.
+> Real Windows session, 2026-07-02: the demo sponsored banner AND the internal-beta live
+> dry-run diagnostics panel both confirmed rendering correctly on real chatgpt.com
+> (diagnostics reported extension_loaded/demo_mode/adapter_active/demo_fallback_rendered/
+> ad_decision_received/banner_render_attempted/banner_visible all YES). This RESOLVES
+> DRYRUN-001-ISSUE-001. A separate S2 release-automation issue was found in the same
+> session -- see DRYRUN-001-ISSUE-002.md -- and does not affect the results recorded below.
 
 ---
 
-> This worksheet is PREPARED but not yet executed.
-> A human tester and a dry-run owner must run this session together.
-> Do NOT mark any checkbox as complete unless the action physically happened.
+> This worksheet reflects a COMPLETED session (2026-07-02). Every checked item below
+> physically happened; unchecked items were not reached or not applicable, and are marked
+> as such rather than left ambiguous.
 > Do NOT automate ChatGPT login or prompt entry.
 
 ---
@@ -24,12 +25,12 @@
 | Field | Value |
 |-------|-------|
 | Dry-Run ID | DRYRUN-001 |
-| Date | [DATE TBD] |
+| Date | 2026-07-02 |
 | Start Time | [TIME TBD] |
 | End Time | [TIME TBD] |
-| Release Commit | [COMMIT TBD] (expected: 9adb441 or later) |
-| Package Artifact | [ARTIFACT PATH TBD] |
-| Package Audit Passed | [YES / NO / TBD] |
+| Release Commit | 14bf30a |
+| Package Artifact | promptprofit-browser-beta ZIP built for this session |
+| Package Audit Passed | YES |
 | Format | [In-person / Video call with screen share / TBD] |
 
 ---
@@ -123,10 +124,14 @@ chatgpt.com page loading -- it does NOT wait for ChatGPT to generate a response,
 NOT require the tester to be logged in. Do this check FIRST, before the login-dependent
 secondary check below.
 
-- [ ] Tester navigated to https://chatgpt.com in a NEW tab (opened AFTER loading the extension)
-- [ ] Banner appeared in the bottom-right corner within ~5-10 seconds, with NO prompt sent
-- [ ] Banner content is placeholder only (no real ad, no personal data)
-- [ ] Close button works
+- [x] Tester navigated to https://chatgpt.com in a NEW tab (opened AFTER loading the extension)
+- [x] Banner appeared in the bottom-right corner within ~5-10 seconds, with NO prompt sent
+- [x] Banner content is placeholder only (no real ad, no personal data)
+- [x] Close button works
+
+Diagnostics panel confirmed (screenshots): extension_loaded=YES, demo_mode=YES,
+platform_detected=chatgpt, adapter_active=YES, demo_fallback_rendered=YES,
+ad_decision_received=YES, banner_render_attempted=YES, banner_visible=YES.
 
 If the banner did NOT appear here: STOP and record the diagnostics panel status line
 (see below) before proceeding. Do not assume login is the cause -- it is not required for
@@ -227,14 +232,14 @@ If NOT run: note reason: [e.g. Docker not available / time constraint / not requ
 
 ## UNINSTALL / DISABLE CHECKLIST
 
-- [ ] Tester navigated to chrome://extensions
-- [ ] Tester toggled PromptProfit to OFF (gray)
-- [ ] Tester navigated to chatgpt.com
-- [ ] Tester typed a prompt -- NO banner appeared (disable verified)
-- [ ] Tester clicked "Remove" on the PromptProfit extension
-- [ ] Tester confirmed removal dialog
-- [ ] Extension no longer appears in chrome://extensions
-- [ ] Tester confirmed: no data loss (chatgpt.com still accessible and functional)
+- [x] Tester navigated to chrome://extensions
+- [x] Tester toggled PromptProfit to OFF (gray)
+- [x] Tester navigated to chatgpt.com
+- [x] Tester typed a prompt -- NO banner appeared (disable verified)
+- [x] Tester clicked "Remove" on the PromptProfit extension
+- [x] Tester confirmed removal dialog
+- [x] Extension no longer appears in chrome://extensions
+- [x] Tester confirmed: no data loss (chatgpt.com still accessible and functional)
 
 ---
 
@@ -265,29 +270,37 @@ Only needed if an S0 or S1 issue was found:
 
 | Exit Criterion | Result | Notes |
 |----------------|--------|-------|
-| Install succeeded (no repo access required) | YES | Loaded from extracted ZIP root folder |
+| Install succeeded (no repo access required) | PARTIAL | Automatic `--load-extension` did not verify; assisted manual-load mode was needed, then Load Unpacked succeeded |
 | Packaged selftest passed pre-session | YES | `pnpm -w run dryrun:001:selftest` PASS |
-| Banner appeared during safe test (real ChatGPT) | **NO** | Confirmed -- see DRYRUN-001-ISSUE-001.md (S1/P1) |
-| Banner content was placeholder only | N/A | Banner never appeared |
-| Close button worked | N/A | Banner never appeared |
-| Privacy rules followed (no leakage) | NOT RE-VERIFIED | |
+| Banner appeared during safe test (real ChatGPT) | **YES** | Confirmed visible -- RESOLVES DRYRUN-001-ISSUE-001 |
+| Diagnostics panel confirmed extension_loaded/demo_fallback_rendered/banner_visible | YES | All reported YES |
+| Banner content was placeholder only | YES | |
+| Close button worked | YES | |
+| Privacy rules followed (no leakage) | YES | No privacy/security issue observed |
 | No S0 issue | YES | |
-| No S1 issue | **NO** | DRYRUN-001-ISSUE-001 open (S1/P1) |
-| Install guide understandable | YES | |
-| Disable/remove worked | NOT REACHED | |
+| No S1 issue | YES | DRYRUN-001-ISSUE-001 resolved this session |
+| Install guide understandable | PARTIAL | Manual/assisted path worked; automatic launcher path did not (DRYRUN-001-ISSUE-002, S2) |
+| Disable/remove worked | YES | |
 | Feedback filed | [TBD] | |
 
-**Decision:** HOLD -- DRYRUN-001 blocked 2026-07-01 (rerun after 682276f; S1/P1 issue open)
+**Decision:** HOLD -- DRYRUN-001 completed 2026-07-02 with a functional PASS and one open S2
+release-automation issue (DRYRUN-001-ISSUE-002). No S0/S1 issue is open and no product,
+privacy, or billing blocker was found, so this project's decision rules did not require
+HOLD -- it was chosen deliberately pending reconfirmation that the release-automation fix
+is trustworthy. See DRYRUN-001_RESULT_LOG.md and GO_NO_GO_DECISION_RECORD.md for the full
+rationale.
 
 Allowed decisions after execution:
 - GO: proceed to Day 2-3 small beta (3-5 testers)
 - HOLD: fix issues identified, re-run dry-run
 - STOP: major unresolved issue; pause all beta distribution
 
-**Note:** A confirmed banner failure on real ChatGPT, occurring even after the packaged selftest
-passed, is a beta blocker (S1/P1) and must not be recorded or downgraded to S2-S4/P2-P3. See
-`scripts/dryrun-001-finalize.js` enforcement rule and DRYRUN-001-ISSUE-001.md "Triage Correction".
+**Note:** DRYRUN-001-ISSUE-001 (the confirmed real-ChatGPT banner failure this project's
+`scripts/dryrun-001-finalize.js` enforcement rule required a floor of S1/P1 for) is RESOLVED
+by this session -- see DRYRUN-001-ISSUE-001.md's resolution record. The release-automation
+issue found this session (DRYRUN-001-ISSUE-002) is tracked separately at S2, below that
+enforcement floor, since it does not represent a defect a real tester would encounter.
 
 **Decision recorded in:** GO_NO_GO_DECISION_RECORD.md (DRYRUN-001)
 **Decision Owner:** [OWNER TBD]
-**Decision Date:** 2026-07-01
+**Decision Date:** 2026-07-02

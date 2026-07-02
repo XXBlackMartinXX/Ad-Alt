@@ -24,6 +24,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const BUNDLE_SCRIPT = path.join(ROOT, 'apps', 'browser-extension', 'scripts', 'bundle.mjs');
 const BUNDLE_SCRIPT_BAK = BUNDLE_SCRIPT + '.integration-test-bak';
 const FAKE_CHROME_NO_SW = path.join(__dirname, 'fixtures', 'fake-chrome-no-service-worker.js');
+const FAKE_CHROME_RUNTIME_RESCUE = path.join(__dirname, 'fixtures', 'fake-chrome-runtime-rescue.js');
 
 /**
  * Temporarily renames bundle.mjs so package:browser:beta's rebuild step
@@ -138,6 +139,49 @@ test(
     // Both retry modes should have been attempted before assisted mode.
     assert.match(out, /mode A:/, 'must attempt mode A (--disable-extensions-except + --load-extension)');
     assert.match(out, /mode B:/, 'must attempt mode B (--load-extension only) after mode A fails to verify');
+  },
+);
+
+test(
+  'dryrun-001-launch-chrome.js reaches PASS via Layer 4 runtime rescue when NO chrome-extension CDP target ever appears but the banner/diagnostics genuinely render (the reported real-Windows false-negative, reproduced end to end)',
+  { timeout: 90_000 },
+  () => {
+    // FAKE_CHROME_RUNTIME_RESCUE never exposes any chrome-extension:// CDP
+    // target (so Layer 1 is always empty) and has no real profile (so Layer 2
+    // is always empty) -- exactly the "predicted extension id never matches"
+    // scenario a real Windows session hit. Its one page target's WebSocket
+    // responds to Runtime.evaluate as if the extension-owned banner and
+    // diagnostics panel ARE genuinely rendered. The launcher must not report
+    // BLOCKED_EXTENSION_LOAD here -- the Layer 4 rescue check is the ONLY
+    // thing that can explain a PASS given this fixture's CDP/Preferences
+    // shape, so reaching PASS here proves the real production override path
+    // (not a reimplemented copy of it) actually fires.
+    let res;
+    try {
+      res = spawnSync('node', [path.join(ROOT, 'scripts', 'dryrun-001-launch-chrome.js')], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 85_000,
+        env: {
+          ...process.env,
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: FAKE_CHROME_RUNTIME_RESCUE,
+          PROMPTPROFIT_ASSISTED_POLL_TIMEOUT_MS: '3000',
+          PROMPTPROFIT_ASSISTED_POLL_INTERVAL_MS: '500',
+        },
+      });
+    } finally {
+      spawnSync('pkill', ['-f', FAKE_CHROME_RUNTIME_RESCUE]);
+    }
+    const out = (res.stdout || '') + (res.stderr || '');
+
+    assert.equal(res.status, 0, 'launcher must exit 0 (PASS) once Layer 4 rescue confirms real runtime evidence');
+    assert.doesNotMatch(out, /BLOCKED_EXTENSION_LOAD/, 'must NOT report BLOCKED_EXTENSION_LOAD when extension-owned diagnostics/banner are present');
+    assert.doesNotMatch(out, /BLOCKED_RUNTIME/, 'must NOT report BLOCKED_RUNTIME when the banner is genuinely visible');
+    assert.match(out, /PASS: PromptProfit extension loaded and runtime verified on chatgpt\.com\./, 'must reach the PASS state');
+    assert.match(out, /RESCUE:/, 'must record that the Layer 4 rescue override actually fired');
+    assert.match(out, /OVERRIDDEN by Layer 4 runtime rescue/, 'launch summary must record the override explicitly, not silently');
+    assert.match(out, /Banner visible:            YES/, 'must report the banner as visible');
+    assert.match(out, /Diagnostics extension_loaded: true/, 'must report the diagnostics extension_loaded field');
   },
 );
 

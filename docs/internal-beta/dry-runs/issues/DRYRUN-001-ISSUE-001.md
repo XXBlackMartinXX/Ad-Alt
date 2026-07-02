@@ -4,8 +4,22 @@
 **Severity:** S1 (Beta blocker)
 **Priority:** P1 (Fix before next beta dry-run)
 **Area:** area:browser-extension, area:chatgpt-adapter, area:dry-run
-**Decision impact:** GO blocked
-**Status:** accepted / definitive fix implemented / human rerun pending
+**Decision impact:** GO blocked while open -- no longer blocking (see Resolution below)
+**Status:** RESOLVED (2026-07-02)
+
+---
+
+> **RESOLVED 2026-07-02:** A real Windows tester session confirmed the demo sponsored
+> banner AND the internal-beta live dry-run diagnostics panel both render correctly on
+> real chatgpt.com. Diagnostics reported extension_loaded / demo_mode / adapter_active /
+> demo_fallback_rendered / ad_decision_received / banner_render_attempted / banner_visible
+> all YES, and the banner was directly observed visible in the bottom-right corner. This
+> meets the exact resolution criteria defined below ("A real human tester confirms the
+> demo banner appears... on real chatgpt.com"). See
+> `docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md` (2026-07-02 session) for the full
+> record. This issue is CLOSED; do not reopen it for the separate release-automation defect
+> found in the same session -- that is tracked as
+> `docs/internal-beta/dry-runs/issues/DRYRUN-001-ISSUE-002.md`.
 
 ---
 
@@ -196,17 +210,14 @@ recommended prompt, and the full diagnostics-panel status-line legend.
 
 ## Resolution Criteria
 
-**Fix implemented, not yet resolved:** The deterministic internal-beta forced demo
-fallback (see "Definitive Fix Implemented" above) removes the dependency on wait-state
-detection, generation timing, and the ad-decision API entirely. The live diagnostics panel
-and longer recommended prompt from the prior fix remain in place as secondary aids. This
-is a real, testable fix (proven by `dryrun:001:selftest` in a synthetic fixture) but is
-**NOT resolution** -- only a real human tester on real chatgpt.com can confirm it works
-there too.
+**RESOLVED 2026-07-02.** A real human tester confirmed the demo banner appears within
+seconds of the chatgpt.com page loading, without needing to log in or send a prompt, on
+real chatgpt.com with the packaged artifact -- the exact criterion below. See
+`docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md` for the session record.
 
 **Resolved (downgrade permitted):** A real human tester confirms the demo banner appears
 within seconds of the chatgpt.com page loading, without needing to log in or send a
-prompt, on real chatgpt.com with the packaged artifact.
+prompt, on real chatgpt.com with the packaged artifact. -- MET 2026-07-02.
 
 **Escalate further (if the fix does not work on real ChatGPT):** If the banner still does
 not appear after this fix, treat it as a confirmed content-script injection or
@@ -227,9 +238,14 @@ recorded with the launcher's printed diagnostic state (banner visible / diagnost
 present / status label / last error code) verbatim. See
 `docs/internal-beta/dry-runs/DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md`. This is a
 verification-tooling improvement, not a fix to the underlying banner-render behavior --
-this issue remains open at S1/P1 until a real human rerun confirms the banner.
+this issue was open at S1/P1 until a real human rerun confirmed the banner -- which
+happened 2026-07-02, closing this issue. That same rerun found a separate,
+BLOCKED_EXTENSION_LOAD false-negative in the launcher itself (the verification tooling
+mismatch this update anticipated), tracked as
+`docs/internal-beta/dry-runs/issues/DRYRUN-001-ISSUE-002.md`.
 
-**Remains S1/P1 until a successful rerun.** Do not schedule DRYRUN-002 wider distribution while this is open.
+**RESOLVED 2026-07-02.** Do not reuse this issue file for the release-automation defect;
+see DRYRUN-001-ISSUE-002.md.
 
 ---
 
@@ -238,7 +254,7 @@ this issue remains open at S1/P1 until a real human rerun confirms the banner.
 | Field | Value |
 |-------|-------|
 | Assigned To | [OWNER TBD -- Engineering + QA Owner] |
-| Status | accepted / needs diagnosis |
+| Status | RESOLVED (2026-07-02) |
 | GitHub Issue # | [Internal tracking only until resolved] |
 | Target Fix Date | [DATE TBD -- before next beta dry-run] |
 

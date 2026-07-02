@@ -145,7 +145,7 @@ function buildChromeLaunchArgs(opts) {
 
 /**
  * Reproduces Chromium's algorithm for deriving an unpacked extension's ID
- * from its absolute install path: SHA-256 the path string, take the first
+ * from its absolute install path: hash the path string, take the first
  * 32 hex characters, map each hex nibble (0-15) to a letter (a-p). This is
  * deterministic and lets every verification layer anchor to the ONE
  * extension ID Chrome will assign -- instead of guessing which of several
@@ -153,20 +153,46 @@ function buildChromeLaunchArgs(opts) {
  * built-in component extensions, e.g. the PDF viewer, also register
  * targets and Preferences entries in a fresh profile).
  *
- * Verified empirically against real Chrome output for multiple paths (see
- * chrome-launch-utils.test.js) -- not a guess.
+ * Verified empirically against real Chrome output for multiple Linux paths
+ * with the default 'utf8' encoding (see chrome-launch-utils.test.js) -- not
+ * a guess. The `encoding` parameter exists because Chromium's own
+ * `base::FilePath` is backed by `std::string` (UTF-8) on POSIX but by
+ * `std::wstring` (UTF-16LE) on Windows -- the same absolute path string can
+ * therefore hash to a DIFFERENT id on Windows than the UTF-8 encoding used
+ * here would predict. See computeUnpackedExtensionIdCandidates, which is
+ * what callers should actually use.
  *
  * @param {string} absolutePath - must be the exact OS-native absolute path
  *   Chrome was launched with (path.resolve(extractDir))
+ * @param {'utf8'|'utf16le'} [encoding] - defaults to 'utf8'
  * @returns {string} 32-character extension ID, a-p only
  */
-function computeUnpackedExtensionId(absolutePath) {
-  const hex = crypto.createHash('sha256').update(absolutePath, 'utf8').digest('hex').slice(0, 32);
+function computeUnpackedExtensionId(absolutePath, encoding) {
+  const hex = crypto.createHash('sha256').update(absolutePath, encoding || 'utf8').digest('hex').slice(0, 32);
   let id = '';
   for (const c of hex) {
     id += String.fromCharCode('a'.charCodeAt(0) + parseInt(c, 16));
   }
   return id;
+}
+
+/**
+ * Returns every plausible extension ID for a given absolute path, so every
+ * verification layer can check "any of these" instead of committing to one
+ * potentially-wrong guess. On win32, both the UTF-8 and UTF-16LE hash are
+ * included (see computeUnpackedExtensionId's doc comment for why); on every
+ * other platform only the UTF-8 id is returned, unchanged from before this
+ * function existed.
+ * @param {string} absolutePath
+ * @param {string} platform - process.platform
+ * @returns {string[]} deduplicated candidate IDs, UTF-8 first
+ */
+function computeUnpackedExtensionIdCandidates(absolutePath, platform) {
+  const candidates = [computeUnpackedExtensionId(absolutePath, 'utf8')];
+  if (platform === 'win32') {
+    candidates.push(computeUnpackedExtensionId(absolutePath, 'utf16le'));
+  }
+  return [...new Set(candidates)];
 }
 
 /**
@@ -186,6 +212,25 @@ function parseExtensionTargetsById(targets, extensionId) {
   return targets
     .filter((t) => t && typeof t === 'object' && typeof t.url === 'string' && t.url.startsWith(prefix))
     .map((t) => ({ type: typeof t.type === 'string' ? t.type : 'unknown', url: t.url }));
+}
+
+/**
+ * Same as parseExtensionTargetsById but checks every candidate ID (see
+ * computeUnpackedExtensionIdCandidates) and returns the matches for
+ * whichever candidate actually has any, plus which ID matched -- so a
+ * Windows UTF-16LE-vs-UTF-8 mismatch on the FIRST candidate doesn't produce
+ * a false "not registered" when a later candidate would have matched.
+ * @param {unknown} targets
+ * @param {string[]} extensionIds
+ * @returns {{matches: Array<{type:string,url:string}>, matchedId: string|null}}
+ */
+function parseExtensionTargetsByIds(targets, extensionIds) {
+  if (!Array.isArray(extensionIds)) return { matches: [], matchedId: null };
+  for (const id of extensionIds) {
+    const matches = parseExtensionTargetsById(targets, id);
+    if (matches.length > 0) return { matches, matchedId: id };
+  }
+  return { matches: [], matchedId: null };
 }
 
 /**
@@ -290,6 +335,29 @@ function evaluatePreferencesEvidence(entry, expectations = {}) {
 }
 
 /**
+ * Checks extensions.settings for every candidate ID (see
+ * computeUnpackedExtensionIdCandidates) and returns evidence for whichever
+ * one actually matches, plus which ID matched. Same rationale as
+ * parseExtensionTargetsByIds: a wrong first guess must not produce a false
+ * "not registered".
+ * @param {unknown} preferencesJson
+ * @param {string[]} extensionIds
+ * @param {{expectedName:string, expectedPathAbs:string}} expectations
+ * @returns {{evidence: ReturnType<typeof evaluatePreferencesEvidence>, matchedId: string|null}}
+ */
+function evaluatePreferencesEvidenceForIds(preferencesJson, extensionIds, expectations) {
+  let best = { ok: false, reasons: ['no Preferences entry for any candidate extension ID'], nameMatches: false, pathMatches: false };
+  if (!Array.isArray(extensionIds)) return { evidence: best, matchedId: null };
+  for (const id of extensionIds) {
+    const entry = extractPromptProfitPreferencesEntry(preferencesJson, id);
+    const evidence = evaluatePreferencesEvidence(entry, expectations);
+    if (evidence.ok) return { evidence, matchedId: id };
+    if (entry) best = evidence; // keep the most informative failure reason if none match
+  }
+  return { evidence: best, matchedId: null };
+}
+
+/**
  * Layer 3: pure parse/validation of the JSON string returned by evaluating
  * `JSON.parse(document.body.innerText).name` against a
  * chrome-extension://<id>/manifest.json probe tab. A tab that failed to
@@ -324,28 +392,74 @@ function parseManifestProbeResult(rawResultValue, expectedName) {
  * @returns {{ok:boolean, bannerVisible:boolean, diagnosticsPresent:boolean, statusLabel:string|null, lastErrorCode:string|null, raw:object|null, error:string|null}}
  */
 function parseRuntimeDomProbeResult(rawResultValue) {
+  const empty = {
+    ok: false, bannerVisible: false, diagnosticsPresent: false, statusLabel: null, lastErrorCode: null,
+    extensionLoaded: null, demoFallbackRendered: null, raw: null, error: null,
+  };
   let parsed;
   try {
     parsed = JSON.parse(rawResultValue);
   } catch (e) {
-    return { ok: false, bannerVisible: false, diagnosticsPresent: false, statusLabel: null, lastErrorCode: null, raw: null, error: 'could not parse DOM probe result: ' + e.message };
+    return { ...empty, error: 'could not parse DOM probe result: ' + e.message };
   }
   if (!parsed || typeof parsed !== 'object') {
-    return { ok: false, bannerVisible: false, diagnosticsPresent: false, statusLabel: null, lastErrorCode: null, raw: null, error: 'DOM probe result was not an object' };
+    return { ...empty, error: 'DOM probe result was not an object' };
   }
   const bannerVisible = parsed.bannerVisible === true;
   const diagnosticsPresent = parsed.diagnosticsPresent === true;
   const statusLabel = typeof parsed.diagStatusLabel === 'string' ? parsed.diagStatusLabel : null;
   const lastErrorCode = typeof parsed.diagLastErrorCode === 'string' ? parsed.diagLastErrorCode : null;
+  const extensionLoaded = typeof parsed.diagExtensionLoaded === 'string' ? parsed.diagExtensionLoaded : null;
+  const demoFallbackRendered = typeof parsed.diagDemoFallbackRendered === 'string' ? parsed.diagDemoFallbackRendered : null;
   return {
     ok: bannerVisible || diagnosticsPresent,
     bannerVisible,
     diagnosticsPresent,
     statusLabel,
     lastErrorCode,
+    extensionLoaded,
+    demoFallbackRendered,
     raw: parsed,
     error: null,
   };
+}
+
+/**
+ * Decides whether a Layer 4 runtime-DOM probe result is strong enough proof
+ * of a genuine, working extension load to OVERRIDE a negative Layer 1/2
+ * (CDP-by-id / Preferences) registration result -- e.g. because the id-
+ * prediction guessed wrong on this machine (see
+ * computeUnpackedExtensionIdCandidates), or because Preferences had not
+ * flushed to disk yet. Deliberately stricter than parseRuntimeDomProbeResult's
+ * own `ok` flag (which is satisfied by the diagnostics panel merely being
+ * present, even mid-failure e.g. kill-switch-active): an override requires
+ * either the banner to be genuinely visible, or the diagnostics panel to
+ * explicitly report the extension itself as loaded.
+ * @param {ReturnType<typeof parseRuntimeDomProbeResult>} result
+ * @returns {boolean}
+ */
+function isStrongRuntimeProof(result) {
+  if (!result) return false;
+  if (result.bannerVisible === true) return true;
+  if (result.diagnosticsPresent === true && result.extensionLoaded === 'true') return true;
+  return false;
+}
+
+/**
+ * The actual override decision dryrun-001-launch-chrome.js applies: if
+ * Layer 1/2 already found the extension registered, there is nothing to
+ * override. Otherwise, a strong Layer 4 runtime proof (see
+ * isStrongRuntimeProof) flips registered to true. Pure so this exact
+ * decision -- not a reimplemented copy of it -- is directly unit-testable;
+ * the real script calls this function rather than duplicating its logic.
+ * @param {boolean} registered - Layer 1/2 result before any rescue attempt
+ * @param {ReturnType<typeof parseRuntimeDomProbeResult>|null} runtimeResult
+ * @returns {{registered:boolean, overridden:boolean}}
+ */
+function applyRuntimeRescueOverride(registered, runtimeResult) {
+  if (registered) return { registered: true, overridden: false };
+  const strong = isStrongRuntimeProof(runtimeResult);
+  return { registered: strong, overridden: strong };
 }
 
 /**
@@ -469,12 +583,17 @@ module.exports = {
   shouldUseHeadlessFallback,
   buildChromeLaunchArgs,
   computeUnpackedExtensionId,
+  computeUnpackedExtensionIdCandidates,
   parseExtensionTargetsById,
+  parseExtensionTargetsByIds,
   findPageTargetExcludingExtensions,
   extractPromptProfitPreferencesEntry,
   evaluatePreferencesEvidence,
+  evaluatePreferencesEvidenceForIds,
   parseManifestProbeResult,
   parseRuntimeDomProbeResult,
+  isStrongRuntimeProof,
+  applyRuntimeRescueOverride,
   buildRuntimeDomProbeExpression,
   classifyLaunchOutcome,
   waitForCondition,

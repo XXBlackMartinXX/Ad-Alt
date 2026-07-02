@@ -1,6 +1,6 @@
 # PromptProfit -- Dry-Run Status Tracker
 
-**INTERNAL BETA ONLY. Branch:** claude/ecstatic-maxwell-h0d8d8
+**INTERNAL BETA ONLY. Branch:** claude/windows-release-pipeline-fix-xfj0sw
 
 ---
 
@@ -15,7 +15,7 @@
 
 | ID | Date | Tester | Track | Status | Decision | Result Log | Notes |
 |----|------|--------|-------|--------|----------|------------|-------|
-| DRYRUN-001 | 2026-07-01 | [TBD] | [A/B] | INCONCLUSIVE / RERUN-READY WITH FORCED DEMO FALLBACK | HOLD | DRYRUN-001_RESULT_LOG.md | Confirmed S1/P1 blocker (Issue 001) remains open pending human rerun. A deterministic internal-beta forced demo fallback now renders the banner independent of wait-state detection, generation timing, or API availability -- see DRYRUN-001_DEFINITIVE_BANNER_FIX.md. Selftest proves this in a synthetic fixture; a real ChatGPT rerun is still required to confirm it works there too. |
+| DRYRUN-001 | 2026-07-02 | engineer | B | COMPLETED | HOLD | DRYRUN-001_RESULT_LOG.md | Real Windows session completed 2026-07-02. Core product functionality CONFIRMED working on real chatgpt.com (banner visible, diagnostics panel confirms extension_loaded/demo_fallback_rendered/banner_visible all yes) -- resolves DRYRUN-001-ISSUE-001. A separate release-automation defect was found in the same session (launcher false-negative, S2) -- see DRYRUN-001-ISSUE-002.md. Decision HOLD chosen deliberately pending reconfirmation that the automation fix is trustworthy, even though no GO-blocking product defect was found. |
 
 ---
 
@@ -48,11 +48,12 @@
 
 ## Open S0/S1 Issues Blocking Go Decision
 
-| Issue # | Title | Severity | Blocking Which Session |
-|---------|-------|----------|----------------------|
-| DRYRUN-001-ISSUE-001 | Banner not observed on real ChatGPT despite packaged selftest passing | S1 | DRYRUN-001 (and any future session until resolved) |
+None -- no blocking issues.
 
-If no open S0/S1 issues: "None -- no blocking issues."
+DRYRUN-001-ISSUE-001 (banner not observed on real ChatGPT) is RESOLVED -- see that issue
+file's resolution record; a real human tester confirmed the banner appears on real
+chatgpt.com in the 2026-07-02 session. DRYRUN-001-ISSUE-002 (launcher automation
+false-negative) is tracked at S2, below the S0/S1 GO-blocking floor -- see that issue file.
 
 ---
 
@@ -62,21 +63,24 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 | Field | Value |
 |-------|-------|
-| Status | INCONCLUSIVE / RERUN-READY WITH FORCED DEMO FALLBACK |
+| Status | COMPLETED |
 | Decision | HOLD |
 | Worksheet | docs/internal-beta/dry-runs/FIRST_TESTER_DRY_RUN_WORKSHEET.md |
 | Owner-Ready Note | docs/internal-beta/dry-runs/DRYRUN-001_OWNER_READY_NOTE.md |
 | Inconclusive Note (attempt 1) | docs/internal-beta/dry-runs/DRYRUN-001_ATTEMPT_001_INCONCLUSIVE_NOTE.md |
-| Result Log (rerun after 682276f) | docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md |
+| Result Log (real Windows session, 2026-07-02) | docs/internal-beta/dry-runs/DRYRUN-001_RESULT_LOG.md |
 | Real-ChatGPT Runtime Investigation | docs/internal-beta/dry-runs/DRYRUN-001_REAL_CHATGPT_RUNTIME_INVESTIGATION.md |
 | Definitive Banner Fix | docs/internal-beta/dry-runs/DRYRUN-001_DEFINITIVE_BANNER_FIX.md |
-| Issues Found | 1 (DRYRUN-001-ISSUE-001, S1/P1 -- remains open until a successful rerun) |
+| Chrome Extension Load Failure Investigation | docs/internal-beta/dry-runs/DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md |
+| Issues Found This Session | 1 (DRYRUN-001-ISSUE-002, S2/P2 -- release-automation false negative; fix implemented, pending real-Windows reconfirmation) |
+| Issues Resolved This Session | DRYRUN-001-ISSUE-001 (S1/P1 -- banner not observed) -- RESOLVED, banner confirmed visible on real ChatGPT |
 | Open S0 | NONE OBSERVED |
-| Open S1 | DRYRUN-001-ISSUE-001 -- banner confirmed not observed on real ChatGPT despite packaged selftest passing; GO blocked; remains open until a successful rerun confirms the banner appears |
-| Privacy Result | NOT RE-VERIFIED THIS SESSION -- not the subject of this triage; do not assume clean |
-| Billing Result | UNKNOWN -- TREAT AS CONCERN |
-| Rollback Result | NOT CONFIRMED -- session did not reach uninstall step |
-| Notes | Rerun after commit 682276f showed the banner still did not appear on real ChatGPT despite the packaged selftest passing -- a CONFIRMED S1/P1 blocker (previously mis-classified at S4/P3; corrected). Root cause: the banner depended entirely on wait-state detection succeeding, which live diagnostics could observe but not fix. A deterministic internal-beta forced demo fallback has now been implemented: it renders the banner from extension-load + demo-mode + supported-host + kill-switch-off alone, with NO dependency on wait-state selectors, generation timing, or the ad-decision API. Proven in a synthetic fixture (`dryrun:001:selftest`); a real human rerun on actual chatgpt.com is still required before this can be marked resolved. See DRYRUN-001-ISSUE-001.md and DRYRUN-001_DEFINITIVE_BANNER_FIX.md. Separately, the `dryrun:001:launch-chrome` verified launcher's OWN extension-load verification was found unreliable (single CDP service-worker-target match, which MV3's idle-worker behavior can make transiently empty even for a correctly-loaded extension) and has been replaced with four independent verification layers plus an assisted manual-load fallback mode -- see DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md. This is a launcher-reliability fix, not a dry-run attempt; it does not change this session's HOLD status or supersede the need for a real human rerun. |
+| Open S1 | NONE -- DRYRUN-001-ISSUE-001 resolved this session |
+| Open S2 | DRYRUN-001-ISSUE-002 -- launcher reported BLOCKED_EXTENSION_LOAD despite the extension being genuinely loaded and rendering; does not block GO by rule, but decision was held pending automation-fix reconfirmation |
+| Privacy Result | NO CONCERN (reported clean this session) |
+| Billing Result | NO CONCERN (reported clean this session) |
+| Rollback Result | CONFIRMED -- disable and remove/uninstall both tested and worked |
+| Notes | This is the first DRYRUN-001 session where the demo banner and diagnostics panel were both confirmed working on real chatgpt.com, resolving the S1/P1 blocker tracked as DRYRUN-001-ISSUE-001 (see that file's resolution record and DRYRUN-001_DEFINITIVE_BANNER_FIX.md for the underlying forced-fallback fix that made this possible). Install required assisted manual-load (automatic `--load-extension` did not verify on this machine); once loaded, every tracked observation was positive. A distinct release-automation defect was found and filed as DRYRUN-001-ISSUE-002: the `dryrun:001:launch-chrome` launcher reported `BLOCKED_EXTENSION_LOAD` despite the extension being genuinely loaded and rendering correctly, confirmed by the exact diagnostics evidence recorded in this session. Root cause and fix: see DRYRUN-001-ISSUE-002.md and DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md -- the launcher's extension-id prediction did not account for Windows' different path-hashing byte encoding, and it had no way to accept direct runtime evidence (the extension's own rendered diagnostics/banner) as proof when its id-based checks were wrong. Both are now fixed: id prediction checks multiple candidate encodings, and a Layer 4 runtime-DOM rescue check overrides a stale/incorrect id-based registration result. Per this project's own finalize-script decision rules, this session's answers (no unknown observations, no S0/S1 issue) do not force HOLD -- GO was a permitted choice. HOLD was chosen anyway, deliberately, because the release-automation tooling itself was not trustworthy at session time; see DRYRUN-001_RESULT_LOG.md for the full rationale. |
 
 ---
 
@@ -84,7 +88,7 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 | Field | Value |
 |-------|-------|
-| Session ID | DRYRUN-001 |
+| Session ID | DRYRUN-001 (reconfirmation) |
 | Date | [DATE TBD] |
 | Tester | [TESTER TBD] |
 | Owner | [OWNER TBD] |
@@ -94,19 +98,22 @@ If no open S0/S1 issues: "None -- no blocking issues."
 
 ## Summary
 
-**Total dry-run sessions:** 2 attempted (1 inconclusive/setup, 1 blocked/confirmed defect), 0 completed with GO
+**Total dry-run sessions:** 3 attempted (1 inconclusive/setup, 1 blocked/confirmed defect,
+1 completed with functional PASS and an open release-automation issue), 0 completed with GO
 
 **Current beta phase status:**
-- Dry-run packet: READY (all checks pass, including `dryrun:001:selftest`, which now
-  proves the forced demo fallback -- not just the old wait-state path)
-- DRYRUN-001: INCONCLUSIVE / RERUN-READY WITH FORCED DEMO FALLBACK -- Decision: HOLD.
-  Real ChatGPT banner confirmed NOT to appear on the prior attempt; S1/P1 blocker
-  DRYRUN-001-ISSUE-001 remains open until a successful human rerun; GO blocked.
-- Wider beta (Day 2-3): BLOCKED on DRYRUN-001 GO decision
+- Dry-run packet: READY (all checks pass, including `dryrun:001:selftest` and
+  `check:first-dry-run-packet`)
+- DRYRUN-001: COMPLETED -- Decision: HOLD. Core product functionality (banner + diagnostics)
+  CONFIRMED working on real chatgpt.com; DRYRUN-001-ISSUE-001 resolved. HOLD held pending
+  reconfirmation of the DRYRUN-001-ISSUE-002 release-automation fix, not because of any
+  open product defect.
+- Wider beta (Day 2-3): BLOCKED on DRYRUN-001 GO decision (process discipline, not a
+  known product defect)
 - Public release: BLOCKED (LICENSE, icons, VSIX, staging reconciliation pending)
 
-**Next action:** Owner runs `pnpm -w run dryrun:001:live-checklist`, shares it with the
-tester, and schedules a rerun. The tester should expect the demo banner to appear within
-seconds of the chatgpt.com page loading -- no login or prompt required for the primary
-check. This session must not be finalized as GO, and wider distribution must not be
-scheduled, until that rerun succeeds with the banner confirmed visible on real ChatGPT.
+**Next action:** Reconfirm the `dryrun:001:launch-chrome` fix (multi-encoding extension-id
+prediction + Layer 4 runtime-DOM rescue override) on a real Windows machine. Once the
+launcher itself is confirmed trustworthy, the owner may reconsider a GO decision for this
+already-completed session, or schedule a fresh confirmation run -- either is acceptable per
+this project's decision rules, since no product defect currently blocks GO.

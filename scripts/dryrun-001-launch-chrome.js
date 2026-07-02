@@ -33,6 +33,19 @@
 // clipboard, and polls for the same evidence for up to two minutes -- the
 // human never has to identify a ZIP or folder themselves.
 //
+// Layers 1-3 are anchored to a PREDICTED extension ID, computed the same
+// way Chromium derives one for an unpacked extension (a hash of the
+// absolute install path). Chromium hashes a DIFFERENT byte encoding of that
+// path on Windows (UTF-16LE) than on POSIX (UTF-8), so every prediction is
+// computed for both candidate encodings on win32 -- a single wrong guess no
+// longer produces a false "not registered". As a further safety net, if
+// Layers 1/2 still find no match for any candidate after mode A, mode B,
+// AND assisted manual-load all complete, a Layer 4 RESCUE check runs before
+// giving up: if the extension's own rendered diagnostics/banner on
+// chatgpt.com prove it is genuinely loaded and active, that direct evidence
+// OVERRIDES the negative id-based result rather than reporting a false
+// BLOCKED_EXTENSION_LOAD for an extension that actually works.
+//
 // PRIVACY: This script does not automate ChatGPT login or prompt entry, does
 // not read cookies/tokens/localStorage/sessionStorage/clipboard-other-than-
 // writing-our-own-path, does not read ChatGPT page content/title/URL, and
@@ -56,13 +69,13 @@ const {
   shouldUseNoSandbox,
   shouldUseHeadlessFallback,
   buildChromeLaunchArgs,
-  computeUnpackedExtensionId,
-  parseExtensionTargetsById,
+  computeUnpackedExtensionIdCandidates,
+  parseExtensionTargetsByIds,
   findPageTargetExcludingExtensions,
-  extractPromptProfitPreferencesEntry,
-  evaluatePreferencesEvidence,
+  evaluatePreferencesEvidenceForIds,
   parseManifestProbeResult,
   parseRuntimeDomProbeResult,
+  applyRuntimeRescueOverride,
   buildRuntimeDomProbeExpression,
   classifyLaunchOutcome,
   waitForCondition,
@@ -500,23 +513,28 @@ function checkWindowsExtensionPolicy() {
 // together they're deliberately redundant so a transient gap in one doesn't
 // produce a false BLOCKED).
 // ---------------------------------------------------------------------------
-async function checkExtensionRegistered({ port, profileDir, predictedExtensionId, extractDirAbs }) {
+async function checkExtensionRegistered({ port, profileDir, predictedExtensionIds, extractDirAbs }) {
   let cdpTargets = [];
   let cdpMatches = [];
+  let cdpMatchedId = null;
   try {
     cdpTargets = await httpGetJson(port, '/json/list', 1500);
-    cdpMatches = parseExtensionTargetsById(cdpTargets, predictedExtensionId);
+    const byIds = parseExtensionTargetsByIds(cdpTargets, predictedExtensionIds);
+    cdpMatches = byIds.matches;
+    cdpMatchedId = byIds.matchedId;
   } catch {
     // CDP not reachable this instant -- Layer 2 doesn't depend on it.
   }
 
   let prefsEvidence = { ok: false, reasons: ['Preferences file not found yet'], nameMatches: false, pathMatches: false };
+  let prefsMatchedId = null;
   try {
     const prefsPath = path.join(profileDir, 'Default', 'Preferences');
     if (fs.existsSync(prefsPath)) {
       const prefsJson = JSON.parse(fs.readFileSync(prefsPath, 'utf8'));
-      const entry = extractPromptProfitPreferencesEntry(prefsJson, predictedExtensionId);
-      prefsEvidence = evaluatePreferencesEvidence(entry, { expectedName: 'PromptProfit', expectedPathAbs: extractDirAbs });
+      const result = evaluatePreferencesEvidenceForIds(prefsJson, predictedExtensionIds, { expectedName: 'PromptProfit', expectedPathAbs: extractDirAbs });
+      prefsEvidence = result.evidence;
+      prefsMatchedId = result.matchedId;
     }
   } catch (e) {
     prefsEvidence = { ok: false, reasons: ['Could not read/parse Preferences: ' + e.message], nameMatches: false, pathMatches: false };
@@ -524,6 +542,7 @@ async function checkExtensionRegistered({ port, profileDir, predictedExtensionId
 
   return {
     registered: cdpMatches.length > 0 || prefsEvidence.ok,
+    matchedExtensionId: cdpMatchedId || prefsMatchedId || null,
     cdpMatches,
     cdpTargetsSummary: summarizeCdpTargetsForLog(cdpTargets),
     prefsEvidence,
@@ -567,7 +586,7 @@ async function probeExtensionManifestResource(port, extensionId) {
 //     (buildRuntimeDomProbeExpression) touches only the two fixed-id
 //     PromptProfit elements and their own data-* attributes.
 // ---------------------------------------------------------------------------
-async function verifyRuntimeOnChatGpt(port) {
+async function verifyRuntimeOnChatGpt(port, timeoutMs) {
   const probe = await waitForCondition(
     async () => {
       let targets;
@@ -586,7 +605,7 @@ async function verifyRuntimeOnChatGpt(port) {
         return null;
       }
     },
-    { timeoutMs: 20000, intervalMs: 1000, sleepFn: realSleep },
+    { timeoutMs: timeoutMs || 20000, intervalMs: 1000, sleepFn: realSleep },
   );
   if (probe && !probe.__pending) return probe;
   // Timed out without bannerVisible/diagnosticsPresent ever becoming true --
@@ -733,7 +752,7 @@ function copyPathToClipboard(targetPath) {
   }
 }
 
-async function assistedManualLoadMode({ launch, predictedExtensionId, extractDirAbs }) {
+async function assistedManualLoadMode({ launch, predictedExtensionIds, extractDirAbs }) {
   console.log('');
   console.log('='.repeat(60));
   console.log('  ASSISTED MANUAL-LOAD MODE');
@@ -778,7 +797,7 @@ async function assistedManualLoadMode({ launch, predictedExtensionId, extractDir
       const r = await checkExtensionRegistered({
         port: launch.port,
         profileDir: launch.profileDir,
-        predictedExtensionId,
+        predictedExtensionIds,
         extractDirAbs,
       });
       return r.registered ? r : null;
@@ -791,13 +810,13 @@ async function assistedManualLoadMode({ launch, predictedExtensionId, extractDir
     console.log('PASS: PromptProfit manually loaded and verified.');
     return result;
   }
-  return { registered: false, cdpMatches: [], cdpTargetsSummary: null, prefsEvidence: { ok: false, reasons: [`assisted manual-load mode timed out after ${Math.round(timeoutMs / 1000)}s`] } };
+  return { registered: false, matchedExtensionId: null, cdpMatches: [], cdpTargetsSummary: null, prefsEvidence: { ok: false, reasons: [`assisted manual-load mode timed out after ${Math.round(timeoutMs / 1000)}s`] } };
 }
 
 // ---------------------------------------------------------------------------
 // 7g. Final summary printing (Phase 5 explicit output states)
 // ---------------------------------------------------------------------------
-function printFinalSummary({ finalState, launch, extractDirAbs, buildInfo, predictedExtensionId, regResult, runtimeResult, manifestProbe, policyCheck, assistedUsed }) {
+function printFinalSummary({ finalState, launch, extractDirAbs, buildInfo, predictedExtensionIds, regResult, runtimeResult, manifestProbe, policyCheck, assistedUsed, registeredByRuntimeRescue }) {
   console.log('');
   console.log('='.repeat(60));
   console.log('  LAUNCH SUMMARY -- ' + finalState);
@@ -809,7 +828,10 @@ function printFinalSummary({ finalState, launch, extractDirAbs, buildInfo, predi
   console.log('  Extracted extension root: ' + extractDirAbs);
   console.log('  Launch mode used:         ' + launch.mode + (assistedUsed ? ' + assisted manual-load' : ''));
   console.log('  Commit verified:          ' + (buildInfo ? buildInfo.gitCommit : '(unknown)'));
-  console.log('  Predicted extension ID:   ' + predictedExtensionId);
+  console.log('  Predicted extension ID candidate(s): ' + predictedExtensionIds.join(', '));
+  if (regResult.matchedExtensionId) {
+    console.log('  Matched extension ID:     ' + regResult.matchedExtensionId);
+  }
   console.log('');
   console.log('  -- Layer 1 (CDP targets by predicted ID) --');
   console.log('  Targets found for this ID: ' + regResult.cdpMatches.length + (regResult.cdpMatches.length ? ' (' + regResult.cdpMatches.map((m) => m.type).join(', ') + ')' : ''));
@@ -828,17 +850,24 @@ function printFinalSummary({ finalState, launch, extractDirAbs, buildInfo, predi
     console.log('  Probe result: ' + (manifestProbe.ok ? 'CONFIRMED (name=' + manifestProbe.name + ')' : 'not confirmed (' + (manifestProbe.error || 'unknown') + ')'));
   }
   console.log('');
-  console.log('  Extension registered (Layer 1 OR 2): ' + (regResult.registered ? 'YES' : 'NO'));
+  console.log('  Extension registered (Layer 1 OR 2' + (registeredByRuntimeRescue ? ', OVERRIDDEN by Layer 4 runtime rescue' : '') + '): ' + (regResult.registered ? 'YES' : 'NO'));
+  if (registeredByRuntimeRescue) {
+    console.log('  NOTE: Layers 1/2 found no match for any predicted ID candidate, but the');
+    console.log('  extension-owned runtime DOM on chatgpt.com proved PromptProfit is loaded');
+    console.log('  and active -- that direct evidence overrides the negative id-based checks.');
+  }
   console.log('');
   console.log('  -- Layer 4 (runtime DOM on chatgpt.com, extension-owned selectors only) --');
-  if (regResult.registered) {
+  if (regResult.registered || registeredByRuntimeRescue) {
     console.log('  Banner visible:            ' + (runtimeResult.bannerVisible ? 'YES' : 'NO'));
     console.log('  Diagnostics panel present: ' + (runtimeResult.diagnosticsPresent ? 'YES' : 'NO'));
+    if (runtimeResult.extensionLoaded !== null) console.log('  Diagnostics extension_loaded: ' + runtimeResult.extensionLoaded);
+    if (runtimeResult.demoFallbackRendered !== null) console.log('  Diagnostics demo_fallback_rendered: ' + runtimeResult.demoFallbackRendered);
     if (runtimeResult.statusLabel) console.log('  Diagnostics status label:  ' + runtimeResult.statusLabel);
     if (runtimeResult.lastErrorCode) console.log('  Diagnostics last error:    ' + runtimeResult.lastErrorCode);
     if (runtimeResult.error) console.log('  Note:                      ' + runtimeResult.error);
   } else {
-    console.log('  Skipped (extension not registered).');
+    console.log('  Attempted as a rescue check (see above); did not find strong evidence.');
   }
   if (policyCheck.checked) {
     console.log('');
@@ -864,24 +893,33 @@ async function main() {
     }
 
     const extractDirAbs = path.resolve(extractDir);
-    const predictedExtensionId = computeUnpackedExtensionId(extractDirAbs);
+    // Chromium hashes the absolute install path to derive an unpacked
+    // extension's id -- but with a DIFFERENT byte encoding on Windows
+    // (UTF-16LE, backing base::FilePath's std::wstring) than on POSIX
+    // (UTF-8, backing std::string). Computing only the UTF-8 candidate
+    // produces a wrong id on Windows -- Layers 1-3 then look for an id that
+    // was never assigned, and legitimately-loaded extension evidence is
+    // invisible to them even though the extension works. Checking every
+    // candidate closes that gap without needing 100% certainty about which
+    // encoding a given Chrome build actually uses.
+    const predictedExtensionIds = computeUnpackedExtensionIdCandidates(extractDirAbs, process.platform);
     console.log('');
-    console.log('Predicted extension ID (Chromium unpacked-ID algorithm): ' + predictedExtensionId);
+    console.log('Predicted extension ID candidate(s) (Chromium unpacked-ID algorithm): ' + predictedExtensionIds.join(', '));
 
     const policyCheck = checkWindowsExtensionPolicy();
 
     // Mode A, then B if A doesn't verify registration.
     let launch = await launchChrome('A', { chromePath, extractDir: extractDirAbs });
     let regResult = launch.launchFailed
-      ? { registered: false, cdpMatches: [], cdpTargetsSummary: null, prefsEvidence: { ok: false, reasons: [launch.reason + ': ' + launch.detail] } }
-      : await checkExtensionRegistered({ port: launch.port, profileDir: launch.profileDir, predictedExtensionId, extractDirAbs });
+      ? { registered: false, matchedExtensionId: null, cdpMatches: [], cdpTargetsSummary: null, prefsEvidence: { ok: false, reasons: [launch.reason + ': ' + launch.detail] } }
+      : await checkExtensionRegistered({ port: launch.port, profileDir: launch.profileDir, predictedExtensionIds, extractDirAbs });
 
     // Give mode A a real registration-polling window (not just one snapshot)
     // before declaring it failed -- Preferences can take a moment to flush.
     if (!launch.launchFailed && !regResult.registered) {
       const polled = await waitForCondition(
         async () => {
-          const r = await checkExtensionRegistered({ port: launch.port, profileDir: launch.profileDir, predictedExtensionId, extractDirAbs });
+          const r = await checkExtensionRegistered({ port: launch.port, profileDir: launch.profileDir, predictedExtensionIds, extractDirAbs });
           return r.registered ? r : null;
         },
         { timeoutMs: 10000, intervalMs: 1000, sleepFn: realSleep },
@@ -896,12 +934,12 @@ async function main() {
       const launchB = await launchChrome('B', { chromePath, extractDir: extractDirAbs });
       launch = launchB;
       regResult = launchB.launchFailed
-        ? { registered: false, cdpMatches: [], cdpTargetsSummary: null, prefsEvidence: { ok: false, reasons: [launchB.reason + ': ' + launchB.detail] } }
-        : await checkExtensionRegistered({ port: launchB.port, profileDir: launchB.profileDir, predictedExtensionId, extractDirAbs });
+        ? { registered: false, matchedExtensionId: null, cdpMatches: [], cdpTargetsSummary: null, prefsEvidence: { ok: false, reasons: [launchB.reason + ': ' + launchB.detail] } }
+        : await checkExtensionRegistered({ port: launchB.port, profileDir: launchB.profileDir, predictedExtensionIds, extractDirAbs });
       if (!launchB.launchFailed && !regResult.registered) {
         const polled = await waitForCondition(
           async () => {
-            const r = await checkExtensionRegistered({ port: launchB.port, profileDir: launchB.profileDir, predictedExtensionId, extractDirAbs });
+            const r = await checkExtensionRegistered({ port: launchB.port, profileDir: launchB.profileDir, predictedExtensionIds, extractDirAbs });
             return r.registered ? r : null;
           },
           { timeoutMs: 10000, intervalMs: 1000, sleepFn: realSleep },
@@ -913,16 +951,47 @@ async function main() {
     let assistedUsed = false;
     if (!regResult.registered && !launch.launchFailed) {
       assistedUsed = true;
-      regResult = await assistedManualLoadMode({ launch, predictedExtensionId, extractDirAbs });
+      regResult = await assistedManualLoadMode({ launch, predictedExtensionIds, extractDirAbs });
+    }
+
+    // ---------------------------------------------------------------------
+    // Layer 4 rescue: if Layers 1/2 (id-anchored CDP + Preferences) still
+    // say "not registered" after every automatic and assisted attempt, that
+    // is not necessarily true -- it may only mean every id candidate above
+    // was wrong, or Preferences hadn't flushed in time. Before giving up,
+    // check the one signal that cannot lie about whether the extension
+    // actually works: its OWN rendered diagnostics/banner on chatgpt.com.
+    // A strong positive here (isStrongRuntimeProof) OVERRIDES the negative
+    // Layer 1/2 result -- this is the fix for the exact mismatch a real
+    // Windows session hit: launcher says not registered, chrome://extensions
+    // and the diagnostics panel both show it working.
+    // ---------------------------------------------------------------------
+    let runtimeResult = { ok: false, bannerVisible: false, diagnosticsPresent: false, statusLabel: null, lastErrorCode: null, extensionLoaded: null, demoFallbackRendered: null, error: 'skipped -- extension not registered' };
+    let registeredByRuntimeRescue = false;
+    if (!regResult.registered && !launch.launchFailed) {
+      console.log('');
+      console.log('Registration not confirmed via Layer 1/2 -- running Layer 4 runtime check');
+      console.log('before giving up (extension-owned diagnostics/banner can prove load even');
+      console.log('when the predicted extension ID or Preferences timing did not cooperate).');
+      const rescueRuntime = await verifyRuntimeOnChatGpt(launch.port);
+      const rescueDecision = applyRuntimeRescueOverride(regResult.registered, rescueRuntime);
+      runtimeResult = rescueRuntime;
+      if (rescueDecision.overridden) {
+        console.log('RESCUE: extension-owned runtime DOM (banner_visible=' + rescueRuntime.bannerVisible +
+          ', diagnostics extension_loaded=' + rescueRuntime.extensionLoaded +
+          ') confirms PromptProfit is genuinely loaded and active -- overriding the');
+        console.log('negative Layer 1/2 registration result.');
+        regResult = { ...regResult, registered: true };
+        registeredByRuntimeRescue = true;
+      }
     }
 
     let manifestProbe = null;
-    if (regResult.registered && !launch.launchFailed) {
-      manifestProbe = await probeExtensionManifestResource(launch.port, predictedExtensionId);
+    if (regResult.registered && !launch.launchFailed && regResult.matchedExtensionId) {
+      manifestProbe = await probeExtensionManifestResource(launch.port, regResult.matchedExtensionId);
     }
 
-    let runtimeResult = { ok: false, bannerVisible: false, diagnosticsPresent: false, statusLabel: null, lastErrorCode: null, error: 'skipped -- extension not registered' };
-    if (regResult.registered && !launch.launchFailed) {
+    if (regResult.registered && !launch.launchFailed && !registeredByRuntimeRescue) {
       runtimeResult = await verifyRuntimeOnChatGpt(launch.port);
     }
 
@@ -932,7 +1001,7 @@ async function main() {
       policyBlockLikely: policyCheck.likely,
     });
 
-    printFinalSummary({ finalState, launch, extractDirAbs, buildInfo, predictedExtensionId, regResult, runtimeResult, manifestProbe, policyCheck, assistedUsed });
+    printFinalSummary({ finalState, launch, extractDirAbs, buildInfo, predictedExtensionIds, regResult, runtimeResult, manifestProbe, policyCheck, assistedUsed, registeredByRuntimeRescue });
 
     if (finalState === 'PASS') {
       releaseChildStdio(launch);
@@ -964,7 +1033,9 @@ async function main() {
       block(
         'BLOCKED_EXTENSION_LOAD: Chrome launched (fresh package, fresh profile) but\n' +
         'PromptProfit was never registered -- neither a CDP target nor a Preferences\n' +
-        'entry for it ever appeared, including after assisted manual-load polling.\n' +
+        'entry for it ever appeared, including after assisted manual-load polling AND\n' +
+        'a Layer 4 runtime-DOM rescue check on chatgpt.com (which also found no\n' +
+        'strong evidence of the extension being loaded there).\n' +
         '\n' +
         '  Remediation:\n' +
         '  1. Close ALL Chrome windows (including background/hidden instances).\n' +

@@ -19,12 +19,17 @@ const {
   shouldUseHeadlessFallback,
   buildChromeLaunchArgs,
   computeUnpackedExtensionId,
+  computeUnpackedExtensionIdCandidates,
   parseExtensionTargetsById,
+  parseExtensionTargetsByIds,
   findPageTargetExcludingExtensions,
   extractPromptProfitPreferencesEntry,
   evaluatePreferencesEvidence,
+  evaluatePreferencesEvidenceForIds,
   parseManifestProbeResult,
   parseRuntimeDomProbeResult,
+  isStrongRuntimeProof,
+  applyRuntimeRescueOverride,
   buildRuntimeDomProbeExpression,
   classifyLaunchOutcome,
   waitForCondition,
@@ -472,4 +477,152 @@ test('evaluatePolicyBlockLikelihood: not likely when no relevant policy values a
   const result = evaluatePolicyBlockLikelihood({});
   assert.equal(result.likely, false);
   assert.deepEqual(result.reasons, []);
+});
+
+// ---------------------------------------------------------------------------
+// Windows id-encoding fix (root cause of the reported BLOCKED_EXTENSION_LOAD
+// false negative) and the Layer 4 runtime-rescue override.
+// ---------------------------------------------------------------------------
+
+test('computeUnpackedExtensionId: utf8 (default) and utf16le encodings produce different, deterministic ids for the same path', () => {
+  const p = 'C:\\Users\\aymad\\AppData\\Local\\Temp\\promptprofit-dryrun-extract-test';
+  const utf8Id = computeUnpackedExtensionId(p, 'utf8');
+  const utf16Id = computeUnpackedExtensionId(p, 'utf16le');
+  assert.match(utf8Id, /^[a-p]{32}$/);
+  assert.match(utf16Id, /^[a-p]{32}$/);
+  assert.notEqual(utf8Id, utf16Id, 'utf8 and utf16le hashes of the same path string must differ');
+  // Deterministic: calling again with the same inputs reproduces the same ids.
+  assert.equal(computeUnpackedExtensionId(p, 'utf8'), utf8Id);
+  assert.equal(computeUnpackedExtensionId(p, 'utf16le'), utf16Id);
+});
+
+test('computeUnpackedExtensionId: omitting the encoding defaults to utf8 (backwards compatible with the original single-arg API)', () => {
+  const p = '/tmp/some-path';
+  assert.equal(computeUnpackedExtensionId(p), computeUnpackedExtensionId(p, 'utf8'));
+});
+
+test('computeUnpackedExtensionIdCandidates: win32 returns both utf8 and utf16le candidates', () => {
+  const p = 'C:\\Users\\aymad\\AppData\\Local\\Temp\\promptprofit-dryrun-extract-test';
+  const candidates = computeUnpackedExtensionIdCandidates(p, 'win32');
+  assert.equal(candidates.length, 2);
+  assert.deepEqual(candidates, [computeUnpackedExtensionId(p, 'utf8'), computeUnpackedExtensionId(p, 'utf16le')]);
+});
+
+test('computeUnpackedExtensionIdCandidates: non-Windows platforms return only the utf8 candidate (unchanged prior behavior)', () => {
+  const p = '/tmp/promptprofit-dryrun-extract-test';
+  assert.deepEqual(computeUnpackedExtensionIdCandidates(p, 'linux'), [computeUnpackedExtensionId(p, 'utf8')]);
+  assert.deepEqual(computeUnpackedExtensionIdCandidates(p, 'darwin'), [computeUnpackedExtensionId(p, 'utf8')]);
+});
+
+test('parseExtensionTargetsByIds: matches on the SECOND candidate id when the first guess is wrong (the exact Windows false-negative scenario)', () => {
+  const wrongGuess = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const actualId = 'knjjfhgannogeempolgkbfgfikofofco';
+  const targets = [{ type: 'service_worker', url: `chrome-extension://${actualId}/dist/background/service-worker.js` }];
+  const result = parseExtensionTargetsByIds(targets, [wrongGuess, actualId]);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matchedId, actualId);
+});
+
+test('parseExtensionTargetsByIds: no match across any candidate returns empty matches and null matchedId', () => {
+  const targets = [{ type: 'page', url: 'https://chatgpt.com/' }];
+  const result = parseExtensionTargetsByIds(targets, ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']);
+  assert.deepEqual(result.matches, []);
+  assert.equal(result.matchedId, null);
+});
+
+test('evaluatePreferencesEvidenceForIds: matches on the SECOND candidate id when the first guess is wrong', () => {
+  const wrongGuess = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const actualId = 'knjjfhgannogeempolgkbfgfikofofco';
+  const prefs = { extensions: { settings: { [actualId]: { path: '/tmp/extract-dir', state: 1 } } } };
+  const result = evaluatePreferencesEvidenceForIds(prefs, [wrongGuess, actualId], { expectedName: 'PromptProfit', expectedPathAbs: '/tmp/extract-dir' });
+  assert.equal(result.evidence.ok, true);
+  assert.equal(result.matchedId, actualId);
+});
+
+test('evaluatePreferencesEvidenceForIds: no candidate matches returns ok:false and null matchedId, does not throw', () => {
+  const result = evaluatePreferencesEvidenceForIds({}, ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'], { expectedName: 'PromptProfit', expectedPathAbs: '/tmp/x' });
+  assert.equal(result.evidence.ok, false);
+  assert.equal(result.matchedId, null);
+});
+
+test('parseRuntimeDomProbeResult: exposes extensionLoaded and demoFallbackRendered fields from the diagnostics panel', () => {
+  const raw = JSON.stringify({
+    bannerPresent: true, bannerVisible: true, diagnosticsPresent: true,
+    diagExtensionLoaded: 'true', diagDemoFallbackRendered: 'true',
+  });
+  const result = parseRuntimeDomProbeResult(raw);
+  assert.equal(result.extensionLoaded, 'true');
+  assert.equal(result.demoFallbackRendered, 'true');
+});
+
+test('parseRuntimeDomProbeResult: extensionLoaded/demoFallbackRendered are null when the diagnostics panel is absent', () => {
+  const raw = JSON.stringify({ bannerPresent: false, bannerVisible: false, diagnosticsPresent: false });
+  const result = parseRuntimeDomProbeResult(raw);
+  assert.equal(result.extensionLoaded, null);
+  assert.equal(result.demoFallbackRendered, null);
+});
+
+test('parseRuntimeDomProbeResult: never exposes fields beyond its known whitelist, even if the raw probe JSON contains extra keys', () => {
+  // Defends against a future edit to buildRuntimeDomProbeExpression
+  // accidentally including page-derived data -- this parser must not just
+  // pass arbitrary keys through.
+  const raw = JSON.stringify({
+    bannerPresent: true, bannerVisible: true, diagnosticsPresent: true,
+    diagExtensionLoaded: 'true',
+    pageTitle: 'My private ChatGPT conversation', pageUrl: 'https://chatgpt.com/c/secret-id',
+  });
+  const result = parseRuntimeDomProbeResult(raw);
+  const exposedKeys = Object.keys(result).filter((k) => k !== 'raw');
+  assert.deepEqual(
+    exposedKeys.sort(),
+    ['bannerVisible', 'demoFallbackRendered', 'diagnosticsPresent', 'error', 'extensionLoaded', 'lastErrorCode', 'ok', 'statusLabel'].sort(),
+  );
+  assert.ok(!('pageTitle' in result));
+  assert.ok(!('pageUrl' in result));
+});
+
+test('isStrongRuntimeProof: true when the banner is genuinely visible', () => {
+  assert.equal(isStrongRuntimeProof({ bannerVisible: true, diagnosticsPresent: false, extensionLoaded: null }), true);
+});
+
+test('isStrongRuntimeProof: true when diagnostics panel is present and explicitly reports extension_loaded=true (the real reported scenario)', () => {
+  assert.equal(isStrongRuntimeProof({ bannerVisible: false, diagnosticsPresent: true, extensionLoaded: 'true' }), true);
+});
+
+test('isStrongRuntimeProof: false when diagnostics panel is present but does NOT report extension_loaded=true (e.g. kill-switch/error state)', () => {
+  assert.equal(isStrongRuntimeProof({ bannerVisible: false, diagnosticsPresent: true, extensionLoaded: 'false' }), false);
+  assert.equal(isStrongRuntimeProof({ bannerVisible: false, diagnosticsPresent: true, extensionLoaded: null }), false);
+});
+
+test('isStrongRuntimeProof: false when neither the banner nor the diagnostics panel shows anything', () => {
+  assert.equal(isStrongRuntimeProof({ bannerVisible: false, diagnosticsPresent: false, extensionLoaded: null }), false);
+});
+
+test('isStrongRuntimeProof: false for null/undefined input, does not throw', () => {
+  assert.equal(isStrongRuntimeProof(null), false);
+  assert.equal(isStrongRuntimeProof(undefined), false);
+});
+
+test('applyRuntimeRescueOverride: already registered -> stays registered, not marked as overridden', () => {
+  const result = applyRuntimeRescueOverride(true, { bannerVisible: false, diagnosticsPresent: false, extensionLoaded: null });
+  assert.equal(result.registered, true);
+  assert.equal(result.overridden, false);
+});
+
+test('applyRuntimeRescueOverride: not registered + strong runtime proof -> becomes registered via override (fixes the reported false negative)', () => {
+  const result = applyRuntimeRescueOverride(false, { bannerVisible: true, diagnosticsPresent: true, extensionLoaded: 'true' });
+  assert.equal(result.registered, true);
+  assert.equal(result.overridden, true);
+});
+
+test('applyRuntimeRescueOverride: not registered + weak/no runtime proof -> stays not registered, no false override', () => {
+  const result = applyRuntimeRescueOverride(false, { bannerVisible: false, diagnosticsPresent: false, extensionLoaded: null });
+  assert.equal(result.registered, false);
+  assert.equal(result.overridden, false);
+});
+
+test('applyRuntimeRescueOverride: not registered + null runtime result (e.g. rescue check itself failed) -> stays not registered, does not throw', () => {
+  const result = applyRuntimeRescueOverride(false, null);
+  assert.equal(result.registered, false);
+  assert.equal(result.overridden, false);
 });
