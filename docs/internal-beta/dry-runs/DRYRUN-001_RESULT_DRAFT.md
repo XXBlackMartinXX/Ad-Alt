@@ -3,9 +3,9 @@
 **Status: READY FOR HUMAN EXECUTION**
 **Dry-Run ID:** DRYRUN-001
 **Branch:** claude/windows-release-pipeline-fix-xfj0sw
-**Commit:** 9bf3c5c
+**Commit:** 61a942a
 **Generated:** 2026-07-02
-**Artifact:** apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-02T08-51-01.zip
+**Artifact:** apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-02T09-51-20.zip
 **Artifact Size:** 66428 bytes
 
 ---
@@ -22,7 +22,7 @@
 | Check | Result |
 |-------|--------|
 | Branch | claude/windows-release-pipeline-fix-xfj0sw |
-| Commit | 9bf3c5c |
+| Commit | 61a942a |
 | check:ps1 | PASS |
 | check:secrets:local | PASS |
 | check:internal-beta-packet | PASS |
@@ -45,9 +45,9 @@
 
 | Field | Value |
 |-------|-------|
-| Artifact | apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-02T08-51-01.zip |
+| Artifact | apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-02T09-51-20.zip |
 | Size | 66428 bytes |
-| Commit | 9bf3c5c |
+| Commit | 61a942a |
 | Date Generated | 2026-07-02 |
 
 ---

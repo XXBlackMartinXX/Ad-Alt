@@ -24,6 +24,16 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const zlib = require('zlib');
+const net = require('net');
+const http = require('http');
+const {
+  parseExtensionServiceWorkerTargets,
+  extractExtensionIdFromUrl,
+  summarizeCdpTargetsForLog,
+  shouldUseNoSandbox,
+  shouldUseHeadlessFallback,
+  buildChromeLaunchArgs,
+} = require('./lib/chrome-launch-utils.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST_PACKAGE_DIR = path.join(ROOT, 'apps', 'browser-extension', 'dist-package');
@@ -241,6 +251,11 @@ if (!blocked) {
 // ---------------------------------------------------------------------------
 // 6. Verify the extracted folder itself
 // ---------------------------------------------------------------------------
+// Hoisted so step 7 can build the expected chrome-extension://<id>/<path>
+// service worker URL suffix for CDP verification without re-reading/
+// re-parsing manifest.json.
+let manifestServiceWorkerRelPath = null;
+
 if (!blocked) {
   console.log('');
   console.log('-- Verifying extracted extension --');
@@ -275,6 +290,7 @@ if (!blocked) {
 
       if (!blocked) {
         const swRelPath = manifest.background && manifest.background.service_worker;
+        manifestServiceWorkerRelPath = swRelPath || null;
         const csRelPaths = (manifest.content_scripts || []).flatMap((cs) => cs.js || []);
         const filesToScan = [swRelPath, ...csRelPaths].filter(Boolean);
         const FALLBACK_MARKERS = ['demo_fallback_active', 'demo_fallback_rendered', 'FORCED_DEMO_MOMENT', 'demo-forced-'];
@@ -340,61 +356,310 @@ function findChromeExecutable() {
   return null;
 }
 
-if (!blocked) {
+// ---------------------------------------------------------------------------
+// 7a. Small async primitives for CDP polling (no external deps)
+// ---------------------------------------------------------------------------
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Finds a free local TCP port by letting the OS assign one, then releasing it. */
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.unref();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+/**
+ * GETs a JSON endpoint off the local CDP HTTP server. Rejects on any
+ * error/timeout. Uses agent:false so the socket is never pooled for
+ * keep-alive -- Chrome's DevTools HTTP server keeps connections alive by
+ * default, and a pooled socket holds an open handle that would otherwise
+ * keep this script's process running indefinitely after Chrome itself is
+ * detached and left open for the human tester.
+ */
+function httpGetJson(port, pathName, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ host: '127.0.0.1', port, path: pathName, timeout: timeoutMs, agent: false }, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error('Could not parse JSON from ' + pathName + ': ' + e.message));
+        }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Request to ' + pathName + ' timed out')));
+    req.on('error', reject);
+  });
+}
+
+/** Repeatedly calls fn() until it returns a truthy value or timeoutMs elapses. */
+async function waitFor(fn, timeoutMs, intervalMs) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const result = await fn();
+    if (result) return result;
+    await sleep(intervalMs);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// 7b. Launch Chrome in one mode and verify via CDP that the extension's
+//     service worker actually registered. Never inspects "page" targets
+//     (see summarizeCdpTargetsForLog) -- only chrome-extension:// service
+//     worker targets, which cannot contain ChatGPT content.
+// ---------------------------------------------------------------------------
+async function launchAndVerify(mode, { chromePath, extractDir, swSuffix }) {
+  const port = await getFreePort();
+  const profileDir = path.join(os.tmpdir(), 'promptprofit-dryrun-chrome-profile-' + Date.now() + '-' + mode);
+  const noSandbox = shouldUseNoSandbox(process.platform, typeof process.getuid === 'function' ? process.getuid() : undefined);
+  const headless = shouldUseHeadlessFallback(process.platform, process.env);
+  const args = buildChromeLaunchArgs({ profileDir, extractDir, port, mode, noSandbox, headless });
+
   console.log('');
-  console.log('-- Launching Chrome --');
+  console.log(`-- Launching Chrome (mode ${mode}: ${mode === 'A' ? '--disable-extensions-except + --load-extension' : '--load-extension only'}) --`);
+  if (noSandbox) console.log('  Note: running as root -- adding --no-sandbox (required for Chromium to start; never added on Windows).');
+  if (headless) console.log('  Note: no display detected -- adding --headless=new so Chrome can start at all.');
+  console.log('  Executable:            ' + chromePath);
+  console.log('  Remote debugging port: ' + port);
+  console.log('  Profile (fresh):       ' + profileDir);
+  console.log('  Args: ' + args.join(' '));
 
-  const chromePath = findChromeExecutable();
-  if (!chromePath) {
-    block('Could not locate a Chrome/Chromium executable on this machine.\n' +
-          '  Load the extension manually instead:\n' +
-          '  1. Open Chrome -> chrome://extensions -> enable Developer Mode\n' +
-          '  2. Click "Load unpacked" and select:\n' +
-          '     ' + extractDir);
-  } else {
-    const profileDir = path.join(os.tmpdir(), 'promptprofit-dryrun-chrome-profile-' + Date.now());
-    const args = [
-      '--user-data-dir=' + profileDir,
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-extensions-except=' + extractDir,
-      '--load-extension=' + extractDir,
-      '--new-window',
-      'https://chatgpt.com',
-    ];
+  let stderrTail = '';
+  let exited = false;
+  let exitInfo = null;
+  let child;
+  try {
+    child = spawn(chromePath, args, { detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
+  } catch (e) {
+    return { ok: false, mode, reason: 'spawn-failed', detail: e.message, port, profileDir, args, chromePath, child: null };
+  }
+  child.stderr.on('data', (d) => {
+    stderrTail = (stderrTail + d.toString()).slice(-8000);
+  });
+  child.on('exit', (code, signal) => {
+    exited = true;
+    exitInfo = { code, signal };
+  });
+  child.on('error', (e) => {
+    exited = true;
+    exitInfo = { code: null, signal: null, error: e.message };
+  });
 
+  // The piped stderr stream holds its own open handle independent of the
+  // child process handle -- child.unref() alone does NOT release it, which
+  // would otherwise keep this script's own process running forever even
+  // after Chrome is successfully detached and left open for the human
+  // tester. Once we no longer need to keep reading it (every return path
+  // below has already captured whatever tail it needs into stderrTail),
+  // destroy it so the stream's handle stops holding the event loop open.
+  function releaseStderrHandle() {
+    try { child.stderr.destroy(); } catch { /* already gone */ }
+  }
+
+  // Wait for the CDP HTTP endpoint to come up -- proves Chrome itself
+  // actually started (not just that spawn() didn't throw synchronously).
+  let cdpUp = null;
+  try {
+    cdpUp = await waitFor(async () => {
+      if (exited) return { exited: true };
+      try {
+        return await httpGetJson(port, '/json/version', 1500);
+      } catch {
+        return null;
+      }
+    }, 15000, 400);
+  } catch {
+    cdpUp = null;
+  }
+
+  if (!cdpUp || cdpUp.exited) {
+    releaseStderrHandle();
+    return {
+      ok: false,
+      mode,
+      reason: exited ? 'chrome-exited-before-cdp-ready' : 'cdp-endpoint-unreachable',
+      detail: exited
+        ? `Chrome process exited before its DevTools port became reachable (code=${exitInfo && exitInfo.code} signal=${exitInfo && exitInfo.signal}).`
+        : 'Chrome did not open its remote-debugging port within 15s.',
+      stderr: stderrTail,
+      pid: child.pid,
+      port,
+      profileDir,
+      args,
+      chromePath,
+      child,
+    };
+  }
+
+  // CDP is up -- now poll /json/list for the extension's own service worker
+  // target. This is the actual proof the extension loaded, not just that
+  // a Chrome window opened.
+  let cdpTargetsSummary = null;
+  let matches = [];
+  const found = await waitFor(async () => {
+    let list;
     try {
-      const child = spawn(chromePath, args, { detached: true, stdio: 'ignore' });
-      child.unref();
-
-      console.log('PASS  Chrome launched.');
-      console.log('');
-      console.log('='.repeat(60));
-      console.log('  LAUNCH SUMMARY');
-      console.log('='.repeat(60));
-      console.log('  Extracted extension root: ' + extractDir);
-      console.log('  Chrome profile (fresh):   ' + profileDir);
-      console.log('  Commit verified:          ' + (buildInfo ? buildInfo.gitCommit : '(unknown)'));
-      console.log('');
-      console.log('  EXPECTED RESULT:');
-      console.log('  - A new Chrome window opens to https://chatgpt.com');
-      console.log('  - The PromptProfit demo banner should appear in the bottom-right');
-      console.log('    corner within ~5-10 seconds, with no login or prompt required.');
-      console.log('');
-      console.log('  Open chrome://extensions in this same window and confirm');
-      console.log('  PromptProfit appears in the list with no error badge.');
-      console.log('');
-      console.log('  This script did not log in, did not enter a prompt, and did not');
-      console.log('  read any page content. It only opened the browser window.');
-      console.log('='.repeat(60));
-      console.log('');
-    } catch (e) {
-      block('Failed to launch Chrome: ' + e.message);
+      list = await httpGetJson(port, '/json/list', 1500);
+    } catch {
+      return null;
     }
+    cdpTargetsSummary = summarizeCdpTargetsForLog(list);
+    const m = parseExtensionServiceWorkerTargets(list, swSuffix);
+    if (m.length > 0) {
+      matches = m;
+      return true;
+    }
+    return null;
+  }, 12000, 500);
+
+  if (!found || matches.length === 0) {
+    releaseStderrHandle();
+    return {
+      ok: false,
+      mode,
+      reason: 'extension-service-worker-not-found',
+      detail: 'CDP is reachable but no chrome-extension:// service_worker target matching "' + swSuffix + '" appeared within 12s.',
+      cdpTargetsSummary,
+      pid: child.pid,
+      port,
+      profileDir,
+      args,
+      chromePath,
+      child,
+    };
+  }
+
+  const serviceWorkerUrl = matches[0].url;
+  const extensionId = extractExtensionIdFromUrl(serviceWorkerUrl);
+  releaseStderrHandle();
+  return {
+    ok: true,
+    mode,
+    serviceWorkerUrl,
+    extensionId,
+    pid: child.pid,
+    port,
+    profileDir,
+    args,
+    chromePath,
+    child,
+  };
+}
+
+function printVerificationSummary(result, { extractDir, buildInfo }) {
+  console.log('');
+  console.log('='.repeat(60));
+  console.log('  LAUNCH SUMMARY');
+  console.log('='.repeat(60));
+  console.log('  Chrome executable:        ' + result.chromePath);
+  console.log('  Chrome PID:                ' + (result.pid || '(not started)'));
+  console.log('  Remote debugging port:    ' + result.port);
+  console.log('  Chrome profile (fresh):   ' + result.profileDir);
+  console.log('  Extracted extension root: ' + extractDir);
+  console.log('  Launch mode used:         ' + result.mode + (result.mode === 'A' ? ' (--disable-extensions-except + --load-extension)' : ' (--load-extension only)'));
+  console.log('  Commit verified:          ' + (buildInfo ? buildInfo.gitCommit : '(unknown)'));
+  console.log('  Extension registration verified: ' + (result.ok ? 'YES' : 'NO'));
+  console.log('  Verification method:      Chrome DevTools Protocol (GET /json/version, /json/list)');
+  if (result.ok) {
+    console.log('  Extension ID:             ' + (result.extensionId || '(could not parse from URL)'));
+    console.log('  Service worker URL:       ' + result.serviceWorkerUrl);
+  } else {
+    console.log('  Blocked reason:           ' + result.reason);
+    console.log('  Detail:                   ' + result.detail);
+    if (result.cdpTargetsSummary) {
+      console.log('  CDP targets seen (counts by type, no page content read): ' + JSON.stringify(result.cdpTargetsSummary.targetCountsByType));
+    }
+    if (result.stderr) {
+      console.log('  Chrome stderr (tail):');
+      result.stderr.trim().split('\n').slice(-15).forEach((l) => console.log('    ' + l));
+    }
+  }
+  console.log('='.repeat(60));
+  console.log('');
+}
+
+async function main() {
+  if (!blocked) {
+    const chromePath = findChromeExecutable();
+    if (!chromePath) {
+      block('Could not locate a Chrome/Chromium executable on this machine.\n' +
+            '  Load the extension manually instead:\n' +
+            '  1. Open Chrome -> chrome://extensions -> enable Developer Mode\n' +
+            '  2. Click "Load unpacked" and select:\n' +
+            '     ' + extractDir);
+    } else {
+      const swSuffix = '/' + String(manifestServiceWorkerRelPath || 'dist/background/service-worker.js').replace(/^\/+/, '');
+
+      let result = await launchAndVerify('A', { chromePath, extractDir, swSuffix });
+      if (!result.ok) {
+        console.log('');
+        console.log(`WARN  Mode A did not verify (${result.reason}). Retrying with mode B (--load-extension only)...`);
+        if (result.child && !result.child.killed) {
+          try { result.child.kill(); } catch { /* already gone */ }
+        }
+        result = await launchAndVerify('B', { chromePath, extractDir, swSuffix });
+      }
+
+      printVerificationSummary(result, { extractDir, buildInfo });
+
+      if (result.ok) {
+        // Detach so the verified, running Chrome window survives this
+        // script's own process exit -- the human tester needs it open.
+        result.child.unref();
+        console.log('PASS: PromptProfit extension loaded in Chrome.');
+        console.log('');
+        console.log('Continue to chatgpt.com; banner should appear within 5-10 seconds.');
+        console.log('');
+        console.log('This script did not log in, did not enter a prompt, and did not');
+        console.log('read any page content. It only verified the extension loaded via');
+        console.log('the DevTools protocol and opened the browser window.');
+      } else {
+        // Leave whatever Chrome window mode B produced open (if any) so the
+        // manual fallback below can be attempted in it directly.
+        if (result.child && !result.child.killed) {
+          try { result.child.unref(); } catch { /* already gone */ }
+        }
+        block(
+          'Chrome launched but PromptProfit was not loaded.\n' +
+          '\n' +
+          '  Remediation:\n' +
+          '  1. Close all Chrome windows (including background/hidden instances).\n' +
+          '  2. Rerun: pnpm -w run dryrun:001:launch-chrome\n' +
+          '  3. If it still fails, load the extension manually:\n' +
+          '     - Open chrome://extensions\n' +
+          '     - Enable Developer Mode (toggle, top right)\n' +
+          '     - Click "Load unpacked"\n' +
+          '     - Select EXACTLY this folder: ' + extractDir + '\n' +
+          '     - Confirm "PromptProfit" appears in the list with no error badge\n' +
+          '     - Then go to https://chatgpt.com\n' +
+          '  4. If Chrome shows a policy warning or an extension error badge,\n' +
+          '     report its exact text -- this can indicate an enterprise/organization\n' +
+          '     policy blocking unpacked or developer-mode extensions on this machine.\n' +
+          '\n' +
+          '  Do NOT proceed to chatgpt.com to look for the banner: without a verified\n' +
+          '  extension load, a missing banner tells you nothing.'
+        );
+      }
+    }
+  }
+
+  if (blocked) {
+    process.exitCode = 1;
   }
 }
 
-if (blocked) {
-  process.exit(1);
-}
-process.exit(0);
+main().catch((e) => {
+  console.error('FATAL: launcher crashed: ' + (e && e.stack ? e.stack : e));
+  process.exitCode = 1;
+});

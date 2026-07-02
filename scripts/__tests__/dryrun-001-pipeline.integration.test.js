@@ -23,6 +23,7 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUNDLE_SCRIPT = path.join(ROOT, 'apps', 'browser-extension', 'scripts', 'bundle.mjs');
 const BUNDLE_SCRIPT_BAK = BUNDLE_SCRIPT + '.integration-test-bak';
+const FAKE_CHROME_NO_SW = path.join(__dirname, 'fixtures', 'fake-chrome-no-service-worker.js');
 
 /**
  * Temporarily renames bundle.mjs so package:browser:beta's rebuild step
@@ -90,3 +91,43 @@ test(
     });
   },
 );
+
+test(
+  'dryrun-001-launch-chrome.js reports BLOCKED with remediation, not PASS, when no extension service worker registers',
+  { timeout: 90_000 },
+  () => {
+    // A real package builds and a real (fixture) "Chrome" process launches --
+    // but the fixture's /json/list never contains a chrome-extension://
+    // service_worker target, so the launcher's own CDP-polling logic (the
+    // exact thing this session adds) must conclude BLOCKED on its own,
+    // through both retry modes, rather than trusting that spawn() not
+    // throwing means the extension loaded.
+    let res;
+    try {
+      res = spawnSync('node', [path.join(ROOT, 'scripts', 'dryrun-001-launch-chrome.js')], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 85_000,
+        env: { ...process.env, PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: FAKE_CHROME_NO_SW },
+      });
+    } finally {
+      // The launcher deliberately leaves its final Chrome process detached
+      // and running (real Chrome, so the human tester can try "Load
+      // unpacked" manually) -- for the fixture that means an orphaned fake
+      // server process we're responsible for reaping in this test.
+      spawnSync('pkill', ['-f', FAKE_CHROME_NO_SW]);
+    }
+    const out = (res.stdout || '') + (res.stderr || '');
+
+    assert.notEqual(res.status, 0, 'launcher must exit non-zero when the extension never registers');
+    assert.match(out, /BLOCKED/, 'launcher must print a BLOCKED message');
+    assert.doesNotMatch(out, /PASS: PromptProfit extension loaded in Chrome\./, 'launcher must NOT claim the extension loaded');
+    assert.match(out, /Extension registration verified: NO/, 'launch summary must record verification as NO');
+    assert.match(out, /Load unpacked/, 'BLOCKED output must include the manual fallback instructions');
+    assert.match(out, /Chrome DevTools Protocol/, 'launch summary must record the verification method attempted');
+    // Both retry modes should have been attempted before giving up.
+    assert.match(out, /mode A/, 'must attempt mode A (--disable-extensions-except + --load-extension)');
+    assert.match(out, /mode B/, 'must attempt mode B (--load-extension only) after mode A fails to verify');
+  },
+);
+
