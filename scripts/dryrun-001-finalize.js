@@ -367,6 +367,8 @@ async function main() {
 
     const commitRes = runCmd('git rev-parse --short HEAD');
     const commit = (commitRes.stdout || '').trim();
+    const branchRes = runCmd('git rev-parse --abbrev-ref HEAD');
+    const branch = (branchRes.stdout || '').trim() || '(unknown)';
 
     const blockerNote = blockers.length > 0
       ? `\n**Blockers preventing GO:**\n${blockers.map(b => `- ${b}`).join('\n')}\n`
@@ -381,7 +383,7 @@ async function main() {
 **Dry-Run ID:** DRYRUN-001
 **Status: ${status}**
 **Date:** ${today}
-**Branch:** claude/ecstatic-maxwell-h0d8d8
+**Branch:** ${branch}
 **Commit:** ${commit}
 **Decision:** ${decision}
 

@@ -27,7 +27,12 @@ const zlib = require('zlib');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST_PACKAGE_DIR = path.join(ROOT, 'apps', 'browser-extension', 'dist-package');
-const EXPECTED_BRANCH = 'claude/ecstatic-maxwell-h0d8d8';
+// Session branches are generated fresh per Claude Code session (the name
+// changes every time), so this can't be a hardcoded literal -- that would
+// make the check fail permanently the moment a new session picks up the
+// work. Instead we block only on protected branches, where launching a
+// verified Chrome session by accident would be a real mistake.
+const PROTECTED_BRANCHES = new Set(['main', 'master']);
 
 let blocked = false;
 function block(msg) {
@@ -118,8 +123,8 @@ console.log('');
 // ---------------------------------------------------------------------------
 const branchRes = runCaptured('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
 const branch = branchRes.stdout.trim();
-if (branch !== EXPECTED_BRANCH) {
-  block(`Current branch is "${branch}", expected "${EXPECTED_BRANCH}".\nSwitch branches before launching.`);
+if (!branch || PROTECTED_BRANCHES.has(branch)) {
+  block(`Current branch is "${branch || '(detached HEAD)'}", which is a protected branch.\nSwitch to a feature/session branch before launching.`);
 }
 
 // ---------------------------------------------------------------------------

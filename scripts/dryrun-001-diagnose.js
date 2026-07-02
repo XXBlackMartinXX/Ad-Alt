@@ -14,7 +14,9 @@ const ROOT = path.resolve(__dirname, '..');
 const BROWSER_EXT_DIR = path.join(ROOT, 'apps', 'browser-extension');
 const DIST_DIR = path.join(BROWSER_EXT_DIR, 'dist');
 const DIST_PACKAGE_DIR = path.join(BROWSER_EXT_DIR, 'dist-package');
-const EXPECTED_BRANCH = 'claude/ecstatic-maxwell-h0d8d8';
+// Session branches are generated fresh per Claude Code session (the name
+// changes every time), so this can't be a hardcoded literal.
+const PROTECTED_BRANCHES = new Set(['main', 'master']);
 
 let passed = 0;
 let warned = 0;
@@ -40,10 +42,10 @@ console.log('-- Section 1: Branch and commit --');
 
 const branchRes = runCmd('git branch --show-current');
 const branch = (branchRes.stdout || '').trim();
-if (branch === EXPECTED_BRANCH) {
+if (branch && !PROTECTED_BRANCHES.has(branch)) {
   pass(`Branch: ${branch}`);
 } else if (branch) {
-  fail(`Branch mismatch. Expected: ${EXPECTED_BRANCH}  Got: ${branch}`);
+  fail(`Branch is protected (${branch}) -- dry-run diagnostics should run on a feature/session branch.`);
 } else {
   warn('Could not detect branch (detached HEAD?)');
 }

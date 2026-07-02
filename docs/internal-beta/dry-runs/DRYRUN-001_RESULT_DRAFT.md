@@ -2,11 +2,11 @@
 
 **Status: READY FOR HUMAN EXECUTION**
 **Dry-Run ID:** DRYRUN-001
-**Branch:** claude/ecstatic-maxwell-h0d8d8
-**Commit:** 4963877
-**Generated:** 2026-07-01
-**Artifact:** apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-01T12-46-56.zip
-**Artifact Size:** 66605 bytes
+**Branch:** claude/windows-release-pipeline-fix-xfj0sw
+**Commit:** 9bf3c5c
+**Generated:** 2026-07-02
+**Artifact:** apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-02T08-51-01.zip
+**Artifact Size:** 66428 bytes
 
 ---
 
@@ -21,8 +21,8 @@
 
 | Check | Result |
 |-------|--------|
-| Branch | claude/ecstatic-maxwell-h0d8d8 |
-| Commit | 4963877 |
+| Branch | claude/windows-release-pipeline-fix-xfj0sw |
+| Commit | 9bf3c5c |
 | check:ps1 | PASS |
 | check:secrets:local | PASS |
 | check:internal-beta-packet | PASS |
@@ -31,6 +31,7 @@
 | package:browser:beta | PASS |
 | ZIP audit (internal-beta) | PASS |
 | VSIX audit (internal-beta) | PASS |
+| dryrun:001:selftest (banner gate) | PASS |
 
 ## Public-Release Gate Status (must remain FAIL/blocking)
 
@@ -44,10 +45,10 @@
 
 | Field | Value |
 |-------|-------|
-| Artifact | apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-01T12-46-56.zip |
-| Size | 66605 bytes |
-| Commit | 4963877 |
-| Date Generated | 2026-07-01 |
+| Artifact | apps/browser-extension/dist-package/promptprofit-browser-beta-2026-07-02T08-51-01.zip |
+| Size | 66428 bytes |
+| Commit | 9bf3c5c |
+| Date Generated | 2026-07-02 |
 
 ---
 

@@ -16,7 +16,12 @@ const DIST_PACKAGE_DIR = path.join(ROOT, 'apps', 'browser-extension', 'dist-pack
 const TEMPLATE_PATH = path.join(DRY_RUNS_DIR, 'DRY_RUN_RESULT_LOG_TEMPLATE.md');
 const DRAFT_PATH = path.join(DRY_RUNS_DIR, 'DRYRUN-001_RESULT_DRAFT.md');
 const RESULT_LOG_PATH = path.join(DRY_RUNS_DIR, 'DRYRUN-001_RESULT_LOG.md');
-const EXPECTED_BRANCH = 'claude/ecstatic-maxwell-h0d8d8';
+// Session branches are generated fresh per Claude Code session (the name
+// changes every time), so this can't be a hardcoded literal -- that would
+// make the check fail permanently the moment a new session picks up the
+// work. Instead we block only on protected branches, where running a
+// dry-run prep by accident would be a real mistake.
+const PROTECTED_BRANCHES = new Set(['main', 'master']);
 
 // Recorded before ANY check runs, so the freshness check below can prove the
 // package used for this session's artifact was actually built during THIS
@@ -74,10 +79,10 @@ console.log('-- Environment --');
 const branchRes = runCmd('git rev-parse --abbrev-ref HEAD');
 const branch = (branchRes.stdout || '').trim();
 
-if (branch !== EXPECTED_BRANCH) {
-  console.log(`  FAIL  Branch: ${branch} (expected ${EXPECTED_BRANCH})`);
+if (!branch || PROTECTED_BRANCHES.has(branch)) {
+  console.log(`  FAIL  Branch: ${branch || '(detached HEAD)'} (dry-run prep must not run on a protected branch)`);
   console.log('');
-  console.log('Switch to the correct branch before running this script.');
+  console.log('Switch to a feature/session branch before running this script.');
   process.exit(1);
 }
 console.log(`  PASS  Branch: ${branch}`);
@@ -310,7 +315,7 @@ if (fs.existsSync(DRAFT_PATH)) {
 
 **Status: READY FOR HUMAN EXECUTION**
 **Dry-Run ID:** DRYRUN-001
-**Branch:** claude/ecstatic-maxwell-h0d8d8
+**Branch:** ${branch}
 **Commit:** ${commit}
 **Generated:** ${today}
 **Artifact:** ${zipPath || '[not found -- run package:browser:beta]'}
