@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { importFile } = require('./lib/import-file.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const REPORT_PATH = path.join(
@@ -50,7 +51,7 @@ async function main() {
   console.log('accounts are used. All IDs and amounts below are synthetic fixtures.');
   console.log('');
 
-  const ledgerMod = await import(path.join(REPO_ROOT, 'packages/ledger/dist/index.js'));
+  const ledgerMod = await importFile(path.join(REPO_ROOT, 'packages/ledger/dist/index.js'));
   const calculator = new ledgerMod.LedgerCalculator();
 
   // ---------------------------------------------------------------------

@@ -35,6 +35,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { importFile } = require('./lib/import-file.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const REPORT_PATH = path.join(
@@ -171,9 +172,9 @@ async function main() {
   console.log('------------------------------------------------------------');
   console.log('');
 
-  const ledgerMod = await import(path.join(REPO_ROOT, 'packages/ledger/dist/index.js'));
-  const fraudMod = await import(path.join(REPO_ROOT, 'packages/fraud/dist/index.js'));
-  const platformCoreMod = await import(path.join(REPO_ROOT, 'packages/platform-core/dist/index.js'));
+  const ledgerMod = await importFile(path.join(REPO_ROOT, 'packages/ledger/dist/index.js'));
+  const fraudMod = await importFile(path.join(REPO_ROOT, 'packages/fraud/dist/index.js'));
+  const platformCoreMod = await importFile(path.join(REPO_ROOT, 'packages/platform-core/dist/index.js'));
 
   const calculator = new ledgerMod.LedgerCalculator();
   const fraudScorer = new fraudMod.FraudScorer();

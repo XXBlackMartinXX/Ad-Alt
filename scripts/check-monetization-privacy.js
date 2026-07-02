@@ -31,6 +31,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { importFile } = require('./lib/import-file.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const KEY_RE = /ppft_[0-9a-f]{48,}/i;
@@ -66,8 +67,8 @@ async function main() {
   console.log('------------------------------------------------------------');
   console.log('');
 
-  const platformCoreMod = await import(
-    path.join(REPO_ROOT, 'packages/platform-core/dist/index.js')
+  const platformCoreMod = await importFile(
+    path.join(REPO_ROOT, 'packages/platform-core/dist/index.js'),
   );
   const forbiddenFields = platformCoreMod.TELEMETRY_FORBIDDEN_FIELDS;
 
