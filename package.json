@@ -66,10 +66,10 @@
     "test:scripts": "node --test scripts/__tests__/*.test.js"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "prettier": "^3.3.0",
-    "turbo": "^2.0.0",
-    "typescript": "^5.5.0"
+    "@types/node": "^26.1.0",
+    "prettier": "^3.9.4",
+    "turbo": "^2.10.2",
+    "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@9.4.0"
 }
