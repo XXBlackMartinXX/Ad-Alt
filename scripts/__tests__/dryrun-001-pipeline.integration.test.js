@@ -93,22 +93,32 @@ test(
 );
 
 test(
-  'dryrun-001-launch-chrome.js reports BLOCKED with remediation, not PASS, when no extension service worker registers',
-  { timeout: 90_000 },
+  'dryrun-001-launch-chrome.js reports BLOCKED_EXTENSION_LOAD, not PASS, when the extension never registers through either mode or assisted manual-load',
+  { timeout: 60_000 },
   () => {
     // A real package builds and a real (fixture) "Chrome" process launches --
     // but the fixture's /json/list never contains a chrome-extension://
-    // service_worker target, so the launcher's own CDP-polling logic (the
-    // exact thing this session adds) must conclude BLOCKED on its own,
-    // through both retry modes, rather than trusting that spawn() not
-    // throwing means the extension loaded.
+    // target for our extension AND it has no real profile (so Layer 2
+    // Preferences also never finds an entry), so the launcher's own
+    // multi-layer verification must conclude BLOCKED_EXTENSION_LOAD on its
+    // own, through both retry modes AND assisted manual-load mode, rather
+    // than trusting that spawn() not throwing means the extension loaded.
+    // PROMPTPROFIT_ASSISTED_POLL_* shrinks the (production: 2-minute)
+    // assisted-mode poll to keep this test fast without changing real
+    // dry-run behavior -- see the env-var override in
+    // dryrun-001-launch-chrome.js's assistedManualLoadMode().
     let res;
     try {
       res = spawnSync('node', [path.join(ROOT, 'scripts', 'dryrun-001-launch-chrome.js')], {
         cwd: ROOT,
         encoding: 'utf8',
-        timeout: 85_000,
-        env: { ...process.env, PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: FAKE_CHROME_NO_SW },
+        timeout: 55_000,
+        env: {
+          ...process.env,
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: FAKE_CHROME_NO_SW,
+          PROMPTPROFIT_ASSISTED_POLL_TIMEOUT_MS: '3000',
+          PROMPTPROFIT_ASSISTED_POLL_INTERVAL_MS: '500',
+        },
       });
     } finally {
       // The launcher deliberately leaves its final Chrome process detached
@@ -120,14 +130,14 @@ test(
     const out = (res.stdout || '') + (res.stderr || '');
 
     assert.notEqual(res.status, 0, 'launcher must exit non-zero when the extension never registers');
-    assert.match(out, /BLOCKED/, 'launcher must print a BLOCKED message');
-    assert.doesNotMatch(out, /PASS: PromptProfit extension loaded in Chrome\./, 'launcher must NOT claim the extension loaded');
-    assert.match(out, /Extension registration verified: NO/, 'launch summary must record verification as NO');
+    assert.match(out, /BLOCKED_EXTENSION_LOAD/, 'launcher must print the BLOCKED_EXTENSION_LOAD state');
+    assert.doesNotMatch(out, /PASS: PromptProfit extension loaded/, 'launcher must NOT claim the extension loaded');
+    assert.match(out, /Extension registered \(Layer 1 OR 2\): NO/, 'launch summary must record registration as NO');
     assert.match(out, /Load unpacked/, 'BLOCKED output must include the manual fallback instructions');
-    assert.match(out, /Chrome DevTools Protocol/, 'launch summary must record the verification method attempted');
-    // Both retry modes should have been attempted before giving up.
-    assert.match(out, /mode A/, 'must attempt mode A (--disable-extensions-except + --load-extension)');
-    assert.match(out, /mode B/, 'must attempt mode B (--load-extension only) after mode A fails to verify');
+    assert.match(out, /ASSISTED MANUAL-LOAD MODE/, 'must have entered assisted manual-load mode after both auto modes failed');
+    // Both retry modes should have been attempted before assisted mode.
+    assert.match(out, /mode A:/, 'must attempt mode A (--disable-extensions-except + --load-extension)');
+    assert.match(out, /mode B:/, 'must attempt mode B (--load-extension only) after mode A fails to verify');
   },
 );
 

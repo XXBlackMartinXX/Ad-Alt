@@ -198,6 +198,23 @@ Estimated time: 60-90 minutes including automated checks.
   # Expect: PASS, exit 0
 
 ### Step 8 -- Load extension in Chrome
+
+**Recommended: use the verified launcher instead of steps 1-3 below.** It builds a fresh
+package, verifies it's genuinely current, extracts it, and PROVES PromptProfit loaded
+through four independent checks (not just a visual glance at chrome://extensions) before
+printing PASS -- you never have to pick a ZIP or find a folder yourself:
+
+```bash
+pnpm -w run dryrun:001:launch-chrome
+```
+
+If it does not print `PASS`, do not proceed manually -- see
+`docs/internal-beta/dry-runs/DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md`. If auto-load
+fails, the launcher itself automatically opens `chrome://extensions` and a file browser at
+the exact folder to select and polls for the load -- you do not need to do steps 1-3
+yourself even in that case.
+
+Manual alternative (only if you're not using the launcher):
 1. Go to chrome://extensions -> enable Developer Mode.
 2. Click "Load unpacked" -> select the `apps/browser-extension/` folder itself
    (the folder that contains `manifest.json` directly). Do NOT select

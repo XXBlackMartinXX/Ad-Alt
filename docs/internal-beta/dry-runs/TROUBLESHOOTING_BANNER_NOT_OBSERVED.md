@@ -44,38 +44,62 @@ before anything else.** If the extension itself never loaded, no diagnostics pan
 banner can ever appear -- there is nothing to diagnose about wait-state or demo-mode
 behavior yet.
 
-- [ ] Open `chrome://extensions` in the SAME Chrome window/profile you tested with.
-- [ ] Look for an entry named "PromptProfit" in the list.
+**Do not answer this by eyeballing chrome://extensions yourself first.** Run the verified
+launcher -- it proves load through four independent checks (a CDP target for the exact
+predicted extension ID, the profile's own Preferences registration, a manifest.json
+resource probe, and -- once registered -- the actual extension-owned banner/diagnostics DOM
+on chatgpt.com) and tells you definitively which of `PASS`, `BLOCKED_EXTENSION_LOAD`,
+`BLOCKED_RUNTIME`, or `BLOCKED_POLICY` you're in, instead of asking you to guess from a
+visual check:
 
-**If PromptProfit is NOT in the list at all:**
+```bash
+pnpm -w run dryrun:001:launch-chrome
+```
+
+**Command-line auto-load (`--load-extension`) can fail on some Chrome/Windows setups even
+when the package itself is fine** (silent process crash, an unpacked-extension enterprise
+policy, a Chrome build quirk). When it does, the launcher does not just report a generic
+failure or ask you to manually verify: it automatically enters **assisted manual-load
+mode** -- it opens `chrome://extensions` and a file browser at the exact extracted folder
+in the same Chrome window, copies that exact path to your clipboard, and then polls for up
+to two minutes for the load to register, continuing on its own the moment it detects
+PromptProfit -- you never have to pick a ZIP, guess a folder, or tell the script when
+you're done. See `docs/internal-beta/dry-runs/DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md`
+for the full investigation and verification-layer design.
+
+**If the launcher reports `BLOCKED_EXTENSION_LOAD` or `BLOCKED_POLICY`:**
 
 - The extension is not loaded. **Do not proceed to ChatGPT.** No banner or diagnostics
   panel can appear under any circumstances until this is fixed.
-- This is an **extension-load failure**, not a banner-render failure -- record it as such.
-  Do not describe this as "the banner didn't appear" in any report; describe it as
-  "PromptProfit was not visible in chrome://extensions after Load unpacked."
+- This is an **extension-load failure**, not a banner-render failure -- record it as such,
+  using the launcher's exact `Blocked reason:`/policy-signal text. Do not describe this as
+  "the banner didn't appear" in any report.
 - Check, in this order:
-  1. **Did packaging actually succeed for THIS session?** Re-run
-     `pnpm -w run package:browser:beta` (or, better, `pnpm -w run dryrun:001:prepare`, which
-     refuses to continue past a packaging failure) and confirm it exits 0 with no FAIL lines.
-     A failed package build silently leaves behind an OLD ZIP from a previous run -- do not
-     assume the ZIP you have is current just because a file exists.
+  1. **Did packaging actually succeed for THIS session?** The launcher already re-runs
+     packaging itself and refuses to proceed on failure -- but if you ran
+     `package:browser:beta` manually first, confirm it exited 0 with no FAIL lines. A failed
+     package build silently leaves behind an OLD ZIP from a previous run -- do not assume
+     the ZIP you have is current just because a file exists.
   2. **Does the extracted folder actually contain manifest.json at its root?**
      Run `pnpm -w run check:browser:load-folder` -- it verifies this and also verifies the
      package's `promptprofit-build-info.json` matches the current commit (i.e. it is not stale).
-  3. **Was Chrome launched with the correct `--load-extension` / "Load unpacked" folder?**
-     If you extracted the ZIP, the folder you select must be the one containing
-     `manifest.json` directly -- not `dist/` or any subfolder.
-  4. **Try the verified launcher instead of manual extraction:**
-     `pnpm -w run dryrun:001:launch-chrome` builds a fresh package, extracts it to a new
-     folder, verifies manifest.json/build-info/forced-fallback markers are all present, and
-     only then launches Chrome pointed at that exact folder -- removing every manual step
-     that could go wrong.
-- Only after PromptProfit is confirmed visible in `chrome://extensions` with no error badge
-  should you proceed to STEP 1 and the banner-specific guidance below.
+  3. **Did assisted manual-load mode time out?** If the launcher entered assisted mode and
+     the two-minute poll expired, re-run the launcher and complete the Load Unpacked steps
+     it prints faster, or check for a Chrome error/policy badge on the extension card and
+     report its exact text.
+  4. **Is a Chrome/Chromium enterprise policy involved?** On Windows, the launcher itself
+     checks the relevant `HKLM/HKCU\Software\Policies\Google\Chrome` (and `\Chromium`)
+     registry values and reports `BLOCKED_POLICY` with the exact policy name/value if one
+     is likely blocking Developer Mode or unpacked extensions.
+- Only after the launcher itself reports `PASS` (or you have independently confirmed
+  PromptProfit in `chrome://extensions` with no error badge AFTER assisted mode) should you
+  proceed to STEP 1 and the banner-specific guidance below.
 
-**If PromptProfit IS visible in chrome://extensions:** proceed to the banner/diagnostics
-guidance below -- this is now genuinely a banner-render (not extension-load) question.
+**If the launcher reports `BLOCKED_RUNTIME`:** the extension IS registered and loaded --
+this is genuinely a banner-render (not extension-load) question. It already printed the
+extension-owned diagnostic state (banner visible / diagnostics present / status label / last
+error code) it observed on chatgpt.com; record that verbatim and proceed to the
+banner/diagnostics guidance below rather than re-debugging package/load steps.
 
 ---
 

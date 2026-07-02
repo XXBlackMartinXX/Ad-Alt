@@ -214,6 +214,21 @@ extension-load failure (see manifest/host-permission review in
 DRYRUN-001_DEFINITIVE_BANNER_FIX.md) -- a more fundamental problem than the original
 wait-state dependency, and file it as a new, distinct issue rather than reusing this one.
 
+**Update -- disambiguation tooling added:** the exact ambiguity this escalation path
+described (is a missing banner an extension-load failure or a runtime-rendering failure?)
+previously had to be judged by eye. `pnpm -w run dryrun:001:launch-chrome` now proves which
+one it is through four independent verification layers before a human ever looks at
+chatgpt.com, and reports it as one of two distinct, non-overlapping states:
+`BLOCKED_EXTENSION_LOAD` (or `BLOCKED_POLICY`) if PromptProfit never registered at all --
+in which case a missing banner is expected and this issue does not apply -- versus
+`BLOCKED_RUNTIME` if PromptProfit IS registered and loaded but the banner/diagnostics still
+never appeared on chatgpt.com, which is this issue's actual failure mode and should be
+recorded with the launcher's printed diagnostic state (banner visible / diagnostics
+present / status label / last error code) verbatim. See
+`docs/internal-beta/dry-runs/DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md`. This is a
+verification-tooling improvement, not a fix to the underlying banner-render behavior --
+this issue remains open at S1/P1 until a real human rerun confirms the banner.
+
 **Remains S1/P1 until a successful rerun.** Do not schedule DRYRUN-002 wider distribution while this is open.
 
 ---

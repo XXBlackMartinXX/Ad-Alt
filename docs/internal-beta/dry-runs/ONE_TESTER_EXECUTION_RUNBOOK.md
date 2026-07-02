@@ -44,16 +44,42 @@ and re-run `pnpm -w run dryrun:001:prepare` until it succeeds.
 
 ## STEP 0 (Before Anything Else): Confirm PromptProfit Loads in chrome://extensions
 
-Before touching chatgpt.com at all, confirm the extension actually loaded:
+Before touching chatgpt.com at all, confirm the extension actually loaded. **Do this by
+running the launcher, not by eyeballing the extensions page yourself:**
 
-- [ ] Open `chrome://extensions` and confirm "PromptProfit" appears in the list, toggle ON, no error badge.
+```bash
+pnpm -w run dryrun:001:launch-chrome
+```
 
-**If it does NOT appear:** STOP. Do not proceed to ChatGPT. This is an extension-load
-failure, not a banner-render failure -- see
+The launcher proves load through four independent checks -- a CDP target for the exact
+predicted extension ID, the profile's own Preferences registration, a manifest.json
+resource probe, and (once registered) the actual banner/diagnostics DOM on chatgpt.com --
+and prints exactly one of four outcomes:
+
+- **`PASS`** -- registered AND the banner/diagnostics were confirmed on chatgpt.com. Proceed
+  to the tester session.
+- **`BLOCKED_EXTENSION_LOAD`** -- command-line auto-load did not verify through either mode.
+  The launcher automatically entered **assisted manual-load mode** first (opened
+  `chrome://extensions` and a file browser at the exact extracted folder, copied that path
+  to your clipboard, and polled for up to 2 minutes) -- if you see this, that also timed
+  out. STOP. Do not proceed to ChatGPT.
+- **`BLOCKED_POLICY`** -- same as above, plus the launcher detected a Windows Chrome/Chromium
+  policy value that likely blocks unpacked/developer-mode extensions. STOP; the remediation
+  is a policy change, not a repackage.
+- **`BLOCKED_RUNTIME`** -- the extension IS registered and loaded, but the banner/diagnostics
+  never appeared on chatgpt.com within 20 seconds. This is a genuinely different problem
+  than the three above (see "1e" and the troubleshooting guide below) -- do not re-debug
+  packaging/load steps for this outcome.
+
+**If it does NOT report `PASS`:** see
 `docs/internal-beta/dry-runs/TROUBLESHOOTING_BANNER_NOT_OBSERVED.md` "STEP 0" for the full
-diagnosis flow. The most common cause is using a stale package after a packaging failure
-that was not noticed -- `pnpm -w run dryrun:001:launch-chrome` eliminates this class of
-mistake entirely by verifying freshness before ever launching Chrome.
+diagnosis flow per outcome, and
+`docs/internal-beta/dry-runs/DRYRUN-001_CHROME_EXTENSION_LOAD_FAILURE.md` for why
+command-line auto-load can fail even with a fresh, correctly-built package, and how
+assisted manual-load mode handles that without you ever having to pick a ZIP or guess a
+folder. The most common historical cause was using a stale package after a packaging
+failure that was not noticed -- `pnpm -w run dryrun:001:launch-chrome` eliminates that class
+of mistake entirely by verifying freshness before ever launching Chrome.
 
 ---
 
