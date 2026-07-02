@@ -13,17 +13,31 @@
  *   pnpm -w run check:billing:reconciliation
  *
  * Modes:
- *   internal-beta  (default) - staging/production absence is WARN
- *   public-release           - staging/production absence is FAIL
+ *   internal-beta - passes only if: local deterministic billing smoke
+ *                   (ledger confidence report) passes, a billing
+ *                   reconciliation report exists, a synthetic payout
+ *                   simulation report exists, and no unresolved S0/S1
+ *                   billing issue is recorded in the monetization risk
+ *                   register. Docker-based local smoke and staging/
+ *                   production evidence remain WARN-only (not required)
+ *                   in this mode.
+ *   public-release - all of the above, PLUS staging/production
+ *                    reconciliation evidence is required (hard FAIL until
+ *                    a real staging run is recorded).
  */
 
 const fs   = require('fs');
 const path = require('path');
 
-const REPO_ROOT    = path.resolve(__dirname, '..');
-const TEST_RESULTS = path.join(REPO_ROOT, 'apps', 'browser-extension', 'test-results', 'local-billing');
-const RECON_PLAN   = path.join(REPO_ROOT, 'docs', 'PRODUCTION_BILLING_RECONCILIATION_PLAN.md');
-const MATRIX_DOC   = path.join(REPO_ROOT, 'docs', 'PUBLIC_RELEASE_READINESS_MATRIX.md');
+const REPO_ROOT       = path.resolve(__dirname, '..');
+const TEST_RESULTS    = path.join(REPO_ROOT, 'apps', 'browser-extension', 'test-results', 'local-billing');
+const RECON_PLAN      = path.join(REPO_ROOT, 'docs', 'PRODUCTION_BILLING_RECONCILIATION_PLAN.md');
+const MATRIX_DOC       = path.join(REPO_ROOT, 'docs', 'PUBLIC_RELEASE_READINESS_MATRIX.md');
+const MONETIZATION_DIR = path.join(REPO_ROOT, 'docs', 'internal-beta', 'monetization');
+const LEDGER_CONFIDENCE_REPORT = path.join(MONETIZATION_DIR, 'LEDGER_CONFIDENCE_REPORT.md');
+const PAYOUT_SIMULATION_REPORT = path.join(MONETIZATION_DIR, 'PAYOUT_SIMULATION_REPORT.md');
+const BILLING_RECONCILIATION_REPORT = path.join(MONETIZATION_DIR, 'BILLING_RECONCILIATION_REPORT.md');
+const RISK_REGISTER    = path.join(MONETIZATION_DIR, 'MONETIZATION_RISK_REGISTER.md');
 
 const modeIdx = process.argv.indexOf('--mode');
 const mode    = modeIdx !== -1 ? process.argv[modeIdx + 1] : 'internal-beta';
@@ -97,6 +111,87 @@ if (!fs.existsSync(TEST_RESULTS)) {
   } else {
     warn('No click billing smoke reports found.');
     info('  Run: pnpm smoke:billing:click:local');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check 1b: Local deterministic billing smoke (ledger confidence report)
+// ---------------------------------------------------------------------------
+
+section('1b. Local Deterministic Billing Smoke (Ledger Confidence)');
+
+if (!fs.existsSync(LEDGER_CONFIDENCE_REPORT)) {
+  fail('docs/internal-beta/monetization/LEDGER_CONFIDENCE_REPORT.md not found');
+  info('  Run: pnpm -w run check:ledger:confidence');
+} else {
+  const content = fs.readFileSync(LEDGER_CONFIDENCE_REPORT, 'utf8');
+  if (/\*\*Result:\*\*\s*PASS/.test(content)) {
+    pass('Ledger confidence report exists and reports PASS (deterministic, no Docker required)');
+  } else {
+    fail('Ledger confidence report exists but does not report PASS -- re-run pnpm -w run check:ledger:confidence');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check 1c: Synthetic payout simulation
+// ---------------------------------------------------------------------------
+
+section('1c. Synthetic Payout Simulation');
+
+if (!fs.existsSync(PAYOUT_SIMULATION_REPORT)) {
+  fail('docs/internal-beta/monetization/PAYOUT_SIMULATION_REPORT.md not found');
+  info('  Run: pnpm -w run simulate:payouts');
+} else {
+  const content = fs.readFileSync(PAYOUT_SIMULATION_REPORT, 'utf8');
+  if (/\*\*Invariant.*:\*\*\s*PASS/.test(content)) {
+    pass('Payout simulation report exists and reports invariant PASS');
+  } else {
+    fail('Payout simulation report exists but does not report invariant PASS -- re-run pnpm -w run simulate:payouts');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check 1d: Billing reconciliation report + documented limitations
+// ---------------------------------------------------------------------------
+
+section('1d. Billing Reconciliation Report');
+
+if (!fs.existsSync(BILLING_RECONCILIATION_REPORT)) {
+  fail('docs/internal-beta/monetization/BILLING_RECONCILIATION_REPORT.md not found');
+} else {
+  pass('docs/internal-beta/monetization/BILLING_RECONCILIATION_REPORT.md exists');
+  const content = fs.readFileSync(BILLING_RECONCILIATION_REPORT, 'utf8');
+  if (/known limitations/i.test(content)) {
+    pass('Billing reconciliation report documents known limitations');
+  } else {
+    fail('Billing reconciliation report does not contain a "Known limitations" section');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check 1e: No unresolved S0/S1 billing issues
+// ---------------------------------------------------------------------------
+
+section('1e. Unresolved S0/S1 Billing Issues');
+
+if (!fs.existsSync(RISK_REGISTER)) {
+  warn('docs/internal-beta/monetization/MONETIZATION_RISK_REGISTER.md not found yet');
+  info('  This check becomes a hard requirement once the risk register exists.');
+} else {
+  const content = fs.readFileSync(RISK_REGISTER, 'utf8');
+  // Look for table rows containing S0/S1 with a status column showing an
+  // open/unresolved state. Rows are pipe-delimited markdown table rows.
+  const rows = content.split('\n').filter((l) => l.trim().startsWith('|'));
+  const openS0S1 = rows.filter((row) => {
+    const isS0S1 = /\bS0\b|\bS1\b/.test(row);
+    const isOpenStatus = /\b(open|unresolved)\b/i.test(row) && !/\bmitigated\b|\bresolved\b|\bclosed\b/i.test(row);
+    return isS0S1 && isOpenStatus;
+  });
+  if (openS0S1.length === 0) {
+    pass('No unresolved S0/S1 billing issue found in the monetization risk register');
+  } else {
+    fail('Unresolved S0/S1 billing issue(s) found in the monetization risk register: ' + openS0S1.length + ' row(s)');
+    openS0S1.forEach((row) => info('  ' + row.trim()));
   }
 }
 
