@@ -54,6 +54,7 @@
     "check:ledger:confidence": "node scripts/check-ledger-confidence.js",
     "check:monetization:privacy": "node scripts/check-monetization-privacy.js",
     "simulate:payouts": "node scripts/simulate-payouts.js",
+    "pilot:rehearsal": "node scripts/run-internal-beta-pilot-rehearsal.js",
     "icons:create": "node scripts/create-placeholder-icons.mjs",
     "check:internal-beta-packet": "node scripts/check-internal-beta-packet.js",
     "check:internal-beta-rollout": "node scripts/check-internal-beta-rollout.js",

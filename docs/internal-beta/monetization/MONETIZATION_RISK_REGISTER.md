@@ -47,6 +47,7 @@
 | Kill-switch has no admin write path (flag toggling requires direct DB access) | S2 | [OWNER TBD — Engineering] | Internal beta engineers have DB access; acceptable stopgap | Open — recommend an admin API/UI before public release |
 | Rate limiting only covers `/v1/events`, not `/v1/ledger/me` or `/v1/admin/*` | S2 | [OWNER TBD — Engineering] | Low practical risk (authenticated, low-value-to-abuse endpoints) | Open — recommend full coverage before public release |
 | Audit logging only covers creative/campaign review, not fraud/ledger/kill-switch actions | S2 | [OWNER TBD — Engineering] | Fraud decisions are still recorded per-event (`fraudScore`, `fraudSignals` columns); no separate admin audit trail for those decisions yet | Open — recommend before public release |
+| Browser extension never fetched `/v1/flags` — a backend kill switch stopped billing server-side but did not reach the extension's local cache, so client-side ad serving could keep running until the cache was somehow refreshed | S2 | Engineering (this phase) | Added `syncFlagsFromBackend()` to `apps/browser-extension/src/background/service-worker.ts`, called fire-and-forget on service-worker startup and the existing 5-minute `refresh-flags` alarm; does not touch the hot per-wait-state gating path. Verified via full re-run of `apps/browser-extension` unit tests (148/148), typecheck, and fixture e2e smoke (27/27, including both kill-switch scenarios). See `KILL_SWITCH_AND_ROLLBACK_REVIEW.md` §6. | **RESOLVED this phase** — serving stop is now live within 5 minutes of a backend flag change (or immediately for a freshly started service worker); still not instantaneous like the billing stop, which is an accepted internal-beta tradeoff |
 
 ## Privacy risk
 
@@ -70,7 +71,7 @@
 |----------|-------|------------------------|
 | S0 | 0 | N/A |
 | S1 | 0 | N/A |
-| S2 | 10 | No — all mitigated or accepted for internal-beta scope |
+| S2 | 11 (10 open, 1 resolved this phase) | No — all mitigated, resolved, or accepted for internal-beta scope |
 | S3 | 5 | No — informational / future enhancement |
 
 **No S0 or S1 item is open.** Per this project's existing decision rules

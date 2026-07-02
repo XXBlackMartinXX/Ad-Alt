@@ -65,6 +65,54 @@ async function refreshFlags(): Promise<FeatureFlags> {
 }
 
 /**
+ * Fetches the current feature-flag state from the backend `/v1/flags`
+ * endpoint and writes it to chrome.storage.local (the same key
+ * refreshFlags() reads). Never throws and never blocks the hot
+ * ad-gating path: this function is called only from the periodic alarm
+ * and once at service-worker startup (both fire-and-forget, `void`d),
+ * never from refreshFlags() itself — so CHECK_ADAPTER_STATUS and
+ * GET_AD_DECISION keep their existing fast, storage-only latency
+ * unchanged.
+ *
+ * Closes a gap: packages/platform-core's FeatureFlags doc comment says
+ * "Adapters must poll this on startup and before each wait-state to
+ * check whether they are kill-switched" (feature-flags.ts), but nothing
+ * in this file previously ever fetched /v1/flags — chrome.storage.local's
+ * "featureFlags" key was populated only by ensureDryRunDefaults()'s safe
+ * default (killSwitchEnabled: false) or by an UPDATE_FLAGS message that
+ * nothing elsewhere in this codebase sends. This meant a kill switch
+ * flipped on the backend never actually reached the extension's local
+ * cache, so the client-side ad-serving stop was not live even though the
+ * server-side BILLING stop already was (apps/api/src/services/
+ * event-processor.ts's isAdapterKillSwitched runs independently, directly
+ * against the database, and is unaffected by this gap — see
+ * docs/internal-beta/monetization/FRAUD_ABUSE_CONTROLS.md #11 and
+ * KILL_SWITCH_AND_ROLLBACK_REVIEW.md).
+ *
+ * On any network/parse error, this leaves the existing cached/stored
+ * flags untouched — the fail-closed default (FALLBACK_FLAGS_DISABLED,
+ * kill-switch ON) still governs until a valid response is ever received.
+ */
+async function syncFlagsFromBackend(): Promise<void> {
+  const apiBaseUrl = await getApiBaseUrl();
+  if (!apiBaseUrl) return;
+  try {
+    const headers = await buildHeaders();
+    const resp = await fetch(`${apiBaseUrl}/v1/flags`, { method: "GET", headers });
+    if (!resp.ok) return;
+    const body = (await resp.json()) as Record<string, unknown>;
+    const candidate = body?.["data"];
+    if (!isValidFeatureFlags(candidate)) return;
+    cachedFlags = candidate;
+    flagsFetchedAt = Date.now();
+    await chrome.storage.local.set({ featureFlags: cachedFlags });
+  } catch {
+    // Network unavailable, non-2xx, or invalid response body — keep
+    // whatever flags are already cached/stored (fail closed by default).
+  }
+}
+
+/**
  * Read or generate a stable device ID from extension storage.
  * The ID is generated once on first use and persisted across service-worker restarts.
  */
@@ -282,6 +330,14 @@ chrome.runtime.onInstalled.addListener(({ reason }: { reason: string }) => {
 // genuinely missing — never overrides a deliberately-set value.
 void ensureDryRunDefaults();
 
+// Background, fire-and-forget flags sync on startup so a freshly-started
+// service worker picks up the real backend kill-switch state promptly
+// instead of only the safe default. Does not block or delay anything else
+// in this file — CHECK_ADAPTER_STATUS/GET_AD_DECISION continue to read
+// whatever is already in chrome.storage.local via the unchanged
+// refreshFlags() path above.
+void syncFlagsFromBackend();
+
 chrome.runtime.onMessage.addListener(
   (message: Record<string, unknown>, _sender: unknown, sendResponse: (r: unknown) => void) => {
     if (message?.["type"] === "CHECK_ADAPTER_STATUS") {
@@ -335,6 +391,10 @@ chrome.alarms.create("refresh-flags", { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm: { name: string }) => {
   if (alarm.name === "refresh-flags") {
     flagsFetchedAt = 0;
+    // Background sync every 5 minutes so a backend kill-switch reaches
+    // this extension's local cache without operator action. Fire-and-
+    // forget: does not block this alarm handler or any message handler.
+    void syncFlagsFromBackend();
   }
 });
 
