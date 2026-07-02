@@ -36,8 +36,8 @@
  *   - Windows: PowerShell 5.1+ (Compress-Archive is auto-executed; no manual step).
  */
 
-import { execSync } from 'child_process';
-import { existsSync, readdirSync, statSync, mkdirSync, rmSync, copyFileSync } from 'fs';
+import { spawnSync } from 'child_process';
+import { existsSync, readdirSync, statSync, mkdirSync, rmSync, copyFileSync, writeFileSync } from 'fs';
 import { join, relative, extname, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -50,6 +50,104 @@ const EXT_DIR   = join(REPO_ROOT, 'apps', 'browser-extension');
 const DIST_DIR  = join(EXT_DIR, 'dist');
 const MANIFEST  = join(EXT_DIR, 'manifest.json');
 const OUT_DIR   = join(EXT_DIR, 'dist-package');
+const FAILURE_LOG_DIR = join(REPO_ROOT, '.tmp');
+
+// ---------------------------------------------------------------------------
+// Captured command execution -- NEVER rely on stdio:'inherit' alone for a
+// command whose failure output must be diagnosable. On Windows, pnpm's own
+// terminal rendering can truncate/collapse inherited child output on
+// failure, leaving only a terse tail (e.g. a bare "Node.js vX.Y.Z" crash
+// report line) visible to the user. Capturing stdout/stderr ourselves and
+// re-printing them in full, plus writing them to a durable log file, means
+// the real root cause is never lost to an upstream renderer.
+// ---------------------------------------------------------------------------
+function runCaptured(command, args, opts = {}) {
+  const res = spawnSync(command, args, {
+    cwd: opts.cwd ?? REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    // shell:true is required on Windows to resolve .cmd/.ps1 shims (e.g. a
+    // bare "node" or "powershell.exe" invocation); spawnSync still keeps
+    // stdout/stderr fully separate and capturable, unlike execSync's
+    // stdio:'inherit' mode.
+    shell: true,
+  });
+  return {
+    status: res.status,
+    // spawnSync returns null status (with res.error set) if the command
+    // itself could not be spawned at all (e.g. not found on PATH) --
+    // treat that as a failure too, not a silent pass.
+    ok: res.status === 0 && !res.error,
+    stdout: res.stdout ?? '',
+    stderr: res.stderr ?? '',
+    error: res.error ?? null,
+    command: [command, ...args].join(' '),
+  };
+}
+
+/**
+ * Prints the full command, exit code, stdout, and stderr for a failed
+ * captured command, and writes the same to a durable log file under .tmp/
+ * (gitignored). This is what Phase 1 requires: never reduce a packaging
+ * failure to a single truncated line.
+ */
+function reportCommandFailure(label, result) {
+  err(`${label} FAILED`);
+  err('  Command:   ' + result.command);
+  err('  Exit code: ' + (result.status === null ? '(process could not start)' : result.status));
+  if (result.error) {
+    err('  Spawn error: ' + (result.error.message ?? String(result.error)));
+  }
+  err('  --- stdout ---');
+  for (const line of (result.stdout || '(empty)').split('\n')) err('  ' + line);
+  err('  --- stderr ---');
+  for (const line of (result.stderr || '(empty)').split('\n')) err('  ' + line);
+
+  try {
+    mkdirSync(FAILURE_LOG_DIR, { recursive: true });
+    const logPath = join(FAILURE_LOG_DIR, 'package-browser-beta-failure.txt');
+    const logContent =
+      `Command: ${result.command}\n` +
+      `Exit code: ${result.status === null ? '(process could not start)' : result.status}\n` +
+      (result.error ? `Spawn error: ${result.error.message ?? String(result.error)}\n` : '') +
+      `\n--- stdout ---\n${result.stdout || '(empty)'}\n` +
+      `\n--- stderr ---\n${result.stderr || '(empty)'}\n`;
+    writeFileSync(logPath, logContent, 'utf8');
+    err('  Full output also written to: ' + relative(REPO_ROOT, logPath));
+  } catch {
+    // Best-effort only -- do not let log-writing itself hide the real error.
+  }
+}
+
+/**
+ * Wraps a filesystem operation that can transiently fail on Windows because
+ * another process (antivirus real-time scan, Explorer preview pane, a
+ * still-open ZIP viewer, a Chrome instance still holding an old extracted
+ * copy open) has a momentary lock on a file in the target directory.
+ * Retries a few times with a short delay before giving up with a clear,
+ * actionable message instead of an opaque EBUSY/EPERM stack trace.
+ */
+function withRetry(label, fn, attempts = 5, delayMs = 200) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      fn();
+      return;
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) {
+        const until = Date.now() + delayMs;
+        while (Date.now() < until) { /* brief synchronous backoff */ }
+      }
+    }
+  }
+  err(`${label} failed after ${attempts} attempts: ${lastErr?.message ?? String(lastErr)}`);
+  err('  On Windows this is usually a file lock: close any program that has');
+  err('  files under dist-package/ open (Explorer preview pane, an unzip tool,');
+  err('  antivirus real-time scan, or a Chrome window still pointed at an');
+  err('  extracted copy) and retry.');
+  process.exit(1);
+}
 
 const modeIdx     = process.argv.indexOf('--mode');
 const mode        = modeIdx !== -1 ? process.argv[modeIdx + 1] : 'internal-beta';
@@ -146,25 +244,43 @@ if (!existsSync(MANIFEST)) {
   process.exit(2);
 }
 
+// Diagnostic context printed unconditionally -- if something below fails,
+// this is already on screen (and in the failure log) rather than lost.
+log('Node: ' + process.version + '  Platform: ' + process.platform + ' (' + process.arch + ')');
+
 // ---------------------------------------------------------------------------
 // Rebuild with the correct build mode before packaging
 // ---------------------------------------------------------------------------
 // This ensures the bundled JS has the right PROMPTPROFIT_BUILD_MODE constant
 // baked in (demo mode for internal-beta; dead-code-eliminated for production).
+//
+// Uses runCaptured() (spawnSync with piped stdio), NOT execSync with
+// stdio:'inherit' -- inherited stdio depends on the OUTER runner (pnpm's
+// Windows terminal rendering) to faithfully relay every line, which is
+// exactly what did not happen when this previously surfaced only a bare
+// "Node.js vX.Y.Z" tail with no actual error text. Capturing here guarantees
+// the full stdout/stderr is printed and logged regardless of what pnpm does.
 const bundleScript = join(EXT_DIR, 'scripts', 'bundle.mjs');
 const buildModeArg = isPublicRelease ? 'production' : 'internal-beta';
 log('Rebuilding extension with --build-mode ' + buildModeArg + ' ...');
-try {
-  execSync('node ' + bundleScript + ' --build-mode ' + buildModeArg, {
-    cwd: EXT_DIR,
-    stdio: 'inherit',
-  });
-  ok('Extension rebuilt with build mode: ' + buildModeArg);
-} catch (e) {
-  err('Rebuild failed: ' + (e.message ?? String(e)));
-  err('Run: pnpm --filter @ad-alt/browser-extension build');
+const rebuildResult = runCaptured('node', [bundleScript, '--build-mode', buildModeArg], { cwd: EXT_DIR });
+if (!rebuildResult.ok) {
+  reportCommandFailure('Rebuild (bundle.mjs --build-mode ' + buildModeArg + ')', rebuildResult);
+  err('');
+  err('Common causes: esbuild\'s platform-specific native binary (e.g.');
+  err('@esbuild/win32-x64) failed to install or was blocked/quarantined by');
+  err('antivirus; a stale/partial node_modules from an interrupted install;');
+  err('or a genuine TypeScript/bundling error in the source (see stdout above).');
+  err('Try: pnpm install --frozen-lockfile, then retry. If the native esbuild');
+  err('binary is suspected, try: pnpm --filter @ad-alt/browser-extension exec');
+  err('node -e "require(\'esbuild\')" to isolate the failure from packaging.');
   process.exit(1);
 }
+// Echo the captured output so a successful rebuild still shows normal esbuild
+// progress (file sizes etc.), matching the previous stdio:'inherit' behavior.
+if (rebuildResult.stdout) process.stdout.write(rebuildResult.stdout);
+if (rebuildResult.stderr) process.stderr.write(rebuildResult.stderr);
+ok('Extension rebuilt with build mode: ' + buildModeArg);
 
 process.stdout.write('\n');
 
@@ -261,24 +377,63 @@ for (const ref of referencedFiles) {
 // ---------------------------------------------------------------------------
 // Create package output directory and staging directory
 // ---------------------------------------------------------------------------
+// Wrapped in withRetry(): on Windows, a momentary file lock (antivirus,
+// Explorer preview pane, a leftover extracted copy, a prior ZIP still open
+// in a viewer) can make rm/mkdir fail transiently. Retrying a few times with
+// a clear message beats a raw EBUSY/EPERM crash with no guidance.
 
-if (existsSync(OUT_DIR)) {
-  rmSync(OUT_DIR, { recursive: true, force: true });
-}
-mkdirSync(OUT_DIR, { recursive: true });
+withRetry('Removing old dist-package/', () => {
+  if (existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true, force: true });
+});
+withRetry('Creating dist-package/', () => mkdirSync(OUT_DIR, { recursive: true }));
 
 // Stage files into a temporary subdirectory preserving relative paths.
 // Both `zip` and Compress-Archive will zip from this staging dir so the
 // layout inside the ZIP matches dist/ exactly regardless of platform.
 const stageDir = join(OUT_DIR, 'stage');
-mkdirSync(stageDir, { recursive: true });
+withRetry('Creating staging directory', () => mkdirSync(stageDir, { recursive: true }));
 
 for (const f of packageFiles) {
   const rel  = relative(EXT_DIR, f);
   const dest = join(stageDir, rel);
-  mkdirSync(dirname(dest), { recursive: true });
-  copyFileSync(f, dest);
+  withRetry('Staging ' + rel, () => {
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(f, dest);
+  });
 }
+
+// ---------------------------------------------------------------------------
+// Build-info marker (Phase 3): a small, extension-owned, non-secret JSON
+// file at the package root proving which commit/build-mode produced this
+// exact artifact. This is what lets downstream tooling (dryrun-001-prepare.js,
+// dryrun-001-launch-chrome.js, check-browser-extension-load-folder.js) refuse
+// a stale package instead of silently reusing an old ZIP.
+// ---------------------------------------------------------------------------
+function gitInfo() {
+  const commitRes = runCaptured('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT });
+  const branchRes = runCaptured('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: REPO_ROOT });
+  return {
+    commit: commitRes.ok ? commitRes.stdout.trim() : null,
+    branch: branchRes.ok ? branchRes.stdout.trim() : null,
+  };
+}
+
+const { commit: gitCommit, branch: gitBranch } = gitInfo();
+const buildInfo = {
+  gitCommit: gitCommit,
+  buildMode: buildModeArg, // "internal-beta" | "production" -- what esbuild actually baked in
+  packageKind: mode,       // "internal-beta" | "public-release" -- CWS-readiness packaging mode
+  builtAt: new Date().toISOString(),
+  sourceBranch: gitBranch,
+  dryRunDemoFallbackExpected: buildModeArg === 'internal-beta',
+  generatedBy: 'package-browser-extension.mjs',
+};
+const buildInfoPath = join(stageDir, 'promptprofit-build-info.json');
+withRetry('Writing promptprofit-build-info.json', () => {
+  writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2) + '\n', 'utf8');
+});
+ok('Build info: commit=' + (gitCommit ? gitCommit.slice(0, 7) : 'unknown') +
+   ' buildMode=' + buildInfo.buildMode + ' dryRunDemoFallbackExpected=' + buildInfo.dryRunDemoFallbackExpected);
 
 // ---------------------------------------------------------------------------
 // Create ZIP
@@ -297,30 +452,40 @@ if (process.platform === 'win32') {
   log('Creating ZIP with PowerShell Compress-Archive (Windows)');
   const stageGlob = stageDir.replace(/'/g, "''") + '\\*';
   const outPath   = zipPath.replace(/'/g, "''");
-  const psCmd     = `powershell.exe -NoProfile -NonInteractive -Command "Compress-Archive -Path '${stageGlob}' -DestinationPath '${outPath}' -Force"`;
-  try {
-    execSync(psCmd, { stdio: 'inherit' });
+  const psArgs = [
+    '-NoProfile', '-NonInteractive', '-Command',
+    `Compress-Archive -Path '${stageGlob}' -DestinationPath '${outPath}' -Force`,
+  ];
+  const psResult = runCaptured('powershell.exe', psArgs);
+  if (psResult.ok) {
+    if (psResult.stdout) process.stdout.write(psResult.stdout);
     zipSuccess = true;
-  } catch (e) {
-    err('Compress-Archive failed: ' + e.message);
+  } else {
+    reportCommandFailure('Compress-Archive', psResult);
+    err('If PowerShell execution policy is blocking this, an administrator may');
+    err('need to allow script execution, or install `zip` via a package manager');
+    err('(e.g. `winget install GnuWin32.Zip`) as a fallback.');
   }
 } else {
   // Use `zip` command on Linux/macOS
-  try {
-    execSync('which zip', { stdio: 'ignore' });
-    const zipCmd = 'cd "' + stageDir + '" && zip -r "' + zipPath + '" .';
-    log('Creating ZIP with: zip command');
-    execSync(zipCmd, { stdio: 'inherit' });
-    zipSuccess = true;
-  } catch {
+  const whichResult = runCaptured('which', ['zip']);
+  if (!whichResult.ok) {
     err('`zip` command not found. Install zip (e.g. apt install zip) and retry.');
-    rmSync(stageDir, { recursive: true, force: true });
+    withRetry('Cleaning up staging directory', () => rmSync(stageDir, { recursive: true, force: true }));
     process.exit(1);
+  }
+  log('Creating ZIP with: zip command');
+  const zipResult = runCaptured('zip', ['-r', zipPath, '.'], { cwd: stageDir });
+  if (zipResult.ok) {
+    if (zipResult.stdout) process.stdout.write(zipResult.stdout);
+    zipSuccess = true;
+  } else {
+    reportCommandFailure('zip -r', zipResult);
   }
 }
 
 // Always clean up staging dir regardless of ZIP success
-rmSync(stageDir, { recursive: true, force: true });
+withRetry('Cleaning up staging directory', () => rmSync(stageDir, { recursive: true, force: true }));
 
 if (!zipSuccess) {
   err('ZIP creation failed.');

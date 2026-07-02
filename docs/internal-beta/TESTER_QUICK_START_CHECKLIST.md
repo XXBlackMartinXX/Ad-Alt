@@ -40,9 +40,18 @@ Unzip the file to a folder you can find easily (e.g., Desktop/promptprofit-beta/
    Do NOT navigate into `dist/` or any subfolder — Chrome needs the folder with `manifest.json`.
 3. Click "Select Folder" (or "Open").
 
-### Step 5 -- Verify the extension loaded
+### Step 5 -- Verify the extension loaded (do this BEFORE going to ChatGPT)
 - "PromptProfit" should now appear in the extension list at chrome://extensions.
 - The extension icon may appear in your Chrome toolbar (puzzle-piece icon area).
+
+**If PromptProfit does NOT appear in the list at all:** STOP HERE. Do not go to
+chatgpt.com yet -- no banner can ever appear if the extension itself did not load. This is
+a different problem than "the banner didn't show up," and should be reported as such
+("PromptProfit is not visible in chrome://extensions after Load unpacked"), not as a
+banner problem. Tell your beta contact; the most common cause is that the ZIP you were
+given was from a build that failed to package correctly (the owner-side tooling now
+refuses to hand out a ZIP produced by a failed build, but always double-check you have the
+newest ZIP your contact sent you).
 
 ### Step 5a -- PRIMARY CHECK: the banner should appear right away (no login needed)
 1. Go to https://chatgpt.com in a NEW tab (open it AFTER loading the extension, not before).
@@ -100,7 +109,10 @@ send a prompt or watch during generation for the primary check to pass.
 Click the X button on the banner. It should disappear immediately.
 
 ### Step 9 -- What to do if no banner appears (in Step 5a)
-- Check: Is the extension toggle ON (blue) in chrome://extensions?
+- Check FIRST: is PromptProfit even visible in chrome://extensions (Step 5)? If not, this
+  is an extension-load failure, not a banner problem -- see Step 5's note above and stop
+  here; do not continue troubleshooting the banner until the extension itself is loaded.
+- If the extension IS visible: Check: Is the extension toggle ON (blue) in chrome://extensions?
 - Check: Did you open chatgpt.com in a NEW tab (opened AFTER loading the extension)?
 - Check: What does the diagnostics panel (Step 6a) say, exactly?
 - Note: being logged in is NOT required for the Step 5a banner -- do not assume that's the cause.
@@ -246,7 +258,8 @@ personal or private data, API keys, .env files, cookies, tokens, or raw logs wit
 
 | Situation | Action |
 |-----------|--------|
-| Banner does not appear at Step 5a (no login needed for this check) | Check: Extension ON? New tab opened after loading extension? Read the diagnostics panel status line (internal beta) instead of guessing. |
+| PromptProfit NOT visible in chrome://extensions at all | STOP -- this is an extension-load failure, not a banner problem. Do not go to ChatGPT. Report exactly this, and confirm you have the newest ZIP your beta contact sent. |
+| Banner does not appear at Step 5a (extension IS visible, no login needed for this check) | Check: Extension ON? New tab opened after loading extension? Read the diagnostics panel status line (internal beta) instead of guessing. |
 | Not logged into chatgpt.com | Only blocks Step 6 (optional secondary check) -- log in, reload tab, try again |
 | Extension shows error badge | Click "Details" -> "Errors" -- record error text (no personal data) |
 | Banner text looks wrong | File a bug report with severity S2 |

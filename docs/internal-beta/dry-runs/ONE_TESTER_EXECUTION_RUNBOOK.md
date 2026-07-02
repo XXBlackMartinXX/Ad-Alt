@@ -13,11 +13,16 @@
 
 ## Semi-Automated Conductor Commands
 
-Three commands cover the automated portions of the dry-run. Human session steps remain manual.
+Four commands cover the automated portions of the dry-run. Human session steps remain manual.
 
 ```bash
 # Before the session: runs all checks, packages, creates result draft, prints human steps
 pnpm -w run dryrun:001:prepare
+
+# Recommended for the actual Chrome launch: builds a FRESH package, verifies it (commit,
+# build mode, forced-fallback marker) BEFORE extracting, and only launches Chrome if every
+# check passes -- refuses to launch on a stale or failed package.
+pnpm -w run dryrun:001:launch-chrome
 
 # After the session: interactive CLI to record results, enforce rules, update all docs
 pnpm -w run dryrun:001:finalize
@@ -27,6 +32,28 @@ pnpm -w run check:dryrun:001
 ```
 
 These commands do NOT automate ChatGPT interaction, login, prompt entry, or tester observation.
+
+**If `dryrun:001:prepare` reports `package:browser:beta` FAILED:** it now stops immediately
+-- it will NOT show a ZIP path, will NOT print human-only tester steps, and exits non-zero.
+Do not manually locate an "existing" ZIP in `dist-package/` and proceed anyway -- any ZIP
+there from before this failure is stale and must not be used. Fix the packaging failure
+(the full captured error is printed, and also written to `.tmp/package-browser-beta-failure.txt`)
+and re-run `pnpm -w run dryrun:001:prepare` until it succeeds.
+
+---
+
+## STEP 0 (Before Anything Else): Confirm PromptProfit Loads in chrome://extensions
+
+Before touching chatgpt.com at all, confirm the extension actually loaded:
+
+- [ ] Open `chrome://extensions` and confirm "PromptProfit" appears in the list, toggle ON, no error badge.
+
+**If it does NOT appear:** STOP. Do not proceed to ChatGPT. This is an extension-load
+failure, not a banner-render failure -- see
+`docs/internal-beta/dry-runs/TROUBLESHOOTING_BANNER_NOT_OBSERVED.md` "STEP 0" for the full
+diagnosis flow. The most common cause is using a stale package after a packaging failure
+that was not noticed -- `pnpm -w run dryrun:001:launch-chrome` eliminates this class of
+mistake entirely by verifying freshness before ever launching Chrome.
 
 ---
 

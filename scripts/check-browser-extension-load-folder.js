@@ -6,6 +6,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
+const { readZipEntries, readZipEntryContent, validateBuildInfo } = require('./lib/zip-utils.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const BROWSER_EXT_DIR = path.join(ROOT, 'apps', 'browser-extension');
@@ -18,43 +20,6 @@ let failed = 0;
 function pass(msg) { console.log(`  PASS  ${msg}`); passed++; }
 function warn(msg) { console.log(`  WARN  ${msg}`); warned++; }
 function fail(msg) { console.log(`  FAIL  ${msg}`); failed++; }
-
-// ---------------------------------------------------------------------------
-// Minimal ZIP central-directory reader (no external deps)
-// ---------------------------------------------------------------------------
-function readZipEntries(zipPath) {
-  const buf = fs.readFileSync(zipPath);
-  const len = buf.length;
-
-  // Find EOCD (End of Central Directory) signature: 0x06054b50
-  let eocdOffset = -1;
-  for (let i = len - 22; i >= Math.max(0, len - 65557); i--) {
-    if (buf[i] === 0x50 && buf[i+1] === 0x4b && buf[i+2] === 0x05 && buf[i+3] === 0x06) {
-      eocdOffset = i;
-      break;
-    }
-  }
-  if (eocdOffset === -1) throw new Error('EOCD not found -- not a valid ZIP');
-
-  const cdSize   = buf.readUInt32LE(eocdOffset + 12);
-  const cdOffset = buf.readUInt32LE(eocdOffset + 16);
-
-  const entries = [];
-  let pos = cdOffset;
-  const cdEnd = cdOffset + cdSize;
-
-  while (pos < cdEnd) {
-    if (buf.readUInt32LE(pos) !== 0x02014b50) break; // central dir signature
-    const fileNameLen = buf.readUInt16LE(pos + 28);
-    const extraLen    = buf.readUInt16LE(pos + 30);
-    const commentLen  = buf.readUInt16LE(pos + 32);
-    const name = buf.slice(pos + 46, pos + 46 + fileNameLen).toString('utf8');
-    entries.push(name);
-    pos += 46 + fileNameLen + extraLen + commentLen;
-  }
-
-  return entries;
-}
 
 // ---------------------------------------------------------------------------
 console.log('');
@@ -98,9 +63,14 @@ console.log('');
 // ---------------------------------------------------------------------------
 console.log('-- Section 2: ZIP structure analysis --');
 
-let entries;
+let entries;      // array of entry NAMES (string) -- kept for all existing checks below
+let rawEntries;   // array of entry objects (name/compMethod/compressedSize/localHeaderOffset) -- for content reads
+let zipBuf;        // whole-ZIP buffer -- paired with rawEntries for readZipEntryContent()
 try {
-  entries = readZipEntries(latest.full);
+  const zipData = readZipEntries(latest.full);
+  rawEntries = zipData.entries;
+  zipBuf = zipData.buf;
+  entries = rawEntries.map((e) => e.name);
 } catch (e) {
   fail(`Cannot read ZIP entries: ${e.message}`);
   printSummaryAndExit();
@@ -159,6 +129,57 @@ if (envFiles.length === 0) {
   pass('No .env files in ZIP');
 } else {
   fail(`SECURITY: .env file(s) found in ZIP: ${envFiles.join(', ')}`);
+}
+
+console.log('');
+
+// ---------------------------------------------------------------------------
+// 2b. Build-info / freshness verification
+// ---------------------------------------------------------------------------
+// This is what lets a tester or automated launcher (dryrun-001-launch-chrome.js)
+// refuse a stale ZIP instead of silently loading an old build -- proves the
+// artifact was actually produced from the current commit, in internal-beta
+// mode, with the forced demo fallback compiled in.
+console.log('-- Section 2b: Build-info verification --');
+
+const buildInfoEntry = rawEntries.find((e) => e.name.replace(/\\/g, '/') === 'promptprofit-build-info.json');
+if (!buildInfoEntry) {
+  fail('promptprofit-build-info.json NOT FOUND in ZIP -- cannot verify freshness/commit');
+  fail('Fix: rebuild with a current package-browser-extension.mjs (older ZIPs predate this marker)');
+} else {
+  let buildInfo = null;
+  try {
+    buildInfo = JSON.parse(readZipEntryContent(zipBuf, buildInfoEntry).toString('utf8'));
+  } catch (e) {
+    fail(`promptprofit-build-info.json is present but unreadable: ${e.message}`);
+  }
+
+  if (buildInfo) {
+    pass('promptprofit-build-info.json present and parseable');
+
+    const headRes = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' });
+    const head = (headRes.stdout || '').trim();
+    if (head && buildInfo.gitCommit === head) {
+      pass(`gitCommit matches current HEAD (${head.slice(0, 7)})`);
+    } else if (head) {
+      fail(`gitCommit MISMATCH -- package: ${buildInfo.gitCommit || '(missing)'} vs HEAD: ${head}`);
+      fail('This ZIP is STALE -- it was not built from the current commit. Rebuild it.');
+    } else {
+      warn('Could not determine current git HEAD to compare against build-info');
+    }
+
+    if (buildInfo.buildMode === 'internal-beta') {
+      pass('buildMode is "internal-beta"');
+    } else {
+      fail(`buildMode is "${buildInfo.buildMode}" -- expected "internal-beta" for a dry-run package`);
+    }
+
+    if (buildInfo.dryRunDemoFallbackExpected === true) {
+      pass('dryRunDemoFallbackExpected is true -- forced demo fallback should be compiled in');
+    } else {
+      fail(`dryRunDemoFallbackExpected is ${buildInfo.dryRunDemoFallbackExpected} -- expected true`);
+    }
+  }
 }
 
 console.log('');

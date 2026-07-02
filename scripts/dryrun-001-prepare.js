@@ -8,6 +8,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { readBuildInfoFromZip, validateBuildInfo, isFreshEnough } = require('./lib/zip-utils.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const DRY_RUNS_DIR = path.join(ROOT, 'docs', 'internal-beta', 'dry-runs');
@@ -16,6 +17,11 @@ const TEMPLATE_PATH = path.join(DRY_RUNS_DIR, 'DRY_RUN_RESULT_LOG_TEMPLATE.md');
 const DRAFT_PATH = path.join(DRY_RUNS_DIR, 'DRYRUN-001_RESULT_DRAFT.md');
 const RESULT_LOG_PATH = path.join(DRY_RUNS_DIR, 'DRYRUN-001_RESULT_LOG.md');
 const EXPECTED_BRANCH = 'claude/ecstatic-maxwell-h0d8d8';
+
+// Recorded before ANY check runs, so the freshness check below can prove the
+// package used for this session's artifact was actually built during THIS
+// run -- not silently reused from a previous (possibly stale) invocation.
+const PREPARE_START_TIME = Date.now();
 
 let checks = [];
 
@@ -113,6 +119,33 @@ console.log('');
 console.log('-- Package and audit --');
 
 const packageCheck = check('package:browser:beta', 'pnpm -w run package:browser:beta');
+
+// -----------------------------------------------------------------------
+// STOP IMMEDIATELY if packaging failed. Do NOT continue to the ZIP audit,
+// selftest, artifact lookup, or human-only steps below -- all of those
+// previously ran unconditionally even after a packaging failure, which let
+// a STALE ZIP from a prior successful run silently stand in for a fresh one
+// (the exact bug that let a tester load an old, pre-fix package while
+// believing it was current). See DRYRUN-001_DEFINITIVE_BANNER_FIX.md.
+// -----------------------------------------------------------------------
+if (!packageCheck.ok) {
+  console.log('');
+  console.log('='.repeat(60));
+  console.log('BLOCKED BEFORE HUMAN TEST');
+  console.log('='.repeat(60));
+  console.log('');
+  console.log('package:browser:beta FAILED. No fresh package was produced; do not test.');
+  console.log('The full captured error is printed above (and, if the failure was in the');
+  console.log('rebuild step, also written to .tmp/package-browser-beta-failure.txt).');
+  console.log('');
+  console.log('Do NOT use any ZIP already present in apps/browser-extension/dist-package/');
+  console.log('-- it is from a previous run and does not reflect the current commit.');
+  console.log('');
+  console.log('Fix the packaging failure, then re-run: pnpm -w run dryrun:001:prepare');
+  console.log('');
+  process.exit(1);
+}
+
 const zipAuditCheck = check('package:browser:zip:audit (internal-beta)', 'pnpm -w run package:browser:zip:audit -- --mode internal-beta');
 const vsixAuditCheck = check('package:vscode:vsix:audit (internal-beta)', 'pnpm -w run package:vscode:vsix:audit -- --mode internal-beta');
 
@@ -163,12 +196,97 @@ if (fs.existsSync(DIST_PACKAGE_DIR)) {
     zipSize = fs.statSync(files[0].abs).size;
     console.log(`  PASS  ZIP: ${zipPath}`);
     console.log(`        Size: ${zipSize} bytes`);
+
+    // -------------------------------------------------------------------
+    // Freshness check: the newest ZIP must have been written DURING this
+    // run (after PREPARE_START_TIME), not merely be the newest of whatever
+    // ZIPs happened to already be sitting in dist-package/. packageCheck.ok
+    // being true only proves the command exited 0 -- it does not by itself
+    // prove THIS ZIP is the one that command just produced.
+    // -------------------------------------------------------------------
+    if (!isFreshEnough(files[0].mtime, PREPARE_START_TIME)) {
+      console.log('');
+      console.log('='.repeat(60));
+      console.log('BLOCKED BEFORE HUMAN TEST');
+      console.log('='.repeat(60));
+      console.log('');
+      console.log('The newest ZIP in dist-package/ is OLDER than this prepare run.');
+      console.log('package:browser:beta reported success, but no new ZIP file appeared --');
+      console.log('this indicates an inconsistency in the packaging pipeline itself.');
+      console.log(`  ZIP mtime:        ${new Date(files[0].mtime).toISOString()}`);
+      console.log(`  Prepare started:  ${new Date(PREPARE_START_TIME).toISOString()}`);
+      console.log('');
+      console.log('Do NOT use this ZIP. Re-run: pnpm -w run dryrun:001:prepare');
+      console.log('');
+      process.exit(1);
+    }
+
+    // -------------------------------------------------------------------
+    // Build-info check: the ZIP must carry promptprofit-build-info.json
+    // proving it was built from the CURRENT commit in internal-beta mode
+    // with the forced demo fallback compiled in. Without this, a ZIP that
+    // is merely "newer than PREPARE_START_TIME" could still be stale if,
+    // for example, a concurrent process wrote a different build in the
+    // same window, or an older packaging pipeline (pre-build-info) somehow
+    // produced this file.
+    // -------------------------------------------------------------------
+    const buildInfo = readBuildInfoFromZip(files[0].abs);
+    if (!buildInfo) {
+      console.log('');
+      console.log('='.repeat(60));
+      console.log('BLOCKED BEFORE HUMAN TEST');
+      console.log('='.repeat(60));
+      console.log('');
+      console.log('promptprofit-build-info.json is missing or unreadable in the ZIP.');
+      console.log('This package cannot be verified as fresh/matching the current commit.');
+      console.log('Do NOT use this ZIP. Re-run: pnpm -w run dryrun:001:prepare');
+      console.log('');
+      process.exit(1);
+    }
+
+    const headFullRes = runCmd('git rev-parse HEAD');
+    const headFull = (headFullRes.stdout || '').trim();
+    const validation = validateBuildInfo(buildInfo, {
+      expectedCommit: headFull || undefined,
+      expectedBuildMode: 'internal-beta',
+      requireFallback: true,
+    });
+
+    if (!validation.ok) {
+      console.log('');
+      console.log('='.repeat(60));
+      console.log('BLOCKED BEFORE HUMAN TEST');
+      console.log('='.repeat(60));
+      console.log('');
+      console.log('This ZIP\'s build-info does not match what this dry-run requires:');
+      for (const reason of validation.reasons) console.log('  - ' + reason);
+      console.log('  -> This package is STALE or was built incorrectly.');
+      console.log('');
+      console.log('Do NOT use this ZIP. Re-run: pnpm -w run dryrun:001:prepare');
+      console.log('');
+      process.exit(1);
+    }
+
+    console.log(`  PASS  Build info verified: commit=${buildInfo.gitCommit.slice(0, 7)} buildMode=${buildInfo.buildMode} dryRunDemoFallbackExpected=${buildInfo.dryRunDemoFallbackExpected}`);
   } else {
-    console.log('  WARN  No beta ZIP found in dist-package/');
-    console.log('        package:browser:beta may have failed or not been run yet');
+    // Unreachable in practice (packageCheck.ok already guarantees a fresh
+    // ZIP exists), but kept as a defensive fallback rather than assuming.
+    console.log('');
+    console.log('='.repeat(60));
+    console.log('BLOCKED BEFORE HUMAN TEST');
+    console.log('='.repeat(60));
+    console.log('');
+    console.log('package:browser:beta reported success but no ZIP was found in dist-package/.');
+    console.log('Do not proceed. Re-run: pnpm -w run dryrun:001:prepare');
+    console.log('');
+    process.exit(1);
   }
 } else {
-  console.log('  WARN  dist-package/ directory does not exist');
+  console.log('');
+  console.log('BLOCKED BEFORE HUMAN TEST: dist-package/ directory does not exist despite');
+  console.log('package:browser:beta reporting success. Do not proceed.');
+  console.log('');
+  process.exit(1);
 }
 
 // -----------------------------------------------------------------------

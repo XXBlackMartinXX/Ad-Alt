@@ -28,6 +28,55 @@ prompt, and what each diagnostic panel state means:
 pnpm -w run dryrun:001:live-checklist
 ```
 
+Best option: use the verified launcher, which builds a fresh package, validates it is
+genuinely current before extracting, and only opens Chrome if every check passes:
+
+```bash
+pnpm -w run dryrun:001:launch-chrome
+```
+
+---
+
+## STEP 0 (Check This FIRST): Is PromptProfit Even Visible in chrome://extensions?
+
+**This is a different problem from "the banner did not render" and must be ruled out
+before anything else.** If the extension itself never loaded, no diagnostics panel and no
+banner can ever appear -- there is nothing to diagnose about wait-state or demo-mode
+behavior yet.
+
+- [ ] Open `chrome://extensions` in the SAME Chrome window/profile you tested with.
+- [ ] Look for an entry named "PromptProfit" in the list.
+
+**If PromptProfit is NOT in the list at all:**
+
+- The extension is not loaded. **Do not proceed to ChatGPT.** No banner or diagnostics
+  panel can appear under any circumstances until this is fixed.
+- This is an **extension-load failure**, not a banner-render failure -- record it as such.
+  Do not describe this as "the banner didn't appear" in any report; describe it as
+  "PromptProfit was not visible in chrome://extensions after Load unpacked."
+- Check, in this order:
+  1. **Did packaging actually succeed for THIS session?** Re-run
+     `pnpm -w run package:browser:beta` (or, better, `pnpm -w run dryrun:001:prepare`, which
+     refuses to continue past a packaging failure) and confirm it exits 0 with no FAIL lines.
+     A failed package build silently leaves behind an OLD ZIP from a previous run -- do not
+     assume the ZIP you have is current just because a file exists.
+  2. **Does the extracted folder actually contain manifest.json at its root?**
+     Run `pnpm -w run check:browser:load-folder` -- it verifies this and also verifies the
+     package's `promptprofit-build-info.json` matches the current commit (i.e. it is not stale).
+  3. **Was Chrome launched with the correct `--load-extension` / "Load unpacked" folder?**
+     If you extracted the ZIP, the folder you select must be the one containing
+     `manifest.json` directly -- not `dist/` or any subfolder.
+  4. **Try the verified launcher instead of manual extraction:**
+     `pnpm -w run dryrun:001:launch-chrome` builds a fresh package, extracts it to a new
+     folder, verifies manifest.json/build-info/forced-fallback markers are all present, and
+     only then launches Chrome pointed at that exact folder -- removing every manual step
+     that could go wrong.
+- Only after PromptProfit is confirmed visible in `chrome://extensions` with no error badge
+  should you proceed to STEP 1 and the banner-specific guidance below.
+
+**If PromptProfit IS visible in chrome://extensions:** proceed to the banner/diagnostics
+guidance below -- this is now genuinely a banner-render (not extension-load) question.
+
 ---
 
 ## Key Behavior Change: the Banner No Longer Waits for Generation or Login

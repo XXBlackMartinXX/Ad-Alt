@@ -312,6 +312,61 @@ if (foundInternalBetaText.length === 0) {
 }
 
 // ---------------------------------------------------------------------------
+// Check 3c: Build-info marker / freshness metadata
+// ---------------------------------------------------------------------------
+// promptprofit-build-info.json proves which commit and build mode produced
+// this exact artifact, so tooling (dryrun-001-prepare.js,
+// dryrun-001-launch-chrome.js, check-browser-extension-load-folder.js) can
+// refuse a stale package instead of silently reusing an old one.
+
+section('3c. Build-Info Marker');
+
+const buildInfoEntry = entries.find(e => e.name.replace(/\\/g, '/') === 'promptprofit-build-info.json');
+if (!buildInfoEntry) {
+  fail('promptprofit-build-info.json NOT FOUND in ZIP -- cannot verify freshness/commit/build mode');
+} else {
+  let buildInfo = null;
+  try {
+    buildInfo = JSON.parse(readZipEntryContent(zipBuf, buildInfoEntry).toString('utf8'));
+  } catch (e) {
+    fail('promptprofit-build-info.json is present but unreadable: ' + e.message);
+  }
+
+  if (buildInfo) {
+    pass('promptprofit-build-info.json present and parseable');
+
+    if (isPublicRelease) {
+      // Defense-in-depth alongside the Check 3b string scan: the metadata
+      // itself must also declare this is NOT an internal-beta / fallback build.
+      if (buildInfo.buildMode !== 'internal-beta' && buildInfo.dryRunDemoFallbackExpected !== true) {
+        pass('build-info confirms this is not an internal-beta/fallback build (buildMode=' + buildInfo.buildMode + ')');
+      } else {
+        fail('build-info declares an internal-beta/fallback build (buildMode=' + buildInfo.buildMode +
+             ', dryRunDemoFallbackExpected=' + buildInfo.dryRunDemoFallbackExpected + ') in a public-release package');
+      }
+    } else {
+      if (buildInfo.buildMode === 'internal-beta') {
+        pass('buildMode is "internal-beta"');
+      } else {
+        warn('buildMode is "' + buildInfo.buildMode + '" (expected "internal-beta" for a dry-run package) [OK for internal-beta mode audit, but check the package source]');
+      }
+      if (buildInfo.dryRunDemoFallbackExpected === true) {
+        pass('dryRunDemoFallbackExpected is true -- forced demo fallback should be compiled in');
+      } else {
+        warn('dryRunDemoFallbackExpected is ' + buildInfo.dryRunDemoFallbackExpected + ' (expected true for a dry-run package)');
+      }
+    }
+
+    if (buildInfo.gitCommit) {
+      info('  gitCommit in package: ' + String(buildInfo.gitCommit).slice(0, 12));
+    }
+    if (buildInfo.builtAt) {
+      info('  builtAt: ' + buildInfo.builtAt);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Check 4: Required files
 // ---------------------------------------------------------------------------
 
