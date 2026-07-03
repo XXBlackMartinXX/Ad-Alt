@@ -121,12 +121,18 @@ async function main() {
     'privacy-guard.test.ts',
     'privacy.test.ts',
     'event-schema.test.ts',
-    'chatgpt.privacy.test.ts',
   ];
+  // Any per-platform "<platform>.privacy.test.ts" file (chatgpt, claude,
+  // gemini, ...) follows the exact same rejection-test pattern -- matched
+  // by suffix rather than requiring a new exact filename added here every
+  // time a new platform adapter's privacy test is added.
+  function isExemptPrivacyTestFilename(name) {
+    return PRIVACY_REJECTION_TEST_EXEMPT.includes(name) || /\.privacy\.test\.ts$/.test(name);
+  }
   const fixtureFiles = [
     ...walk(path.join(REPO_ROOT, 'apps/browser-extension/src'), ['.ts', '.tsx'], []).filter(
       (f) => (f.includes('__tests__') || f.includes('fixture') || f.includes('mock')) &&
-        !PRIVACY_REJECTION_TEST_EXEMPT.includes(path.basename(f)),
+        !isExemptPrivacyTestFilename(path.basename(f)),
     ),
     ...walk(path.join(REPO_ROOT, 'scripts/__tests__/fixtures'), ['.js', '.ts'], []),
   ];
@@ -151,17 +157,15 @@ async function main() {
   // "reject" (case-insensitive) -- confirming it is testing that the field
   // is blocked, not that it is accepted/emitted.
   let exemptionMisuse = [];
-  for (const filename of PRIVACY_REJECTION_TEST_EXEMPT) {
-    const matches = walk(path.join(REPO_ROOT, 'apps/browser-extension/src'), ['.ts', '.tsx'], []).filter(
-      (f) => path.basename(f) === filename,
-    );
-    for (const file of matches) {
-      const content = fs.readFileSync(file, 'utf8');
-      const hasForbiddenField = forbiddenFields.some((f) => content.includes(f));
-      const hasRejectLanguage = /reject/i.test(content);
-      if (hasForbiddenField && !hasRejectLanguage) {
-        exemptionMisuse.push(path.relative(REPO_ROOT, file));
-      }
+  const exemptedFiles = walk(path.join(REPO_ROOT, 'apps/browser-extension/src'), ['.ts', '.tsx'], []).filter(
+    (f) => isExemptPrivacyTestFilename(path.basename(f)),
+  );
+  for (const file of exemptedFiles) {
+    const content = fs.readFileSync(file, 'utf8');
+    const hasForbiddenField = forbiddenFields.some((f) => content.includes(f));
+    const hasRejectLanguage = /reject/i.test(content);
+    if (hasForbiddenField && !hasRejectLanguage) {
+      exemptionMisuse.push(path.relative(REPO_ROOT, file));
     }
   }
   if (exemptionMisuse.length === 0) {
