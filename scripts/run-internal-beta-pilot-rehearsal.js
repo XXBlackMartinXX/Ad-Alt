@@ -26,6 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { importFile } = require('./lib/import-file.js');
+const { writeReportIfChanged } = require('./lib/report-writer.js');
 const fixtures = require('./fixtures/internal-beta-pilot-fixtures.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -697,10 +698,11 @@ function writeReport(ctx) {
   lines.push('report or to any rehearsal fixture.**');
   lines.push('');
 
-  fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
-  fs.writeFileSync(REPORT_PATH, lines.join('\n'), 'utf8');
+  const result = writeReportIfChanged(REPORT_PATH, lines.join('\n'));
   console.log('');
-  console.log(`Report written: ${path.relative(REPO_ROOT, REPORT_PATH)}`);
+  console.log(
+    `Report ${result.written ? 'written' : 'unchanged'}: ${path.relative(REPO_ROOT, REPORT_PATH)} (${result.reason})`,
+  );
 }
 
 // Exported for direct unit testing (scripts/__tests__/internal-beta-pilot-rehearsal.test.js)

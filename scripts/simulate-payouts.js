@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { importFile } = require('./lib/import-file.js');
+const { writeReportIfChanged } = require('./lib/report-writer.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const REPORT_PATH = path.join(
@@ -301,10 +302,11 @@ function writeReport(rows, totals, invariantOk) {
   lines.push('script\'s synthetic fixtures.**');
   lines.push('');
 
-  fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
-  fs.writeFileSync(REPORT_PATH, lines.join('\n'), 'utf8');
+  const result = writeReportIfChanged(REPORT_PATH, lines.join('\n'));
   console.log('');
-  console.log(`Report written: ${path.relative(REPO_ROOT, REPORT_PATH)}`);
+  console.log(
+    `Report ${result.written ? 'written' : 'unchanged'}: ${path.relative(REPO_ROOT, REPORT_PATH)} (${result.reason})`,
+  );
 }
 
 main().catch((err) => {

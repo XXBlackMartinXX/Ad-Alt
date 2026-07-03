@@ -58,7 +58,13 @@
   re-approving this document.
 - Submitting to the Chrome Web Store or VS Code Marketplace, or any other
   public distribution (public release remains blocked — CANARY 12).
-- Adding Claude/Gemini/Desktop/Antigravity support.
+- Enabling Claude, Gemini, VS Code, desktop, or terminal support for any
+  real user during this pilot. (Note: separate, later platform-expansion
+  work has since added Claude/Gemini browser adapters and hardened the
+  VS Code extension — see `docs/internal-beta/platforms/PLATFORM_SUPPORT_MATRIX.md`
+  — but all of that remains `beta`/kill-switch-disabled and entirely
+  outside this pilot's scope. This pilot is `browser_chatgpt` only, full
+  stop, regardless of what other platform code exists in the repo.)
 
 ## Required checks (must all PASS immediately before launch)
 
