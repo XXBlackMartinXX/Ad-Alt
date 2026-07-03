@@ -1,8 +1,8 @@
 # PromptProfit -- Internal Beta Pilot Rehearsal Report
 
-**Generated:** 2026-07-02T20:29:23.441Z
+**Generated:** 2026-07-03T05:51:22.777Z
 **Generator:** scripts/run-internal-beta-pilot-rehearsal.js
-**Commit:** 48a1641
+**Commit:** bc2b376
 **Branch:** claude/windows-release-pipeline-fix-xfj0sw
 **Decision:** PASS (30 passed, 0 failed -- 0 critical, 0 normal)
 
