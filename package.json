@@ -64,6 +64,8 @@
     "check:terminal-prototype": "node scripts/check-terminal-prototype.js",
     "check:platform-certification": "node scripts/check-platform-certification.js",
     "check:platform-live-readiness": "node scripts/check-platform-live-readiness.js",
+    "check:vscode-extension": "node scripts/check-vscode-extension-readiness.js",
+    "check:nonbrowser-platforms": "node scripts/check-nonbrowser-platform-readiness.js",
     "icons:create": "node scripts/create-placeholder-icons.mjs",
     "check:internal-beta-packet": "node scripts/check-internal-beta-packet.js",
     "check:internal-beta-rollout": "node scripts/check-internal-beta-rollout.js",

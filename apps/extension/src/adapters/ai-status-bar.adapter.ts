@@ -40,7 +40,13 @@ export class AiStatusBarAdapter implements IWaitStateAdapter {
   deactivate(): void {
     this.clearTimers();
     if (this.isInWaitState) {
-      this.endWaitState();
+      // Inline the "wait-state ended" notification instead of calling
+      // endWaitState(), which also re-arms scheduleIdleCheck() -- that would
+      // leave a phantom idle timer running after deactivation, capable of
+      // firing another wait-state (and re-triggering ad rendering) even
+      // though the adapter was just torn down.
+      this.isInWaitState = false;
+      this.waitStateEndHandlers.forEach((h) => h());
     }
     this.disposables.forEach((d) => d.dispose());
     this.disposables = [];

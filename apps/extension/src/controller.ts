@@ -204,6 +204,13 @@ export class PromptProfitController {
   private stopAdapter(): void {
     this.adapter?.dispose();
     this.adapter = undefined;
+    // Defense in depth: sever this controller's own onWaitStateStart/
+    // onWaitStateEnd subscriptions explicitly, rather than relying solely
+    // on adapter.dispose() to fully stop event delivery. This ensures a
+    // disable()/kill-switch stop can never leave a stale handler attached
+    // to render an ad after the adapter was supposed to be off.
+    this.disposables.forEach((d) => d.dispose());
+    this.disposables = [];
     this.clearViewabilityTimer();
   }
 
