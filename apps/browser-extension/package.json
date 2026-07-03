@@ -19,6 +19,8 @@
     "test:e2e:live": "pnpm build:test && playwright test --config playwright.config.live.ts",
     "test:e2e:selftest": "pnpm build:test && playwright test e2e/dryrun-selftest.smoke.spec.ts --reporter=line",
     "smoke:chatgpt-fixture": "pnpm build:test && playwright test --grep chatgpt-adapter",
+    "smoke:claude:fixture": "pnpm build:test && playwright test e2e/claude-adapter.smoke.spec.ts --reporter=line",
+    "smoke:gemini:fixture": "pnpm build:test && playwright test e2e/gemini-adapter.smoke.spec.ts --reporter=line",
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {

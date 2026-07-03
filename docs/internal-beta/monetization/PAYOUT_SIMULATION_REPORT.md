@@ -1,6 +1,6 @@
 # PromptProfit -- Payout Simulation Report
 
-**Generated:** 2026-07-03T08:31:43.883Z
+**Generated:** 2026-07-03T09:55:34.871Z
 **Generator:** scripts/simulate-payouts.js
 **Invariant (developer earned + platform retained == advertiser charged):** PASS
 

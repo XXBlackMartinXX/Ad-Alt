@@ -2,22 +2,30 @@
  * TEST-ONLY content script for local fixture pages. Never included in production builds.
  *
  * Runs on http://127.0.0.1:PORT/* during E2E tests (see dist-test/manifest.json).
- * Loads the ChatGPTAdapter with a hostname override so it activates on local fixture
- * pages rather than on chatgpt.com, enabling full adapter integration testing without
- * a real ChatGPT session.
+ * Selects ChatGPTAdapter, ClaudeAdapter, or GeminiAdapter based on the fixture
+ * page's filename (see selectAdapterForPath below) and constructs it with a
+ * hostname override so it activates on local fixture pages rather than on the
+ * real platform's hostname, enabling full adapter integration testing without
+ * a real ChatGPT/Claude/Gemini session. Reading `location.pathname` here is a
+ * local test-fixture routing decision, not page content -- it is the same
+ * kind of extension-owned signal as a hostname check, never user data.
  *
- * PRIVACY RULE: Inherits all privacy rules from ChatGPTAdapter and ad-event-sender —
- * this script never reads page content, user input, DOM text, cookies, auth tokens,
- * page URL/title, or any data beyond structural DOM signals.
+ * PRIVACY RULE: Inherits all privacy rules from the underlying adapter and
+ * ad-event-sender — this script never reads page content, user input, DOM
+ * text, cookies, auth tokens, page URL/title, or any data beyond structural
+ * DOM signals.
  *
  * TEST THRESHOLD: Reads `testViewabilityThresholdMs` from chrome.storage.local.
  * When set, it overrides the production BILLABLE_DURATION_MS for the viewability
  * observer — allowing E2E tests to complete in milliseconds rather than 5 seconds.
  * This key is ONLY written by the test harness (configureExtensionStorage) and
- * is ONLY read by this file. chatgpt.ts (production) never touches it.
+ * is ONLY read by this file. chatgpt.ts/claude.ts/gemini.ts (production) never
+ * touch it.
  */
 
 import { ChatGPTAdapter } from "../adapters/chatgpt/chatgpt.adapter.js";
+import { ClaudeAdapter } from "../adapters/claude/claude.adapter.js";
+import { GeminiAdapter } from "../adapters/gemini/gemini.adapter.js";
 import { ViewabilityObserver } from "./viewability-observer.js";
 import { DebugPanel, isDebugModeEnabled, isApiConfigured } from "./debug-panel.js";
 import {
@@ -56,11 +64,37 @@ const FORCED_DEMO_MOMENT: SponsoredMoment = {
   expiresAt: 0,
 };
 
+/**
+ * Selects which adapter a given fixture page exercises, based on its
+ * filename. Defaults to ChatGPT (the original, still-most-used fixture
+ * behavior) when the path matches neither "claude" nor "gemini" -- this
+ * keeps every existing chatgpt-*.html fixture and spec file byte-for-byte
+ * unaffected by this generalization.
+ */
+function selectAdapterForPath(
+  pathname: string,
+): { adapter: ChatGPTAdapter | ClaudeAdapter | GeminiAdapter; platformDetected: string } {
+  if (pathname.includes("claude")) {
+    return {
+      adapter: new ClaudeAdapter({ getHostname: () => "claude.ai" }),
+      platformDetected: "claude",
+    };
+  }
+  if (pathname.includes("gemini")) {
+    return {
+      adapter: new GeminiAdapter({ getHostname: () => "gemini.google.com" }),
+      platformDetected: "gemini",
+    };
+  }
+  return {
+    adapter: new ChatGPTAdapter({ getHostname: () => "chatgpt.com" }),
+    platformDetected: "chatgpt",
+  };
+}
+
 void (async () => {
   // Override getHostname so canActivate() passes on the local fixture origin.
-  const adapter = new ChatGPTAdapter({
-    getHostname: () => "chatgpt.com",
-  });
+  const { adapter, platformDetected } = selectAdapterForPath(window.location.pathname);
 
   // Read test-only viewability threshold. Undefined = use production value.
   // SAFETY: only fixture-test.ts reads this key. chatgpt.ts never does.
@@ -95,7 +129,14 @@ void (async () => {
       isDryRunDemoModeActive(),
       isDryRunDiagnosticsEnabled(),
     ]);
-    diagnostics?.update({ dry_run_demo_mode: demoActive, platform_detected: "chatgpt" });
+    // The dry-run diagnostics panel is ChatGPT/DRYRUN-001-specific tooling
+    // (PlatformDetectedState is narrowly "chatgpt" | "unknown"); Claude/Gemini
+    // fixture runs report "unknown" here rather than widening that panel's
+    // type for platforms outside its scope.
+    diagnostics?.update({
+      dry_run_demo_mode: demoActive,
+      platform_detected: platformDetected === "chatgpt" ? "chatgpt" : "unknown",
+    });
     if (diagnosticsEnabled) diagnostics?.mount();
   }
 

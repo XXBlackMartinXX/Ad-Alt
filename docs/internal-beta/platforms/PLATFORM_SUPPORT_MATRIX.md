@@ -1,37 +1,57 @@
 # PromptProfit — Platform Support Matrix
 
-**Phase:** Multi-Platform Professional Completeness Sprint
+**Phase:** Complete Multi-Platform Support Before Pilot Execution
 **Date:** 2026-07-03
 
 > Machine-checkable summary. `scripts/check-platform-support-readiness.js`
-> verifies ChatGPT remains `verified` and that no other platform is
-> mislabeled `verified` without evidence — see Phase 7.
+> (`check:platforms`) verifies ChatGPT remains `verified` and that no
+> other platform is mislabeled `verified` without evidence.
+> `scripts/check-platform-certification.js` (`check:platform-certification`)
+> additionally verifies that Claude/Gemini have real smoke+privacy test
+> evidence behind their `beta` label, that desktop/terminal/Codex are
+> correctly NOT claimed as tested/verified, and that no doc in this
+> directory overclaims support.
 
-| Platform | Surface type | Support status | Adapter exists | Tests exist | Privacy reviewed | Monetization ready | Kill-switch verified | Launch priority | Blocks revenue pilot? | Next action |
+| Platform | Surface type | Support status | Adapter exists | Tests exist | Privacy reviewed | Monetization ready | Kill-switch capable | Launch priority | Blocks revenue pilot? | Next action |
 |----------|---------------|------------------|-----------------|--------------|---------------------|-----------------------|--------------------------|--------------------|--------------------------|--------------|
-| ChatGPT browser | Browser extension (MV3) | **verified** | Yes — `chatgpt.adapter.ts` + selectors/renderer/wait-state | Yes — 42 unit tests + 27 e2e smoke tests | Yes — dedicated privacy test suite + `check:monetization:privacy` | Yes — full pipeline, real ledger writes verified | Yes — server-side (event-processor.ts) + client-side (`syncFlagsFromBackend`), both verified | 1 (current revenue platform) | **No** | None — maintain |
-| VS Code extension | Native extension | **beta** (implemented, not DRYRUN-verified) | Yes — `ai-status-bar.adapter.ts` | Yes — 34 unit tests (event-queue, privacy) | Partial — privacy test exists, no live-session record | Yes — real event queue + API client wired | Not separately re-verified this sprint | 2 | No | Run a DRYRUN-001-equivalent live session for VS Code, record it (separate effort) |
-| Claude browser | Browser extension (MV3) | **placeholder** | No dedicated adapter — generic bootstrapper only | No Claude-specific tests | No | No — `WAIT_STATE_START`/`END` messages have no service-worker handler | Kill-switch check happens before pipeline exists, so N/A | 3 | No | See `NEXT_PLATFORM_EXPANSION_PLAN.md` — first expansion target |
-| Gemini browser | Browser extension (MV3) | **placeholder** | No dedicated adapter — generic bootstrapper only | No Gemini-specific tests | No | No — same gap as Claude | N/A | 4 | No | Second expansion target, after Claude |
-| Claude Code terminal | CLI/terminal | **not supported** | No | No | No | No | No | 5 | No | Research only — separate integration model required (CANARY 10) |
-| Codex | Unknown (not researched) | **not supported** | No | No | No | No | No | 5 | No | Research only |
-| Claude Code desktop | Desktop app | **not supported** | No | No | No | No | No | 6 | No | Research only — no DOM, no extension API; screen-scraping/OCR explicitly forbidden |
-| Generic terminal AI tools | CLI/terminal | **not supported** | No | No | No | No | No | 6 | No | Research only |
+| ChatGPT browser | Browser extension (MV3) | **verified** | Yes — `chatgpt.adapter.ts` + selectors/renderer/wait-state | Yes — 42 unit tests + 27 e2e smoke tests | Yes — dedicated privacy test suite + `check:monetization:privacy` | Yes — full pipeline, real ledger writes confirmed | Yes — server-side (event-processor.ts) + client-side (`syncFlagsFromBackend`), both confirmed | 1 (current revenue platform) | **No** | None — maintain |
+| Claude browser | Browser extension (MV3) | **beta** | Yes — `claude.adapter.ts` + selectors/renderer/wait-state, now wired live into `content/claude.ts` | Yes — 25 unit + 15 privacy tests + 7 e2e smoke tests (`claude-adapter.smoke.spec.ts`) | Yes — dedicated privacy test suite + `check:monetization:privacy` passing | Pipeline wired (same API/ledger path as ChatGPT); disabled for real users pending live-session confirmation | Yes — same two-layer kill-switch as ChatGPT, unit + e2e tested | 2 | No | Human-operated live-session confirmation against real claude.ai — see `CLAUDE_BROWSER_VERIFICATION.md` §5 |
+| Gemini browser | Browser extension (MV3) | **beta** | Yes — `gemini.adapter.ts` + selectors/renderer/wait-state, new this sprint, wired live into `content/gemini.ts` | Yes — 25 unit + 15 privacy tests + 7 e2e smoke tests (`gemini-adapter.smoke.spec.ts`) | Yes — dedicated privacy test suite + `check:monetization:privacy` passing | Pipeline wired (same API/ledger path as ChatGPT); disabled for real users pending live-session confirmation | Yes — same two-layer kill-switch as ChatGPT, unit + e2e tested | 3 | No | Human-operated live-session confirmation against real gemini.google.com — see `GEMINI_BROWSER_VERIFICATION.md` §5 |
+| VS Code extension | Native extension | **beta** | Yes — `ai-status-bar.adapter.ts` (real idle-timer heuristic, not a stub) | Yes — 34 unit tests (event-queue, privacy); no e2e host-level harness | Yes — 26 unit privacy tests; no live-session record | Yes — real event queue + API client wired | Yes — flag-cache polling wired, not separately re-confirmed this sprint | 4 | No | Add `@vscode/test-electron` e2e harness, then a live session — see `VSCODE_EXTENSION_VERIFICATION.md` |
+| Claude Code terminal | CLI/terminal | **fixture-only** (prototype) / **requires separate integration** (real product) | No real adapter; a tool-agnostic fixture-only prototype exists (`scripts/lib/terminal-fixture.js`) | Yes, for the prototype only — 14 unit tests (privacy + kill-switch) | Yes, for the prototype only | No — prototype never contacts a real API | N/A for the prototype (kill-switch logic tested in isolation) | 5 | No | Build a real CLI wrapper — see `CLAUDE_CODE_CODEX_SUPPORT_RESEARCH.md` |
+| Codex (CLI/terminal) | CLI/terminal | **requires separate integration** | No | No | No | No | No | 5 | No | Research complete; no safe implementation attempted this sprint — see `CLAUDE_CODE_CODEX_SUPPORT_RESEARCH.md` |
+| Codex (IDE/editor) | Unknown (unresearched product surface) | **requires separate integration** | No | No | No | No | No | 5 | No | External product research needed before any code — see `CLAUDE_CODE_CODEX_SUPPORT_RESEARCH.md` |
+| Claude Code desktop | Desktop app | **requires separate integration** | No | No | No | No | No | 6 | No | No safe integration point known; screen-scraping/OCR explicitly forbidden — see `CLAUDE_CODE_CODEX_SUPPORT_RESEARCH.md` |
+| Generic terminal AI tools | CLI/terminal | **fixture-only** (prototype) / **experimental** (product concept) | No real adapter; covered by the same tool-agnostic fixture-only prototype as Claude Code terminal | Yes, for the prototype only — same 14 unit tests | Yes, for the prototype only | No | N/A for the prototype | 6 | No | Same as Claude Code terminal |
 | `browser_mock` | Test fixture (not a real platform) | **verified (fixture only)** | Yes | Yes — 10 tests | Yes | Yes (synthetic) | Yes (synthetic) | N/A | No | None — this is test infrastructure, never describe it as a real platform |
-| `antigravity` | Desktop (reserved ID only) | **placeholder** | No | No | No | No | No | Not prioritized | No | None this sprint |
+| `antigravity` | Desktop (reserved ID only) | **placeholder** | No | No | No | No | No | Not prioritized | No | Not confirmed to correspond to any specific researched product this sprint |
 | `copilot_status` | VS Code (reserved ID only) | **placeholder** | No | No | No | No | No | Not prioritized | No | None this sprint |
 
 ---
 
-**Business priority order (unchanged from mission default, confirmed by
-this audit — no evidence found to override it):**
+**Business priority order (confirmed unchanged by this sprint's audit):**
 
 1. ChatGPT browser — keep verified, protect the revenue pilot.
-2. VS Code MVP — verify separately (already functionally implemented).
-3. Claude browser — next browser adapter to build.
-4. Gemini browser — after Claude.
-5. Claude Code terminal / Codex / desktop — separate integration
-   research, not scheduled this sprint.
+2. Claude browser — beta; needs a human-operated live session to reach verified.
+3. Gemini browser — beta; needs a human-operated live session to reach verified.
+4. VS Code — beta; needs an e2e harness + live session to reach verified.
+5. Claude Code terminal / Codex / desktop — separate integration research
+   complete (`CLAUDE_CODE_CODEX_SUPPORT_RESEARCH.md`); a tool-agnostic
+   fixture-only prototype exists for the terminal case, proving the safe
+   architecture without a real integration. No real integration is
+   scheduled this sprint.
+
+**What changed this sprint:** Claude and Gemini both moved from
+`placeholder` to `beta` (fixture-tested, unit-tested, privacy-reviewed,
+wired live, kill-switch-capable — but explicitly not human-session-
+confirmed). VS Code's label is unchanged (`beta`) but now has a dedicated
+verification record. Terminal/desktop/Codex remain correctly unimplemented,
+now with a fixture-only prototype proving the safe architecture pattern and
+a dedicated research document instead of silence.
+
+**Nothing in this sprint changed the ChatGPT revenue pilot's scope.** It
+remains `browser_chatgpt` only, per
+`docs/internal-beta/revenue-pilot/CONTROLLED_REVENUE_PILOT_CRITERIA.md`.
 
 ---
 
