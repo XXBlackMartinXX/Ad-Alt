@@ -24,7 +24,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const FIXTURES_DIR = path.resolve(fileURLToPath(new URL('.', import.meta.url)), 'fixtures');
-const MOCK_API_PORT = 19101;
 
 // Milliseconds to wait after triggering a wait-state before asserting.
 // The MutationObserver in the extension has a ~150 ms throttle; 500 ms is safe.
@@ -85,9 +84,10 @@ function createFixtureServer(): Promise<number> {
 // ---------------------------------------------------------------------------
 
 test.beforeAll(async () => {
-  // Start mock API server.
+  // Start mock API server on an OS-assigned free port (never a hardcoded
+  // one -- see mock-api-server.ts's start() doc comment for why).
   mockApi = new MockApiServer();
-  await mockApi.start(MOCK_API_PORT);
+  await mockApi.start();
 
   // Start static fixture file server.
   fileServerPort = await createFixtureServer();

@@ -93,6 +93,7 @@ function readBody(req: IncomingMessage): Promise<string> {
 export class MockApiServer {
   private server: http.Server;
   private port = 0;
+  private listening = false;
   private killSwitchActive = false;
   private capturedEvents: CapturedEvent[] = [];
 
@@ -104,23 +105,67 @@ export class MockApiServer {
   // Lifecycle
   // -------------------------------------------------------------------------
 
-  start(preferredPort = 19101): Promise<void> {
+  /**
+   * Starts the server. Defaults to port 0, which asks the OS to assign an
+   * available ephemeral port -- this is the actual fix for a class of test
+   * flakiness where two Playwright test files (each running in its own
+   * worker process) previously hardcoded the SAME fixed port and raced to
+   * bind it, producing EADDRINUSE on whichever worker started second. A
+   * caller MAY still pass an explicit port (e.g. for a reproduction test
+   * that deliberately wants two servers to collide), but no production
+   * spec file should ever do so.
+   *
+   * Binding directly to port 0 (rather than a separate "find a free port,
+   * close it, then reopen on that number" helper) avoids a TOCTOU race of
+   * its own: the OS reserves the port for this exact listening socket, so
+   * there is no window in which another process could grab it first.
+   */
+  start(preferredPort = 0): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.server.once('error', reject);
+      const onError = (err: Error): void => {
+        this.listening = false;
+        reject(err);
+      };
+      this.server.once('error', onError);
       this.server.listen(preferredPort, '127.0.0.1', () => {
+        this.server.removeListener('error', onError);
         const addr = this.server.address();
         if (addr && typeof addr === 'object') {
           this.port = addr.port;
+        }
+        this.listening = true;
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Stops the server. Safe to call even if start() never completed (e.g. a
+   * beforeAll that threw before this server bound) or if the server has
+   * already been stopped -- both are treated as a no-op success rather than
+   * throwing ERR_SERVER_NOT_RUNNING, so afterAll cleanup can always call
+   * this unconditionally without producing a second, misleading failure on
+   * top of whatever caused start() to fail.
+   */
+  stop(): Promise<void> {
+    if (!this.listening) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      this.server.close((err) => {
+        this.listening = false;
+        if (err && (err as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING') {
+          reject(err);
+          return;
         }
         resolve();
       });
     });
   }
 
-  stop(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.server.close((err) => (err ? reject(err) : resolve()));
-    });
+  /** True once start() has completed successfully and stop() has not been called since. */
+  isListening(): boolean {
+    return this.listening;
   }
 
   // -------------------------------------------------------------------------

@@ -27,7 +27,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const FIXTURES_DIR = path.resolve(fileURLToPath(new URL('.', import.meta.url)), 'fixtures');
-const MOCK_API_PORT = 19102; // Different port to avoid conflict with chatgpt suite
 
 /**
  * Fields that must NEVER appear in any outbound request.
@@ -114,8 +113,12 @@ function createFixtureServer(): Promise<number> {
 // ---------------------------------------------------------------------------
 
 test.beforeAll(async () => {
+  // OS-assigned free port -- never hardcoded (see mock-api-server.ts).
+  // Previously this and dryrun-diagnostics.smoke.spec.ts both hardcoded
+  // port 19102, which raced across parallel Playwright workers and caused
+  // an intermittent EADDRINUSE failure on Windows.
   mockApi = new MockApiServer();
-  await mockApi.start(MOCK_API_PORT);
+  await mockApi.start();
 
   fileServerPort = await createFixtureServer();
 

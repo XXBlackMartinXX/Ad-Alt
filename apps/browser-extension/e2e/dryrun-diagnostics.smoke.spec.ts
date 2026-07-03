@@ -31,7 +31,6 @@ import {
 } from './helpers/extension-context.js';
 
 const FIXTURES_DIR = path.resolve(fileURLToPath(new URL('.', import.meta.url)), 'fixtures');
-const MOCK_API_PORT = 19102;
 const CONTENT_SCRIPT_SETTLE_MS = 500;
 const PANEL_SELECTOR = '#promptprofit-dryrun-diagnostics';
 
@@ -102,8 +101,9 @@ function createFixtureServer(): Promise<number> {
 }
 
 test.beforeAll(async () => {
+  // OS-assigned free port -- never hardcoded (see mock-api-server.ts).
   mockApi = new MockApiServer();
-  await mockApi.start(MOCK_API_PORT);
+  await mockApi.start();
   fileServerPort = await createFixtureServer();
   extensionContext = await buildExtensionContext();
 });
