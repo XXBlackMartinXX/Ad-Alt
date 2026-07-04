@@ -83,6 +83,18 @@ function main() {
   if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-terminal-adapter.js'))) {
     runFresh('check:terminal-adapter', 'scripts/check-terminal-adapter.js', true);
   }
+  if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-native-hooks.js'))) {
+    runFresh('check:native-hooks', 'scripts/check-native-hooks.js', true);
+  }
+  if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-claude-code-native-hooks.js'))) {
+    runFresh('check:claude-code-native-hooks', 'scripts/check-claude-code-native-hooks.js', true);
+  }
+  if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-codex-native-hooks.js'))) {
+    runFresh('check:codex-native-hooks', 'scripts/check-codex-native-hooks.js', true);
+  }
+  if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-native-hook-installation.js'))) {
+    runFresh('check:native-hook-installation', 'scripts/check-native-hook-installation.js', true);
+  }
 
   // -------------------------------------------------------------------
   // 2. Required nonbrowser docs exist
@@ -100,6 +112,16 @@ function main() {
     'CLAUDE_CODE_TERMINAL_INTEGRATION_DECISION.md',
     'CLAUDE_CODE_DESKTOP_INTEGRATION_DECISION.md',
     'CODEX_CLI_IDE_INTEGRATION_DECISION.md',
+    'NATIVE_CLAUDE_CODE_CODEX_INTEGRATION_AUDIT.md',
+    'NATIVE_HOOK_PRIVACY_CONTRACT.md',
+    'CLAUDE_CODE_NATIVE_HOOK_INTEGRATION.md',
+    'CODEX_CLI_NATIVE_HOOK_INTEGRATION.md',
+    'CODEX_IDE_EDITOR_NATIVE_INTEGRATION_DECISION.md',
+    'CLAUDE_CODE_DESKTOP_NATIVE_INTEGRATION_DECISION.md',
+    'CLAUDE_CODE_NATIVE_HOOK_VERIFICATION_RUNBOOK.md',
+    'CODEX_CLI_NATIVE_HOOK_VERIFICATION_RUNBOOK.md',
+    'CLAUDE_CODE_NATIVE_HOOK_RESULT_TEMPLATE.md',
+    'CODEX_CLI_NATIVE_HOOK_RESULT_TEMPLATE.md',
   ];
   for (const docName of requiredDocs) {
     record(`docs/internal-beta/platforms/${docName} exists`, fs.existsSync(path.join(PLATFORMS_DIR, docName)));
@@ -181,6 +203,10 @@ function main() {
       'reads command text',
       'captures prompt',
       'captures response',
+      'claude code native verified',
+      'codex native verified',
+      'codex ide supported',
+      'codex desktop supported',
     ];
     // A phrase sitting inside a negation/prohibition context (e.g. "must
     // NOT claim ... supported", or a bullet under a "## What must not be

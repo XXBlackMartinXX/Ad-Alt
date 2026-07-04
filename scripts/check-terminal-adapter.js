@@ -229,6 +229,10 @@ function main() {
       'production ready',
       'production-ready',
       'real payout ready',
+      'claude code native verified',
+      'codex native verified',
+      'codex ide supported',
+      'codex desktop supported',
     ];
     const NEGATION_CUES = [
       'not ', "n't", 'never', 'no ', 'without', 'forbidden', 'must not',

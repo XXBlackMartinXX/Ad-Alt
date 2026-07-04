@@ -195,6 +195,10 @@ function main() {
       'terminal supported',
       'zero ban risk',
       'zero account risk',
+      'claude code native verified',
+      'codex native verified',
+      'codex ide supported',
+      'codex desktop supported',
     ];
     // A phrase is only a genuine overclaim if it is NOT sitting inside a
     // negation/prohibition context (e.g. "must NOT claim production ready",

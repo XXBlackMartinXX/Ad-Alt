@@ -10,7 +10,11 @@
 > `scripts/check-platform-support-readiness.js`,
 > `scripts/check-platform-certification.js`,
 > `scripts/check-nonbrowser-platform-readiness.js`,
-> `scripts/check-terminal-adapter.js`, and
+> `scripts/check-terminal-adapter.js`,
+> `scripts/check-native-hooks.js`,
+> `scripts/check-claude-code-native-hooks.js`,
+> `scripts/check-codex-native-hooks.js`,
+> `scripts/check-native-hook-installation.js`, and
 > `scripts/check-final-internal-pilot-readiness.js`.
 
 ---
@@ -61,46 +65,46 @@
 
 ## Claude Code terminal
 
-- **Support label:** `experimental` (via the new generic lifecycle adapter) / `requires separate integration` (Claude-Code-specific, named support)
-- **Evidence:** `packages/terminal-adapter` (`@ad-alt/terminal-adapter`, built this sprint) — a real, tool-agnostic, opt-in `wrap`/`demo` CLI; `wrap` mode spawns an arbitrary user-specified command with fully inherited stdio, observing only start/exit/duration. The older fixture-only prototype (`scripts/lib/terminal-fixture.js`) remains in place, unchanged, and passing.
-- **Test coverage:** 35 unit tests (kill-switch, lifecycle schema, demo sequence, real-process `wrap` behavior including a real spawned child process, dedicated privacy suite)
-- **Privacy status:** Sound — `check:terminal-adapter` statically confirms `stdio: 'inherit'` (never `'pipe'`), no `child.stdout`/`child.stderr` reads, no network I/O, and no forbidden field in any emitted event
-- **Monetization status:** N/A — package never contacts any API, mock or real
-- **Blocker:** No Claude-Code-specific hook/API found in this repo (re-confirmed this sprint); a human-operated session wrapping a real `claude` invocation is required before `beta`
-- **Next action:** See `CLAUDE_CODE_TERMINAL_INTEGRATION_DECISION.md`
+- **Support label:** `beta` (native official hooks, this sprint) — also reachable via `experimental` generic lifecycle adapter (prior sprint)
+- **Evidence:** `scripts/claude-code-hook.js` + `packages/native-hook-adapter`, wired via Claude Code's own official `settings.json` `hooks` mechanism — confirmed via official docs (`code.claude.com/docs/en/hooks`) AND cross-validated against strings in the actual installed `@anthropic-ai/claude-code@2.1.42` binary on this machine (`hook_event_name`, `tool_input`, `tool_response`, `session_id`, `matcher`, `"hooks":`, `.claude/settings.json`, etc. all confirmed present). Also still reachable via `packages/terminal-adapter`'s generic `wrap`/`demo` modes (unchanged, prior sprint).
+- **Test coverage:** 5 native-hook fixture tests (hostile `tool_input`/`tool_response`/prompt canaries, real child-process invocation of the actual script) + 76 shared-package (`native-hook-adapter`) unit tests + 35 generic-adapter tests (unchanged)
+- **Privacy status:** Sound — `check:native-hooks`/`check:claude-code-native-hooks` confirm the allowlist normalizer discards all forbidden fields even under hostile payloads; the hook script always exits 0 and never emits any Claude-Code-recognized control field, so it cannot alter real session behavior
+- **Monetization status:** N/A — fully offline, never contacts any API
+- **Blocker:** Human-operated manual verification (`CLAUDE_CODE_NATIVE_HOOK_VERIFICATION_RUNBOOK.md`) is required before `verified`
+- **Next action:** See `CLAUDE_CODE_NATIVE_HOOK_INTEGRATION.md`
 - **Blocks controlled pilot:** **No**
 
 ## Claude Code desktop
 
-- **Support label:** `requires separate integration`
-- **Evidence:** None — no code exists; re-confirmed this sprint via `TERMINAL_DESKTOP_CODEX_DEEP_INTEGRATION_AUDIT.md` and `CLAUDE_CODE_DESKTOP_INTEGRATION_DECISION.md`
-- **Test coverage:** None
-- **Privacy status:** N/A (nothing built); any future implementation must avoid screen-scraping/OCR/accessibility-tree text reading/clipboard monitoring (hard restrictions re-affirmed this sprint)
+- **Support label:** `experimental` (revised this sprint, up from `requires separate integration`)
+- **Evidence:** Official docs (`code.claude.com/docs/en/overview`) confirm Desktop shares the exact same underlying engine/settings/hooks as the CLI — no separate integration is architecturally required, and no OCR/scraping was ever the right model for this specific product. A credible, unofficial community bug report (not confirmed by Anthropic) describes hooks not firing in some Desktop modes on Windows — this keeps the label at `experimental` rather than `beta`.
+- **Test coverage:** Same as Claude Code terminal (no Desktop-specific code was written — the same hook script and settings wiring apply)
+- **Privacy status:** Same as Claude Code terminal
 - **Monetization status:** N/A
-- **Blocker:** No safe, confirmed integration point (extension/plugin API) is known to exist
-- **Next action:** External product research only
+- **Blocker:** A human confirming, via a real Desktop App installation, that the hook actually fires (addresses the documented firing-reliability gap)
+- **Next action:** See `CLAUDE_CODE_DESKTOP_NATIVE_INTEGRATION_DECISION.md`
 - **Blocks controlled pilot:** **No**
 
 ## Codex CLI
 
-- **Support label:** `experimental` (via the new generic lifecycle adapter) / `requires separate integration` (Codex-specific, named support)
-- **Evidence:** Same tool-agnostic `packages/terminal-adapter` as Claude Code terminal, pointed at a `codex` binary instead — no Codex-specific code exists or is needed
-- **Test coverage:** Same 35 tests (tool-agnostic by construction)
-- **Privacy status:** Same as Claude Code terminal
+- **Support label:** `experimental` (native hooks via `scripts/codex-hook.js`, this sprint) — also reachable via `experimental` generic lifecycle adapter (prior sprint)
+- **Evidence:** `scripts/codex-hook.js` + `packages/native-hook-adapter`, wired via Codex's own official `hooks.json`/`config.toml` `[hooks]` mechanism — confirmed via a **primary source** (`openai/codex`'s own `config.schema.json`, fetched live this sprint). `codex` is not installed on this machine, so the runtime hook-payload schema is inferred (from the config schema), not directly confirmed — this evidence gap is why this stays `experimental` rather than reaching `beta` like Claude Code.
+- **Test coverage:** 5 native-hook fixture tests (including a `notify`-shaped `input-messages`/`last-assistant-message` hostile canary) + same 76 shared-package tests + same 35 generic-adapter tests
+- **Privacy status:** Sound — same allowlist normalizer; deliberately does not wire Codex's separate `notify` mechanism, which is confirmed to carry real prompt/response content
 - **Monetization status:** N/A
-- **Blocker:** Same reasoning as Claude Code terminal (§ above)
-- **Next action:** See `CODEX_CLI_IDE_INTEGRATION_DECISION.md`
+- **Blocker:** Human-operated manual verification with a real `codex` installation (resolves the runtime-schema evidence gap) — see `CODEX_CLI_NATIVE_HOOK_VERIFICATION_RUNBOOK.md`
+- **Next action:** See `CODEX_CLI_NATIVE_HOOK_INTEGRATION.md`
 - **Blocks controlled pilot:** **No**
 
 ## Codex IDE/editor
 
-- **Support label:** `requires separate integration`
-- **Evidence:** None — unresearched product surface (re-confirmed this sprint)
-- **Test coverage:** None
-- **Privacy status:** N/A
+- **Support label:** `experimental` (revised this sprint, up from `requires separate integration`)
+- **Evidence:** Official-docs-corroborated research confirms the Codex IDE extension (VS Code/Cursor/Windsurf/JetBrains) uses the Codex CLI underneath and shares the same config/hooks/MCP layers — no separate bridge is architecturally required. The same `scripts/codex-hook.js --ide` flag tags events accordingly.
+- **Test coverage:** Same as Codex CLI, plus an explicit `--ide` tagging test
+- **Privacy status:** Same as Codex CLI
 - **Monetization status:** N/A
-- **Blocker:** Not confirmed what IDE(s), if any, Codex integrates with
-- **Next action:** External product research only
+- **Blocker:** Same evidence gap as Codex CLI, plus a human confirming hooks fire identically inside the IDE extension
+- **Next action:** See `CODEX_IDE_EDITOR_NATIVE_INTEGRATION_DECISION.md`
 - **Blocks controlled pilot:** **No**
 
 ## Generic terminal AI tools

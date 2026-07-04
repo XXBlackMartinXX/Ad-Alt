@@ -137,26 +137,29 @@ function main() {
     const codexRows = rows.filter((r) => r.includes('Codex'));
     const desktopRow = rows.find((r) => r.includes('Claude Code desktop'));
 
-    // Accepts either the original fixture-only-prototype wording or the
-    // newer real-generic-adapter wording ("experimental") introduced by
-    // the Safe Real Integration Sprint -- both are honest, non-"verified"
-    // labels; only an unqualified "verified" claim should ever fail this.
-    record('Claude Code terminal row uses fixture-only/experimental + requires-separate-integration wording',
+    // Accepts fixture-only/experimental/beta wording -- all are honest,
+    // non-"verified" labels reflecting real, evidence-graduated progress
+    // across sprints (generic adapter, then native hooks). Only an
+    // unqualified "verified" claim should ever fail this.
+    record('Claude Code terminal row uses fixture-only/experimental/beta wording, never verified',
       !!terminalRow &&
-        (/fixture-only/i.test(terminalRow) || /experimental/i.test(terminalRow)) &&
-        /requires separate integration/i.test(terminalRow),
+        (/fixture-only/i.test(terminalRow) || /experimental/i.test(terminalRow) || /\bbeta\b/i.test(terminalRow)) &&
+        !/\bverified\b/i.test(terminalRow),
       terminalRow ? terminalRow.trim() : 'row not found');
 
     record('Generic terminal AI tools row uses fixture-only/experimental wording',
       !!genericTerminalRow && (/fixture-only/i.test(genericTerminalRow) || /experimental/i.test(genericTerminalRow)),
       genericTerminalRow ? genericTerminalRow.trim() : 'row not found');
 
-    record('All Codex rows use requires-separate-integration wording, never verified',
-      codexRows.length > 0 && codexRows.every((r) => /requires separate integration/i.test(r) && !/\bverified\b/i.test(r)),
+    record('All Codex rows use requires-separate-integration/experimental wording, never verified',
+      codexRows.length > 0 && codexRows.every((r) =>
+        (/requires separate integration/i.test(r) || /experimental/i.test(r)) && !/\bverified\b/i.test(r)),
       JSON.stringify(codexRows.map((r) => r.trim())));
 
-    record('Claude Code desktop row uses requires-separate-integration wording, never verified',
-      !!desktopRow && /requires separate integration/i.test(desktopRow) && !/\bverified\b/i.test(desktopRow),
+    record('Claude Code desktop row uses requires-separate-integration/experimental wording, never verified',
+      !!desktopRow &&
+        (/requires separate integration/i.test(desktopRow) || /experimental/i.test(desktopRow)) &&
+        !/\bverified\b/i.test(desktopRow),
       desktopRow ? desktopRow.trim() : 'row not found');
   } else {
     record('Matrix doc exists for desktop/terminal/Codex labeling checks', false, 'matrix doc missing');
@@ -240,6 +243,24 @@ function main() {
       'claude browser is verified',
       'gemini browser is verified',
     ];
+    // A phrase sitting inside a negation/prohibition context (e.g. "must
+    // NOT claim ... production ready", or a bullet under a "## What must
+    // not be claimed" heading) is not an overclaim -- it is correctly
+    // documenting what must not be claimed. Mirrors the negation-aware
+    // scan already built for check-final-internal-pilot-readiness.js and
+    // check-nonbrowser-platform-readiness.js.
+    const NEGATION_CUES = [
+      'not ', "n't", 'never', 'no ', 'without', 'forbidden', 'must not',
+      'does not', 'do not', 'blocked', 'cannot', 'nor ', 'disclaim',
+      'not claim', 'not overclaim', 'must never', 'unless',
+    ];
+    function isNegatedContext(lowerContent, matchIndex) {
+      const searchStart = Math.max(0, matchIndex - 1000);
+      const preceding = lowerContent.slice(searchStart, matchIndex);
+      const lastHeadingIdx = preceding.lastIndexOf('\n#');
+      const window = lastHeadingIdx !== -1 ? preceding.slice(lastHeadingIdx) : preceding.slice(-300);
+      return NEGATION_CUES.some((cue) => window.includes(cue));
+    }
     let overclaims = [];
     if (fs.existsSync(PLATFORMS_DIR)) {
       for (const entry of fs.readdirSync(PLATFORMS_DIR, { withFileTypes: true })) {
@@ -247,13 +268,18 @@ function main() {
         const full = path.join(PLATFORMS_DIR, entry.name);
         const contentLower = fs.readFileSync(full, 'utf8').toLowerCase();
         for (const phrase of OVERCLAIM_PHRASES) {
-          if (contentLower.includes(phrase)) {
-            overclaims.push({ file: entry.name, phrase });
+          let searchFrom = 0;
+          let idx;
+          while ((idx = contentLower.indexOf(phrase, searchFrom)) !== -1) {
+            if (!isNegatedContext(contentLower, idx)) {
+              overclaims.push({ file: entry.name, phrase });
+            }
+            searchFrom = idx + phrase.length;
           }
         }
       }
     }
-    record('No platform doc contains an overclaiming phrase', overclaims.length === 0,
+    record('No platform doc contains an overclaiming phrase (negated/prohibition context excluded)', overclaims.length === 0,
       overclaims.length ? JSON.stringify(overclaims) : '');
   }
 

@@ -22,13 +22,27 @@ security and billing/ledger posture end-to-end, and fixed a real
 recurring workflow defect (generated-report dirty trees). No new
 evidence emerged that would change the decision.
 
-**Re-affirmed 2026-07-04:** a follow-on sprint built a real, tested,
-generic, opt-in, lifecycle-only terminal adapter
-(`packages/terminal-adapter`) and finalized separate integration
-decisions for Claude Code terminal, Claude Code desktop, and Codex
-CLI/IDE (see `TERMINAL_DESKTOP_CODEX_DEEP_INTEGRATION_AUDIT.md` and the
-three decision docs it references). None of this touches the ChatGPT
-browser pilot's scope, evidence, or dependencies — the decision above is
+**Re-affirmed 2026-07-04 (Safe Real Integration Sprint):** a follow-on
+sprint built a real, tested, generic, opt-in, lifecycle-only terminal
+adapter (`packages/terminal-adapter`) and finalized separate
+integration decisions for Claude Code terminal, Claude Code desktop,
+and Codex CLI/IDE (see `TERMINAL_DESKTOP_CODEX_DEEP_INTEGRATION_AUDIT.md`
+and the three decision docs it references). None of this touches the
+ChatGPT browser pilot's scope, evidence, or dependencies — the decision
+above is unchanged and unweakened.
+
+**Re-affirmed again 2026-07-04 (Native Claude Code / Codex Integration
+Completion Sprint):** a second follow-on sprint went further, building
+real, tested, **official-hook-based** native integrations —
+`scripts/claude-code-hook.js` (reaching `beta`, grounded in both
+official Claude Code docs and the actual installed `claude` binary) and
+`scripts/codex-hook.js` (reaching `experimental`, grounded in Codex's
+own primary-source config schema). This sprint also revised, with new
+official evidence, the prior conclusion that Claude Code Desktop and
+the Codex IDE extension "require separate integration" — both are now
+`experimental`, since both share their CLI counterpart's underlying
+engine. Nothing in this sprint touches the ChatGPT browser pilot's
+scope, evidence, or dependencies either — the GO decision above remains
 unchanged and unweakened.
 
 ---
@@ -55,9 +69,9 @@ unchanged and unweakened.
 - Any real payout execution (no such code path exists; none may be
   added without a dedicated, future, explicitly-approved phase).
 - Any marketing or external claim that Claude, Gemini, VS Code, Claude
-  Code, Codex, or any desktop/terminal surface is "supported" or
-  "verified" — all remain `beta`/`requires separate integration`/
-  `fixture-only` per `FINAL_PLATFORM_STATUS_FREEZE.md`.
+  Code, Codex, or any desktop/terminal/IDE surface is "supported" or
+  "verified" — all remain `beta`/`experimental`/`requires separate
+  integration`/`fixture-only` per `FINAL_PLATFORM_STATUS_FREEZE.md`.
 - Self-serve advertiser onboarding (this pilot uses exactly one
   manually-seeded advertiser).
 - Any claim that "all platforms" are verified — only ChatGPT is.
@@ -76,8 +90,14 @@ unchanged and unweakened.
 | `check:nonbrowser-platforms` | PASS |
 | `check:platform-live-readiness` | HOLD (human live evidence for Claude/Gemini intentionally pending — does not block this ChatGPT-only pilot) |
 | `check:final-internal-pilot` (this sprint) | PASS |
-| `check:terminal-adapter` (new, follow-on sprint) | PASS |
+| `check:terminal-adapter` (follow-on sprint) | PASS |
 | `check:nonbrowser-platforms` (re-run, follow-on sprint) | PASS |
+| `check:native-hooks` (new, second follow-on sprint) | PASS |
+| `check:claude-code-native-hooks` (new, second follow-on sprint) | PASS |
+| `check:codex-native-hooks` (new, second follow-on sprint) | PASS |
+| `check:native-hook-installation` (new, second follow-on sprint) | PASS |
+| `check:nonbrowser-platforms` (re-run, second follow-on sprint) | PASS |
+| `check:final-internal-pilot` (re-run, second follow-on sprint) | PASS |
 | `smoke:chatgpt:fixture` | 41/41 PASS |
 | `smoke:claude:fixture` | 7/7 PASS |
 | `smoke:gemini:fixture` | 7/7 PASS |
