@@ -44,7 +44,16 @@ function main() {
   record('scripts/claude-code-hook.js exists', fs.existsSync(HOOK_SCRIPT));
   record('scripts/__tests__/claude-code-hook.test.js exists', fs.existsSync(FIXTURE_TEST));
   if (fs.existsSync(FIXTURE_TEST)) {
-    const result = spawnSync(process.execPath, ['--test', FIXTURE_TEST], { cwd: REPO_ROOT, encoding: 'utf8' });
+    // Strip NODE_TEST_CONTEXT: when this gate itself runs under `node
+    // --test` (e.g. from a test file that transitively invokes this
+    // gate), that env var is inherited by this spawnSync call and makes
+    // Node's test runner treat the nested `--test` invocation below as
+    // a forbidden recursive run, silently skipping it with only a
+    // warning -- which then looks like a failure here. Fresh child
+    // processes of this gate should always run as a normal, top-level
+    // test run regardless of what invoked the gate.
+    const { NODE_TEST_CONTEXT, ...childEnv } = process.env;
+    const result = spawnSync(process.execPath, ['--test', FIXTURE_TEST], { cwd: REPO_ROOT, encoding: 'utf8', env: childEnv });
     const output = (result.stdout || '') + (result.stderr || '');
     record('node --test scripts/__tests__/claude-code-hook.test.js exits 0', result.status === 0,
       result.status !== 0 ? output.slice(-800) : '');

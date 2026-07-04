@@ -1,0 +1,19 @@
+{
+  "pilotId": "pilot-fixture-example",
+  "createdAt": "2026-07-04T12:09:05.819Z",
+  "ownerInitials": "JD",
+  "rollbackOwnerInitials": "AB",
+  "platform": "ChatGPT browser",
+  "buyerAlias": "buyer-alpha-internal",
+  "budgetCapUsd": "25",
+  "startDate": "2026-07-10",
+  "endDate": "2026-07-17",
+  "manualRevenueRecordRequired": true,
+  "noRealPayouts": true,
+  "noPublicRelease": true,
+  "chatgptOnly": true,
+  "rollbackConfirmed": true,
+  "finalPreflightRequired": true,
+  "notes": "",
+  "status": "READY"
+}

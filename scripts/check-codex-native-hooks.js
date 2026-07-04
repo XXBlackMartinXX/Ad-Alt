@@ -45,7 +45,11 @@ function main() {
   record('scripts/codex-hook.js exists', fs.existsSync(HOOK_SCRIPT));
   record('scripts/__tests__/codex-hook.test.js exists', fs.existsSync(FIXTURE_TEST));
   if (fs.existsSync(FIXTURE_TEST)) {
-    const result = spawnSync(process.execPath, ['--test', FIXTURE_TEST], { cwd: REPO_ROOT, encoding: 'utf8' });
+    // Strip NODE_TEST_CONTEXT -- see the identical comment in
+    // check-claude-code-native-hooks.js for why this is required
+    // whenever this gate itself may run nested under `node --test`.
+    const { NODE_TEST_CONTEXT, ...childEnv } = process.env;
+    const result = spawnSync(process.execPath, ['--test', FIXTURE_TEST], { cwd: REPO_ROOT, encoding: 'utf8', env: childEnv });
     const output = (result.stdout || '') + (result.stderr || '');
     record('node --test scripts/__tests__/codex-hook.test.js exits 0', result.status === 0,
       result.status !== 0 ? output.slice(-800) : '');

@@ -1,0 +1,19 @@
+{
+  "pilotId": "TEMPLATE",
+  "createdAt": "2026-07-04T12:44:40.371Z",
+  "ownerInitials": "",
+  "rollbackOwnerInitials": "",
+  "platform": "ChatGPT browser",
+  "buyerAlias": "",
+  "budgetCapUsd": "",
+  "startDate": "",
+  "endDate": "",
+  "manualRevenueRecordRequired": true,
+  "noRealPayouts": true,
+  "noPublicRelease": true,
+  "chatgptOnly": true,
+  "rollbackConfirmed": false,
+  "finalPreflightRequired": true,
+  "notes": "",
+  "status": "DRAFT_NEEDS_HUMAN_COMPLETION"
+}

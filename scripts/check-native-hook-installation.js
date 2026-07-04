@@ -43,7 +43,11 @@ function main() {
   record('scripts/lib/native-hook-installer.js exists', fs.existsSync(path.join(REPO_ROOT, 'scripts', 'lib', 'native-hook-installer.js')));
 
   section('2. Fresh execution of installer fixture tests (temp-dir only)');
-  const testResult = spawnSync(process.execPath, ['--test', INSTALLER_TEST], { cwd: REPO_ROOT, encoding: 'utf8' });
+  // Strip NODE_TEST_CONTEXT -- see the identical comment in
+  // check-claude-code-native-hooks.js for why this is required whenever
+  // this gate itself may run nested under `node --test`.
+  const { NODE_TEST_CONTEXT, ...installerTestEnv } = process.env;
+  const testResult = spawnSync(process.execPath, ['--test', INSTALLER_TEST], { cwd: REPO_ROOT, encoding: 'utf8', env: installerTestEnv });
   const testOutput = (testResult.stdout || '') + (testResult.stderr || '');
   record('node --test scripts/__tests__/native-hook-installers.test.js exits 0', testResult.status === 0,
     testResult.status !== 0 ? testOutput.slice(-800) : '');
