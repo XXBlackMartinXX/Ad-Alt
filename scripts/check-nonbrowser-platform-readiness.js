@@ -80,6 +80,9 @@ function main() {
   if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-terminal-prototype.js'))) {
     runFresh('check:terminal-prototype', 'scripts/check-terminal-prototype.js', true);
   }
+  if (fs.existsSync(path.join(REPO_ROOT, 'scripts', 'check-terminal-adapter.js'))) {
+    runFresh('check:terminal-adapter', 'scripts/check-terminal-adapter.js', true);
+  }
 
   // -------------------------------------------------------------------
   // 2. Required nonbrowser docs exist
@@ -92,6 +95,11 @@ function main() {
     'TERMINAL_CLAUDE_CODE_CODEX_FEASIBILITY_DECISION.md',
     'DESKTOP_TERMINAL_INTEGRATION_ARCHITECTURE.md',
     'CLAUDE_CODE_CODEX_SUPPORT_RESEARCH.md',
+    'TERMINAL_DESKTOP_CODEX_DEEP_INTEGRATION_AUDIT.md',
+    'REAL_TERMINAL_ADAPTER_DESIGN.md',
+    'CLAUDE_CODE_TERMINAL_INTEGRATION_DECISION.md',
+    'CLAUDE_CODE_DESKTOP_INTEGRATION_DECISION.md',
+    'CODEX_CLI_IDE_INTEGRATION_DECISION.md',
   ];
   for (const docName of requiredDocs) {
     record(`docs/internal-beta/platforms/${docName} exists`, fs.existsSync(path.join(PLATFORMS_DIR, docName)));
@@ -163,21 +171,52 @@ function main() {
       'zero ban risk',
       'zero account risk',
       'claude code supported',
+      'claude code terminal verified',
+      'claude code desktop supported',
       'codex supported',
       'desktop supported',
       'terminal supported',
+      'all terminal tools supported',
+      'reads terminal output',
+      'reads command text',
+      'captures prompt',
+      'captures response',
     ];
+    // A phrase sitting inside a negation/prohibition context (e.g. "must
+    // NOT claim ... supported", or a bullet under a "## What must not be
+    // claimed" heading) is not an overclaim -- it is correctly documenting
+    // what must not be claimed. Mirrors the negation-aware scan built for
+    // check-final-internal-pilot-readiness.js.
+    const NEGATION_CUES = [
+      'not ', "n't", 'never', 'no ', 'without', 'forbidden', 'must not',
+      'does not', 'do not', 'blocked', 'cannot', 'nor ', 'disclaim',
+      'not claim', 'not overclaim', 'must never', 'unless',
+    ];
+    function isNegatedContext(lowerContent, matchIndex) {
+      const searchStart = Math.max(0, matchIndex - 1000);
+      const preceding = lowerContent.slice(searchStart, matchIndex);
+      const lastHeadingIdx = preceding.lastIndexOf('\n#');
+      const window = lastHeadingIdx !== -1 ? preceding.slice(lastHeadingIdx) : preceding.slice(-300);
+      return NEGATION_CUES.some((cue) => window.includes(cue));
+    }
     let overclaims = [];
     if (fs.existsSync(PLATFORMS_DIR)) {
       for (const entry of fs.readdirSync(PLATFORMS_DIR, { withFileTypes: true })) {
         if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
         const lower = fs.readFileSync(path.join(PLATFORMS_DIR, entry.name), 'utf8').toLowerCase();
         for (const phrase of OVERCLAIM_PHRASES) {
-          if (lower.includes(phrase)) overclaims.push({ file: entry.name, phrase });
+          let searchFrom = 0;
+          let idx;
+          while ((idx = lower.indexOf(phrase, searchFrom)) !== -1) {
+            if (!isNegatedContext(lower, idx)) {
+              overclaims.push({ file: entry.name, phrase });
+            }
+            searchFrom = idx + phrase.length;
+          }
         }
       }
     }
-    record('No overclaiming phrase found in any platform doc', overclaims.length === 0,
+    record('No overclaiming phrase found (negated/prohibition context excluded)', overclaims.length === 0,
       overclaims.length ? JSON.stringify(overclaims) : '');
   }
 

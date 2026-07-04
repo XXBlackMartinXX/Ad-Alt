@@ -1,7 +1,9 @@
 # Final Go / No-Go — Controlled Internal Pilot
 
 **Phase:** Final Internal Pilot Release-Readiness Consolidation
-**Date:** 2026-07-03
+(re-affirmed by the Safe Real Integration Sprint for Claude Code
+Terminal, Claude Code Desktop, and Codex CLI/IDE)
+**Date:** 2026-07-04 (originally 2026-07-03)
 **Branch:** `claude/windows-release-pipeline-fix-xfj0sw`
 
 ---
@@ -19,6 +21,15 @@ made — see `PILOT_EXECUTION_PACKET_REVIEW.md`), reviewed privacy/
 security and billing/ledger posture end-to-end, and fixed a real
 recurring workflow defect (generated-report dirty trees). No new
 evidence emerged that would change the decision.
+
+**Re-affirmed 2026-07-04:** a follow-on sprint built a real, tested,
+generic, opt-in, lifecycle-only terminal adapter
+(`packages/terminal-adapter`) and finalized separate integration
+decisions for Claude Code terminal, Claude Code desktop, and Codex
+CLI/IDE (see `TERMINAL_DESKTOP_CODEX_DEEP_INTEGRATION_AUDIT.md` and the
+three decision docs it references). None of this touches the ChatGPT
+browser pilot's scope, evidence, or dependencies — the decision above is
+unchanged and unweakened.
 
 ---
 
@@ -64,7 +75,9 @@ evidence emerged that would change the decision.
 | `check:platform-certification` | PASS |
 | `check:nonbrowser-platforms` | PASS |
 | `check:platform-live-readiness` | HOLD (human live evidence for Claude/Gemini intentionally pending — does not block this ChatGPT-only pilot) |
-| `check:final-internal-pilot` (new, this sprint) | PASS |
+| `check:final-internal-pilot` (this sprint) | PASS |
+| `check:terminal-adapter` (new, follow-on sprint) | PASS |
+| `check:nonbrowser-platforms` (re-run, follow-on sprint) | PASS |
 | `smoke:chatgpt:fixture` | 41/41 PASS |
 | `smoke:claude:fixture` | 7/7 PASS |
 | `smoke:gemini:fixture` | 7/7 PASS |

@@ -1,0 +1,34 @@
+{
+  "name": "@ad-alt/terminal-adapter",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Generic, opt-in, lifecycle-only terminal adapter for PromptProfit -- never reads command, prompt, or output content",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "promptprofit-terminal-adapter": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --project tsconfig.typecheck.json",
+    "test:unit": "vitest run",
+    "demo": "tsx src/cli.ts demo",
+    "start": "tsx src/cli.ts",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.9"
+  }
+}

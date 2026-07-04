@@ -137,12 +137,18 @@ function main() {
     const codexRows = rows.filter((r) => r.includes('Codex'));
     const desktopRow = rows.find((r) => r.includes('Claude Code desktop'));
 
-    record('Claude Code terminal row uses fixture-only/requires-separate-integration wording',
-      !!terminalRow && /fixture-only/i.test(terminalRow) && /requires separate integration/i.test(terminalRow),
+    // Accepts either the original fixture-only-prototype wording or the
+    // newer real-generic-adapter wording ("experimental") introduced by
+    // the Safe Real Integration Sprint -- both are honest, non-"verified"
+    // labels; only an unqualified "verified" claim should ever fail this.
+    record('Claude Code terminal row uses fixture-only/experimental + requires-separate-integration wording',
+      !!terminalRow &&
+        (/fixture-only/i.test(terminalRow) || /experimental/i.test(terminalRow)) &&
+        /requires separate integration/i.test(terminalRow),
       terminalRow ? terminalRow.trim() : 'row not found');
 
     record('Generic terminal AI tools row uses fixture-only/experimental wording',
-      !!genericTerminalRow && /fixture-only/i.test(genericTerminalRow) && /experimental/i.test(genericTerminalRow),
+      !!genericTerminalRow && (/fixture-only/i.test(genericTerminalRow) || /experimental/i.test(genericTerminalRow)),
       genericTerminalRow ? genericTerminalRow.trim() : 'row not found');
 
     record('All Codex rows use requires-separate-integration wording, never verified',

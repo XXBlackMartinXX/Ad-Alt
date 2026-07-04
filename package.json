@@ -68,6 +68,8 @@
     "check:vscode-extension": "node scripts/check-vscode-extension-readiness.js",
     "check:nonbrowser-platforms": "node scripts/check-nonbrowser-platform-readiness.js",
     "check:final-internal-pilot": "node scripts/check-final-internal-pilot-readiness.js",
+    "terminal:adapter:demo": "pnpm --filter @ad-alt/terminal-adapter demo",
+    "check:terminal-adapter": "node scripts/check-terminal-adapter.js",
     "icons:create": "node scripts/create-placeholder-icons.mjs",
     "check:internal-beta-packet": "node scripts/check-internal-beta-packet.js",
     "check:internal-beta-rollout": "node scripts/check-internal-beta-rollout.js",

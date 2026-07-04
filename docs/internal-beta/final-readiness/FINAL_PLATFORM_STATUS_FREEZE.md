@@ -9,7 +9,8 @@
 > log, etc.) — never on request alone. Mechanically enforced by
 > `scripts/check-platform-support-readiness.js`,
 > `scripts/check-platform-certification.js`,
-> `scripts/check-nonbrowser-platform-readiness.js`, and
+> `scripts/check-nonbrowser-platform-readiness.js`,
+> `scripts/check-terminal-adapter.js`, and
 > `scripts/check-final-internal-pilot-readiness.js`.
 
 ---
@@ -60,21 +61,21 @@
 
 ## Claude Code terminal
 
-- **Support label:** `fixture-only` (architecture prototype) / `requires separate integration` (real product)
-- **Evidence:** `scripts/lib/terminal-fixture.js` — tool-agnostic, hardcoded synthetic timestamps/durations only, statically proven to never `require('child_process')`/`http`/`https`/`net`
-- **Test coverage:** 14 unit tests (privacy + kill-switch), all against the prototype only
-- **Privacy status:** Sound — the prototype has no real process/command/output access to violate privacy with
-- **Monetization status:** N/A — prototype never contacts a real API
-- **Blocker:** No real CLI wrapper exists; explicitly decided not to build one this sprint (unattempted stdio-passthrough engineering, no confirmed target tool — see `TERMINAL_CLAUDE_CODE_CODEX_FEASIBILITY_DECISION.md` §6)
-- **Next action:** None scheduled
+- **Support label:** `experimental` (via the new generic lifecycle adapter) / `requires separate integration` (Claude-Code-specific, named support)
+- **Evidence:** `packages/terminal-adapter` (`@ad-alt/terminal-adapter`, built this sprint) — a real, tool-agnostic, opt-in `wrap`/`demo` CLI; `wrap` mode spawns an arbitrary user-specified command with fully inherited stdio, observing only start/exit/duration. The older fixture-only prototype (`scripts/lib/terminal-fixture.js`) remains in place, unchanged, and passing.
+- **Test coverage:** 35 unit tests (kill-switch, lifecycle schema, demo sequence, real-process `wrap` behavior including a real spawned child process, dedicated privacy suite)
+- **Privacy status:** Sound — `check:terminal-adapter` statically confirms `stdio: 'inherit'` (never `'pipe'`), no `child.stdout`/`child.stderr` reads, no network I/O, and no forbidden field in any emitted event
+- **Monetization status:** N/A — package never contacts any API, mock or real
+- **Blocker:** No Claude-Code-specific hook/API found in this repo (re-confirmed this sprint); a human-operated session wrapping a real `claude` invocation is required before `beta`
+- **Next action:** See `CLAUDE_CODE_TERMINAL_INTEGRATION_DECISION.md`
 - **Blocks controlled pilot:** **No**
 
 ## Claude Code desktop
 
 - **Support label:** `requires separate integration`
-- **Evidence:** None — no code exists
+- **Evidence:** None — no code exists; re-confirmed this sprint via `TERMINAL_DESKTOP_CODEX_DEEP_INTEGRATION_AUDIT.md` and `CLAUDE_CODE_DESKTOP_INTEGRATION_DECISION.md`
 - **Test coverage:** None
-- **Privacy status:** N/A (nothing built); any future implementation must avoid screen-scraping/OCR/accessibility-tree text reading (see `DESKTOP_TERMINAL_INTEGRATION_ARCHITECTURE.md`)
+- **Privacy status:** N/A (nothing built); any future implementation must avoid screen-scraping/OCR/accessibility-tree text reading/clipboard monitoring (hard restrictions re-affirmed this sprint)
 - **Monetization status:** N/A
 - **Blocker:** No safe, confirmed integration point (extension/plugin API) is known to exist
 - **Next action:** External product research only
@@ -82,19 +83,19 @@
 
 ## Codex CLI
 
-- **Support label:** `requires separate integration`
-- **Evidence:** None — no code exists; covered generically by the same fixture-only prototype as Claude Code terminal, which never names or detects any specific tool
-- **Test coverage:** None specific to Codex (the generic prototype's 14 tests apply equally)
-- **Privacy status:** N/A
+- **Support label:** `experimental` (via the new generic lifecycle adapter) / `requires separate integration` (Codex-specific, named support)
+- **Evidence:** Same tool-agnostic `packages/terminal-adapter` as Claude Code terminal, pointed at a `codex` binary instead — no Codex-specific code exists or is needed
+- **Test coverage:** Same 35 tests (tool-agnostic by construction)
+- **Privacy status:** Same as Claude Code terminal
 - **Monetization status:** N/A
 - **Blocker:** Same reasoning as Claude Code terminal (§ above)
-- **Next action:** None scheduled
+- **Next action:** See `CODEX_CLI_IDE_INTEGRATION_DECISION.md`
 - **Blocks controlled pilot:** **No**
 
 ## Codex IDE/editor
 
 - **Support label:** `requires separate integration`
-- **Evidence:** None — unresearched product surface
+- **Evidence:** None — unresearched product surface (re-confirmed this sprint)
 - **Test coverage:** None
 - **Privacy status:** N/A
 - **Monetization status:** N/A
@@ -104,13 +105,13 @@
 
 ## Generic terminal AI tools
 
-- **Support label:** `fixture-only` (prototype) / `experimental` (product concept)
-- **Evidence:** Same tool-agnostic prototype as Claude Code terminal
-- **Test coverage:** Same 14 tests
-- **Privacy status:** Sound, same reasoning as Claude Code terminal
-- **Monetization status:** N/A
-- **Blocker:** Same as Claude Code terminal
-- **Next action:** None scheduled
+- **Support label:** `experimental`
+- **Evidence:** `packages/terminal-adapter` (`@ad-alt/terminal-adapter`) — real package, local JSON config, two-layer kill-switch, synthetic `demo` mode, real-process `wrap` mode
+- **Test coverage:** 35 unit tests, including a dedicated privacy suite
+- **Privacy status:** Sound, verified by `check:terminal-adapter`
+- **Monetization status:** N/A — fully offline
+- **Blocker:** Human-operated verification session against a real long-running CLI tool, to reach `beta`
+- **Next action:** See `REAL_TERMINAL_ADAPTER_DESIGN.md` §13
 - **Blocks controlled pilot:** **No**
 
 ---
