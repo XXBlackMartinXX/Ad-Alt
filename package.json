@@ -90,7 +90,7 @@
     "dryrun:001:selftest": "node scripts/dryrun-001-selftest.js",
     "dryrun:001:live-checklist": "node scripts/dryrun-001-live-checklist.js",
     "dryrun:001:launch-chrome": "node scripts/dryrun-001-launch-chrome.js",
-    "test:scripts": "node --test scripts/__tests__/*.test.js"
+    "test:scripts": "node scripts/run-script-tests.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
