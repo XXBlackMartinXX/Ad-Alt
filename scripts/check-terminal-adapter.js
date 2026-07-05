@@ -30,7 +30,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { runPnpm, describeFailure } = require('./lib/run-command.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const PKG_DIR = path.join(REPO_ROOT, 'packages', 'terminal-adapter');
@@ -53,12 +53,8 @@ function section(t) {
 function runPnpmFilter(label, args) {
   const cmd = `pnpm --filter @ad-alt/terminal-adapter ${args.join(' ')}`;
   commandsRun.push(cmd);
-  const result = spawnSync('pnpm', ['--filter', '@ad-alt/terminal-adapter', ...args], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
-  const ok = result.status === 0;
-  record(label, ok, ok ? '' : `exit status ${result.status}: ${(result.stderr || '').slice(-500)}`);
+  const result = runPnpm(['--filter', '@ad-alt/terminal-adapter', ...args], { cwd: REPO_ROOT });
+  record(label, result.ok, result.ok ? '' : describeFailure(result));
   return result;
 }
 
@@ -85,7 +81,7 @@ function main() {
     runPnpmFilter('typecheck passes', ['typecheck']);
     runPnpmFilter('build passes', ['build']);
     const testResult = runPnpmFilter('test:unit passes', ['test:unit']);
-    const testOutput = (testResult.stdout || '') + (testResult.stderr || '');
+    const testOutput = testResult.stdoutText + testResult.stderrText;
     record('Test output reports zero failed tests', !/\d+\s+failed/i.test(testOutput),
       /\d+\s+failed/i.test(testOutput) ? 'a "failed" count was reported' : '');
   } else {
@@ -96,20 +92,16 @@ function main() {
 
   section('2. Fresh demo run produces only allowed lifecycle events');
   if (packageExists) {
-    const demoResult = spawnSync('pnpm', ['--filter', '@ad-alt/terminal-adapter', 'demo'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
+    const demoResult = runPnpm(['--filter', '@ad-alt/terminal-adapter', 'demo'], { cwd: REPO_ROOT });
     commandsRun.push('pnpm --filter @ad-alt/terminal-adapter demo');
-    record('demo command exits 0', demoResult.status === 0,
-      demoResult.status !== 0 ? `exit status ${demoResult.status}` : '');
+    record('demo command exits 0', demoResult.ok, demoResult.ok ? '' : describeFailure(demoResult));
 
     const ALLOWED_EVENT_TYPES = [
       'adapter_started', 'adapter_stopped', 'session_started',
       'wait_state_started', 'wait_state_ended', 'banner_rendered',
       'banner_closed', 'kill_switch_active', 'error_safe_code_only',
     ];
-    const lines = (demoResult.stdout || '').split('\n').filter((l) => l.trim().startsWith('{'));
+    const lines = demoResult.stdoutText.split('\n').filter((l) => l.trim().startsWith('{'));
     let parsedEvents = [];
     let parseError = null;
     try {

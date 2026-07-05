@@ -16,7 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { runPnpm, describeFailure } = require('./lib/run-command.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const PKG_DIR = path.join(REPO_ROOT, 'packages', 'native-hook-adapter');
@@ -35,11 +35,8 @@ function section(t) {
 }
 function runPnpmFilter(label, args) {
   commandsRun.push(`pnpm --filter @ad-alt/native-hook-adapter ${args.join(' ')}`);
-  const result = spawnSync('pnpm', ['--filter', '@ad-alt/native-hook-adapter', ...args], {
-    cwd: REPO_ROOT, encoding: 'utf8',
-  });
-  const ok = result.status === 0;
-  record(label, ok, ok ? '' : `exit status ${result.status}: ${(result.stderr || '').slice(-500)}`);
+  const result = runPnpm(['--filter', '@ad-alt/native-hook-adapter', ...args], { cwd: REPO_ROOT });
+  record(label, result.ok, result.ok ? '' : describeFailure(result));
   return result;
 }
 
@@ -66,7 +63,7 @@ function main() {
     runPnpmFilter('typecheck passes', ['typecheck']);
     runPnpmFilter('build passes', ['build']);
     const testResult = runPnpmFilter('test:unit passes', ['test:unit']);
-    const testOutput = (testResult.stdout || '') + (testResult.stderr || '');
+    const testOutput = testResult.stdoutText + testResult.stderrText;
     record('Test output reports zero failed tests', !/\d+\s+failed/i.test(testOutput),
       /\d+\s+failed/i.test(testOutput) ? 'a "failed" count was reported' : '');
   } else {

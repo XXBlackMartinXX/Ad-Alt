@@ -16,7 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { runNodeTest, describeFailure } = require('./lib/run-command.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const CLAUDE_INSTALLER = path.join(REPO_ROOT, 'scripts', 'install-claude-code-hooks.js');
@@ -43,14 +43,13 @@ function main() {
   record('scripts/lib/native-hook-installer.js exists', fs.existsSync(path.join(REPO_ROOT, 'scripts', 'lib', 'native-hook-installer.js')));
 
   section('2. Fresh execution of installer fixture tests (temp-dir only)');
-  // Strip NODE_TEST_CONTEXT -- see the identical comment in
+  // runNodeTest strips NODE_TEST_CONTEXT -- see the identical comment in
   // check-claude-code-native-hooks.js for why this is required whenever
   // this gate itself may run nested under `node --test`.
-  const { NODE_TEST_CONTEXT, ...installerTestEnv } = process.env;
-  const testResult = spawnSync(process.execPath, ['--test', INSTALLER_TEST], { cwd: REPO_ROOT, encoding: 'utf8', env: installerTestEnv });
-  const testOutput = (testResult.stdout || '') + (testResult.stderr || '');
-  record('node --test scripts/__tests__/native-hook-installers.test.js exits 0', testResult.status === 0,
-    testResult.status !== 0 ? testOutput.slice(-800) : '');
+  const testResult = runNodeTest(INSTALLER_TEST, { cwd: REPO_ROOT });
+  const testOutput = testResult.stdoutText + testResult.stderrText;
+  record('node --test scripts/__tests__/native-hook-installers.test.js exits 0', testResult.ok,
+    testResult.ok ? '' : `${describeFailure(testResult)} -- output tail: ${testOutput.slice(-800)}`);
   record('Test file only ever targets os.tmpdir() paths (static check)', (() => {
     const src = fs.readFileSync(INSTALLER_TEST, 'utf8');
     return src.includes('os.tmpdir()') && !/homedir\(\)/.test(src);

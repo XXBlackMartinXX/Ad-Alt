@@ -16,7 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { runNodeTest, describeFailure } = require('./lib/run-command.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const PLATFORMS_DIR = path.join(REPO_ROOT, 'docs', 'internal-beta', 'platforms');
@@ -44,19 +44,18 @@ function main() {
   record('scripts/claude-code-hook.js exists', fs.existsSync(HOOK_SCRIPT));
   record('scripts/__tests__/claude-code-hook.test.js exists', fs.existsSync(FIXTURE_TEST));
   if (fs.existsSync(FIXTURE_TEST)) {
-    // Strip NODE_TEST_CONTEXT: when this gate itself runs under `node
-    // --test` (e.g. from a test file that transitively invokes this
-    // gate), that env var is inherited by this spawnSync call and makes
-    // Node's test runner treat the nested `--test` invocation below as
-    // a forbidden recursive run, silently skipping it with only a
-    // warning -- which then looks like a failure here. Fresh child
-    // processes of this gate should always run as a normal, top-level
-    // test run regardless of what invoked the gate.
-    const { NODE_TEST_CONTEXT, ...childEnv } = process.env;
-    const result = spawnSync(process.execPath, ['--test', FIXTURE_TEST], { cwd: REPO_ROOT, encoding: 'utf8', env: childEnv });
-    const output = (result.stdout || '') + (result.stderr || '');
-    record('node --test scripts/__tests__/claude-code-hook.test.js exits 0', result.status === 0,
-      result.status !== 0 ? output.slice(-800) : '');
+    // runNodeTest strips NODE_TEST_CONTEXT before spawning: when this
+    // gate itself runs under `node --test` (e.g. from a test file that
+    // transitively invokes this gate), that env var would otherwise be
+    // inherited by the child and make Node's test runner treat the
+    // nested `--test` invocation below as a forbidden recursive run,
+    // silently skipping it with only a warning -- which then looks like
+    // a failure here. Fresh child processes of this gate should always
+    // run as a normal, top-level test run regardless of what invoked it.
+    const result = runNodeTest(FIXTURE_TEST, { cwd: REPO_ROOT });
+    const output = result.stdoutText + result.stderrText;
+    record('node --test scripts/__tests__/claude-code-hook.test.js exits 0', result.ok,
+      result.ok ? '' : `${describeFailure(result)} -- output tail: ${output.slice(-800)}`);
     record('Test output reports 0 failing tests', /# fail 0/.test(output), /# fail 0/.test(output) ? '' : output.slice(-400));
   }
 

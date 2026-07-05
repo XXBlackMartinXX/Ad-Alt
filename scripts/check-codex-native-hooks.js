@@ -16,7 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { runNodeTest, describeFailure } = require('./lib/run-command.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const PLATFORMS_DIR = path.join(REPO_ROOT, 'docs', 'internal-beta', 'platforms');
@@ -45,14 +45,13 @@ function main() {
   record('scripts/codex-hook.js exists', fs.existsSync(HOOK_SCRIPT));
   record('scripts/__tests__/codex-hook.test.js exists', fs.existsSync(FIXTURE_TEST));
   if (fs.existsSync(FIXTURE_TEST)) {
-    // Strip NODE_TEST_CONTEXT -- see the identical comment in
-    // check-claude-code-native-hooks.js for why this is required
+    // runNodeTest strips NODE_TEST_CONTEXT -- see the identical comment
+    // in check-claude-code-native-hooks.js for why this is required
     // whenever this gate itself may run nested under `node --test`.
-    const { NODE_TEST_CONTEXT, ...childEnv } = process.env;
-    const result = spawnSync(process.execPath, ['--test', FIXTURE_TEST], { cwd: REPO_ROOT, encoding: 'utf8', env: childEnv });
-    const output = (result.stdout || '') + (result.stderr || '');
-    record('node --test scripts/__tests__/codex-hook.test.js exits 0', result.status === 0,
-      result.status !== 0 ? output.slice(-800) : '');
+    const result = runNodeTest(FIXTURE_TEST, { cwd: REPO_ROOT });
+    const output = result.stdoutText + result.stderrText;
+    record('node --test scripts/__tests__/codex-hook.test.js exits 0', result.ok,
+      result.ok ? '' : `${describeFailure(result)} -- output tail: ${output.slice(-800)}`);
     record('Test output reports 0 failing tests', /# fail 0/.test(output), /# fail 0/.test(output) ? '' : output.slice(-400));
   }
 

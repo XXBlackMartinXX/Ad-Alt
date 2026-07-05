@@ -11,16 +11,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { runPnpm, describeFailure } = require('../lib/run-command.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const HOOK_SCRIPT = path.join(REPO_ROOT, 'scripts', 'claude-code-hook.js');
 
 test.before(() => {
-  const build = spawnSync('pnpm', ['--filter', '@ad-alt/native-hook-adapter', 'build'], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
-  assert.equal(build.status, 0, `native-hook-adapter build failed: ${build.stderr}`);
+  const build = runPnpm(['--filter', '@ad-alt/native-hook-adapter', 'build'], { cwd: REPO_ROOT });
+  assert.equal(build.status, 0, `native-hook-adapter build failed: ${describeFailure(build)}`);
 });
 
 function runHook(stdinText) {
