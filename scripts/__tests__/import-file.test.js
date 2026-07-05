@@ -65,7 +65,18 @@ test('toFileUrl correctly encodes and round-trips a path containing spaces', () 
   // Simulates "My Repo" style paths without needing a real directory named
   // that on disk -- pathToFileURL/fileURLToPath operate on the string, not
   // the filesystem, so this exercises real encode/decode logic.
-  const absPathWithSpaces = path.join(path.sep, 'tmp', 'My Test Repo', 'dist', 'index.js');
+  //
+  // Uses path.resolve (not path.join) with the leading path.sep so this is
+  // a genuinely absolute path on every platform. path.join(path.sep, ...)
+  // alone produces a drive-relative path on Windows (e.g.
+  // "\tmp\My Test Repo\dist\index.js", with no drive letter) -- that is
+  // not how a real absolute Windows path looks, and comparing
+  // fileURLToPath's round-tripped result (which resolves against the
+  // current drive, e.g. "C:\tmp\My Test Repo\dist\index.js") against the
+  // driveless original would fail the equality check. path.resolve
+  // anchors the fixture path to the current drive up front, so both sides
+  // of the round-trip compare the same true absolute path.
+  const absPathWithSpaces = path.resolve(path.sep, 'tmp', 'My Test Repo', 'dist', 'index.js');
   const href = toFileUrl(absPathWithSpaces);
   assert.match(href, /%20/, 'space must be percent-encoded in the URL, not left raw');
   assert.equal(fileURLToPath(href), absPathWithSpaces);
