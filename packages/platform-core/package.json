@@ -23,7 +23,7 @@
     "@ad-alt/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "vitest": "^2.1.9"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }
